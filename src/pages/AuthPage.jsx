@@ -3,6 +3,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+const BRAND_PRIMARY = '#C0392B'
+const BRAND_DARK    = '#922B21'
+const BRAND_BLUE    = '#1A5276'
+
 export default function AuthPage() {
   const [mode, setMode] = useState('login')
   const [loading, setLoading] = useState(false)
@@ -32,70 +36,102 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-4">
+    <div style={{ minHeight: '100vh', background: '#F4F6F8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
 
-      {/* ── Desktop layout: side by side ── */}
-      <div className="w-full max-w-[900px] flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16">
+      <div style={{ width: '100%', maxWidth: 900, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 64 }}>
 
-        {/* Left — branding (visible on desktop) */}
-        <div className="hidden lg:flex flex-col gap-4 flex-1 max-w-sm">
+        {/* Left branding — desktop only */}
+        <div style={{ display: 'none', flexDirection: 'column', gap: 20, flex: 1, maxWidth: 360 }} className="lg-show">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#0D7377] flex items-center justify-center shadow-lg">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M4 19l4-4m0 0l4-4m-4 4l4 4m4-8l4-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
-              </svg>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(192,57,43,0.4)',
+              fontSize: 28,
+            }}>
+              📢
             </div>
-            <span
-              style={{ fontFamily: '"Bricolage Grotesque", system-ui, sans-serif', fontWeight: 800, fontSize: 28, letterSpacing: '-0.5px', color: '#1c1e21' }}
-            >
-              EduBoard
-            </span>
+            <div>
+              <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 36, color: BRAND_PRIMARY, letterSpacing: '-1px', lineHeight: 1 }}>
+                CSB
+              </div>
+              <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, color: BRAND_BLUE, letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Computer Science Board
+              </div>
+            </div>
           </div>
-          <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 26, fontWeight: 400, color: '#1c1e21', lineHeight: 1.3 }}>
-            Connect with your class and stay on top of everything.
+
+          {/* Divider accent */}
+          <div style={{ width: 48, height: 4, borderRadius: 4, background: `linear-gradient(90deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})` }} />
+
+          <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 22, fontWeight: 400, color: '#1c1e21', lineHeight: 1.4, margin: 0 }}>
+            Your official hub for CS announcements, deadlines & class updates.
           </p>
+
+          {/* Feature pills */}
+          {['📅 Track deadlines', '📢 Class announcements', '💬 Group chat', '📁 Share materials'].map(f => (
+            <div key={f} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 14px', borderRadius: 20,
+              background: 'white', border: '1px solid #DADDE1',
+              fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: '#1c1e21',
+              width: 'fit-content',
+            }}>
+              {f}
+            </div>
+          ))}
         </div>
 
         {/* Right — card */}
-        <div className="w-full max-w-[396px]">
+        <div style={{ width: '100%', maxWidth: 400 }}>
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
-            <div className="w-14 h-14 rounded-3xl bg-[#0D7377] flex items-center justify-center shadow-lg">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <path d="M4 19l4-4m0 0l4-4m-4 4l4 4m4-8l4-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
-              </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 28 }} className="lg-hide">
+            <div style={{
+              width: 64, height: 64, borderRadius: 20,
+              background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(192,57,43,0.4)',
+              fontSize: 32,
+            }}>
+              📢
             </div>
-            <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 26, letterSpacing: '-0.5px', color: '#1c1e21' }}>
-              EduBoard
-            </span>
+            <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 32, color: BRAND_PRIMARY, letterSpacing: '-1px' }}>
+              CSB
+            </div>
+            <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, color: BRAND_BLUE, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              Computer Science Board
+            </div>
           </div>
 
-          {/* Main form card */}
-          <div className="bg-white rounded-2xl px-6 py-8 shadow-sm border border-[#DADDE1]">
+          {/* Form card */}
+          <div style={{
+            background: 'white', borderRadius: 20,
+            padding: '28px 28px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+            border: '1px solid #DADDE1',
+            borderTop: `4px solid ${BRAND_PRIMARY}`,
+          }}>
 
-            {/* Tab switcher — pill style */}
-            <div className="flex gap-1 p-1 bg-[#F0F2F5] rounded-xl mb-6">
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', gap: 4, padding: 4, background: '#F4F6F8', borderRadius: 12, marginBottom: 24 }}>
               {['login', 'register'].map(m => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
                   style={{
-                    flex: 1,
-                    padding: '8px 0',
-                    borderRadius: 10,
-                    fontSize: 14,
-                    fontWeight: 600,
+                    flex: 1, padding: '9px 0', borderRadius: 9,
+                    fontSize: 14, fontWeight: 600,
                     fontFamily: '"Instrument Sans", system-ui',
+                    background: mode === m
+                      ? `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_DARK})`
+                      : 'transparent',
+                    color: mode === m ? 'white' : '#65676B',
+                    border: 'none', cursor: 'pointer',
+                    boxShadow: mode === m ? '0 2px 8px rgba(192,57,43,0.3)' : 'none',
                     transition: 'all 0.18s ease',
-                    background: mode === m ? 'white' : 'transparent',
-                    color: mode === m ? '#1c1e21' : '#65676B',
-                    boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
-                    border: 'none',
-                    cursor: 'pointer',
                   }}
                 >
                   {m === 'login' ? 'Log In' : 'Sign Up'}
@@ -107,67 +143,48 @@ export default function AuthPage() {
               {mode === 'register' && (
                 <InputField
                   icon={<User size={16} color="#65676B" />}
-                  type="text"
-                  placeholder="Full name"
+                  type="text" placeholder="Full name"
                   value={form.displayName}
                   onChange={e => set('displayName', e.target.value)}
                   required
                 />
               )}
-
               <InputField
                 icon={<Mail size={16} color="#65676B" />}
-                type="email"
-                placeholder="Email address"
+                type="email" placeholder="Email address"
                 value={form.email}
                 onChange={e => set('email', e.target.value)}
                 required
               />
-
               <InputField
                 icon={<Lock size={16} color="#65676B" />}
                 type={showPass ? 'text' : 'password'}
                 placeholder="Password"
                 value={form.password}
                 onChange={e => set('password', e.target.value)}
-                required
-                minLength={6}
+                required minLength={6}
                 suffix={
-                  <button type="button" onClick={() => setShowPass(!showPass)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
+                  <button type="button" onClick={() => setShowPass(!showPass)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
                     {showPass ? <EyeOff size={16} color="#65676B" /> : <Eye size={16} color="#65676B" />}
                   </button>
                 }
               />
 
-              {mode === 'login' && (
-                <div style={{ textAlign: 'right', marginTop: -4 }}>
-                  <button type="button" style={{ background: 'none', border: 'none', color: '#0D7377', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui' }}>
-                    Forgot password?
-                  </button>
-                </div>
-              )}
-
-              {/* CTA button */}
               <button
-                type="submit"
-                disabled={loading}
+                type="submit" disabled={loading}
                 style={{
-                  marginTop: 4,
-                  width: '100%',
-                  padding: '14px 0',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: loading ? '#7EC8C8' : '#0D7377',
+                  marginTop: 8, width: '100%', padding: '14px 0',
+                  borderRadius: 12, border: 'none',
+                  background: loading
+                    ? '#E5A39D'
+                    : `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_DARK})`,
                   color: 'white',
-                  fontFamily: '"Instrument Sans", system-ui',
-                  fontWeight: 700,
-                  fontSize: 16,
+                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16,
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'background 0.15s ease, transform 0.1s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: loading ? 'none' : '0 4px 12px rgba(192,57,43,0.35)',
+                  transition: 'all 0.15s',
                 }}
                 onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.98)' }}
                 onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
@@ -177,78 +194,54 @@ export default function AuthPage() {
               </button>
             </form>
 
-            {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
               <div style={{ flex: 1, height: 1, background: '#DADDE1' }} />
-              <span style={{ color: '#65676B', fontSize: 13, fontWeight: 500, fontFamily: '"Instrument Sans", system-ui' }}>or</span>
+              <span style={{ color: '#65676B', fontSize: 13, fontFamily: '"Instrument Sans", system-ui' }}>or</span>
               <div style={{ flex: 1, height: 1, background: '#DADDE1' }} />
             </div>
 
-            {/* Switch mode */}
             <p style={{ textAlign: 'center', fontSize: 14, color: '#65676B', fontFamily: '"Instrument Sans", system-ui', margin: 0 }}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <button
                 onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                style={{ background: 'none', border: 'none', color: '#0D7377', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui' }}
+                style={{ background: 'none', border: 'none', color: BRAND_PRIMARY, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui' }}
               >
                 {mode === 'login' ? 'Sign up' : 'Log in'}
               </button>
             </p>
           </div>
 
-          {/* Footer note */}
-          <p style={{ textAlign: 'center', fontSize: 12, color: '#65676B', marginTop: 20, fontFamily: '"Instrument Sans", system-ui' }}>
-            EduBoard · Student Announcement Platform
+          <p style={{ textAlign: 'center', fontSize: 12, color: '#BCC0C4', marginTop: 20, fontFamily: '"Instrument Sans", system-ui' }}>
+            CSB · Computer Science Board · Announcement Platform
           </p>
         </div>
       </div>
 
-      {/* Spin keyframe for loader */}
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media (min-width: 1024px) { .lg-show { display: flex !important; } .lg-hide { display: none !important; } }
       `}</style>
     </div>
   )
 }
 
-/* ── Reusable input field ── */
 function InputField({ icon, type, placeholder, value, onChange, required, minLength, suffix }) {
   const [focused, setFocused] = useState(false)
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '0 14px',
-        height: 50,
-        borderRadius: 12,
-        border: `1.5px solid ${focused ? '#0D7377' : '#DADDE1'}`,
-        background: focused ? '#fff' : '#F7F8FA',
-        transition: 'border-color 0.15s ease, background 0.15s ease',
-        boxShadow: focused ? '0 0 0 3px rgba(13,115,119,0.12)' : 'none',
-      }}
-    >
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '0 14px', height: 50, borderRadius: 12,
+      border: `1.5px solid ${focused ? BRAND_PRIMARY : '#DADDE1'}`,
+      background: focused ? '#fff' : '#F7F8FA',
+      boxShadow: focused ? `0 0 0 3px rgba(192,57,43,0.12)` : 'none',
+      transition: 'all 0.15s',
+    }}>
       <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>{icon}</span>
       <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        required={required}
-        minLength={minLength}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={{
-          flex: 1,
-          border: 'none',
-          background: 'transparent',
-          outline: 'none',
-          fontSize: 15,
-          color: '#1c1e21',
-          fontFamily: '"Instrument Sans", system-ui',
-        }}
+        type={type} placeholder={placeholder} value={value}
+        onChange={onChange} required={required} minLength={minLength}
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 15, color: '#1c1e21', fontFamily: '"Instrument Sans", system-ui' }}
       />
       {suffix}
     </div>
