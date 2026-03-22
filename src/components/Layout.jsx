@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../hooks/useNotifications'
 import {
   Home, MessageSquare, Bell, BookMarked, Grid3X3,
-  LogOut, Settings, Check, X, ChevronDown
+  LogOut, Settings, Check, ChevronDown
 } from 'lucide-react'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','5C4A7A','6B5B8A','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','4A3A7A','3E3068']
@@ -15,11 +15,8 @@ function dicebearUrl(name = '') {
 }
 import { formatDistanceToNow } from 'date-fns'
 
-// CSB Brand Colors
-const BRAND_PRIMARY = '#C0392B'   // Red
-const BRAND_DARK    = '#922B21'   // Dark Red
-const BRAND_BLUE    = '#1A5276'   // Blue
-const BRAND_LIGHT   = '#EBF5FB'   // Light Blue tint
+const BRAND_PRIMARY = '#C0392B'
+const BRAND_BLUE    = '#1A5276'
 
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
@@ -55,12 +52,12 @@ export default function Layout({ children }) {
   return (
     <div style={{ minHeight: '100vh', background: '#F4F6F8', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Top Header ── */}
+      {/* ── Top Header — subtle 1px red shadow line ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
         background: 'white',
-        borderBottom: '3px solid ' + BRAND_PRIMARY,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+        borderBottom: '1px solid #EBEBEB',
+        boxShadow: '0 1px 0 rgba(192,57,43,0.18), 0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <div style={{
           maxWidth: 680, margin: '0 auto',
@@ -74,7 +71,7 @@ export default function Layout({ children }) {
               background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(192,57,43,0.4)',
+              boxShadow: '0 2px 6px rgba(192,57,43,0.35)',
             }}>
               <span style={{ fontSize: 20 }}>📢</span>
             </div>
@@ -82,27 +79,18 @@ export default function Layout({ children }) {
               <span style={{
                 fontFamily: '"Bricolage Grotesque", system-ui',
                 fontWeight: 800, fontSize: 22,
-                color: BRAND_PRIMARY,
-                letterSpacing: '-0.5px',
-              }}>
-                CSB
-              </span>
+                color: BRAND_PRIMARY, letterSpacing: '-0.5px',
+              }}>CSB</span>
               <span style={{
                 fontFamily: '"Instrument Sans", system-ui',
                 fontWeight: 600, fontSize: 9,
-                color: BRAND_BLUE,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-              }}>
-                Computer Science Board
-              </span>
+                color: BRAND_BLUE, letterSpacing: '0.8px', textTransform: 'uppercase',
+              }}>Computer Science Board</span>
             </div>
           </div>
 
           {/* Right actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-
-            {/* Notification bell */}
             <div ref={notifRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => { setShowNotifs(!showNotifs); setShowUserMenu(false) }}
@@ -128,7 +116,6 @@ export default function Layout({ children }) {
                   </span>
                 )}
               </button>
-
               {showNotifs && (
                 <NotifPanel
                   notifications={notifications}
@@ -141,7 +128,6 @@ export default function Layout({ children }) {
               )}
             </div>
 
-            {/* Avatar + menu */}
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifs(false) }}
@@ -199,12 +185,12 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      {/* ── Bottom Nav ── */}
+      {/* ── Bottom Nav — subtle 1px red shadow line ── */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
         background: 'white',
-        borderTop: `2px solid ${BRAND_PRIMARY}`,
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.08)',
+        borderTop: '1px solid #EBEBEB',
+        boxShadow: '0 -1px 0 rgba(192,57,43,0.15), 0 -2px 8px rgba(0,0,0,0.05)',
       }}>
         <div style={{
           maxWidth: 680, margin: '0 auto',
@@ -212,31 +198,21 @@ export default function Layout({ children }) {
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
           {navItems.map(({ to, icon: Icon, label, exact }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              style={{ flex: 1, textDecoration: 'none' }}
-            >
+            <NavLink key={to} to={to} end={exact} style={{ flex: 1, textDecoration: 'none' }}>
               {({ isActive }) => (
                 <div style={{
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
                   gap: 3, padding: '6px 0',
                   borderTop: isActive ? `2px solid ${BRAND_PRIMARY}` : '2px solid transparent',
-                  marginTop: -2,
+                  marginTop: -1,
                   transition: 'all 0.15s ease',
                 }}>
-                  <Icon
-                    size={22}
-                    color={isActive ? BRAND_PRIMARY : '#65676B'}
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
+                  <Icon size={22} color={isActive ? BRAND_PRIMARY : '#65676B'} strokeWidth={isActive ? 2.5 : 2} />
                   <span style={{
                     fontSize: 10, fontWeight: isActive ? 700 : 500,
                     color: isActive ? BRAND_PRIMARY : '#65676B',
-                    fontFamily: '"Instrument Sans", system-ui',
-                    letterSpacing: 0.1,
+                    fontFamily: '"Instrument Sans", system-ui', letterSpacing: 0.1,
                   }}>
                     {label}
                   </span>
@@ -257,8 +233,7 @@ export default function Layout({ children }) {
 function MenuAction({ icon, label, onClick, danger }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button
-      onClick={onClick}
+    <button onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -287,28 +262,25 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px', borderBottom: `3px solid ${BRAND_PRIMARY}`,
+        padding: '12px 16px',
+        borderBottom: `2px solid ${BRAND_PRIMARY}`,
         background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
       }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: 'white' }}>
           Notifications
         </span>
         {unreadCount > 0 && (
-          <button
-            onClick={markAllRead}
-            style={{
-              background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer',
-              color: 'white', fontSize: 12, fontWeight: 600,
-              fontFamily: '"Instrument Sans", system-ui',
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', borderRadius: 20,
-            }}
-          >
+          <button onClick={markAllRead} style={{
+            background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer',
+            color: 'white', fontSize: 12, fontWeight: 600,
+            fontFamily: '"Instrument Sans", system-ui',
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '4px 10px', borderRadius: 20,
+          }}>
             <Check size={12} /> Mark all read
           </button>
         )}
       </div>
-
       <div style={{ maxHeight: 320, overflowY: 'auto' }}>
         {notifications.length === 0 ? (
           <div style={{ padding: '32px 16px', textAlign: 'center', color: '#65676B', fontSize: 14, fontFamily: '"Instrument Sans", system-ui' }}>
@@ -333,8 +305,7 @@ function NotifItem({ notif, onRead, onClose, navigate }) {
   }
 
   return (
-    <button
-      onClick={handleClick}
+    <button onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
