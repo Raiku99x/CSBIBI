@@ -15,6 +15,12 @@ function dicebearUrl(name = '') {
 }
 import { formatDistanceToNow } from 'date-fns'
 
+// CSB Brand Colors
+const BRAND_PRIMARY = '#C0392B'   // Red
+const BRAND_DARK    = '#922B21'   // Dark Red
+const BRAND_BLUE    = '#1A5276'   // Blue
+const BRAND_LIGHT   = '#EBF5FB'   // Light Blue tint
+
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
@@ -47,14 +53,14 @@ export default function Layout({ children }) {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F2F5', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#F4F6F8', display: 'flex', flexDirection: 'column' }}>
 
       {/* ── Top Header ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
         background: 'white',
-        borderBottom: '1px solid #DADDE1',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+        borderBottom: '3px solid ' + BRAND_PRIMARY,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
       }}>
         <div style={{
           maxWidth: 680, margin: '0 auto',
@@ -64,19 +70,33 @@ export default function Layout({ children }) {
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: '#0D7377',
+              width: 38, height: 38, borderRadius: 10,
+              background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(192,57,43,0.4)',
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M4 19l4-4m0 0l4-4m-4 4l4 4m4-8l4-4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="white" strokeWidth="2.2" strokeLinecap="round"/>
-              </svg>
+              <span style={{ fontSize: 20 }}>📢</span>
             </div>
-            <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#1c1e21', letterSpacing: '-0.3px' }}>
-              EduBoard
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+              <span style={{
+                fontFamily: '"Bricolage Grotesque", system-ui',
+                fontWeight: 800, fontSize: 22,
+                color: BRAND_PRIMARY,
+                letterSpacing: '-0.5px',
+              }}>
+                CSB
+              </span>
+              <span style={{
+                fontFamily: '"Instrument Sans", system-ui',
+                fontWeight: 600, fontSize: 9,
+                color: BRAND_BLUE,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+              }}>
+                Computer Science Board
+              </span>
+            </div>
           </div>
 
           {/* Right actions */}
@@ -88,18 +108,18 @@ export default function Layout({ children }) {
                 onClick={() => { setShowNotifs(!showNotifs); setShowUserMenu(false) }}
                 style={{
                   width: 40, height: 40, borderRadius: '50%',
-                  background: showNotifs ? '#E0F2F2' : '#F0F2F5',
+                  background: showNotifs ? '#FADBD8' : '#F4F6F8',
                   border: 'none', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   position: 'relative', transition: 'background 0.15s',
                 }}
               >
-                <Bell size={20} color={showNotifs ? '#0D7377' : '#65676B'} />
+                <Bell size={20} color={showNotifs ? BRAND_PRIMARY : '#65676B'} />
                 {unreadCount > 0 && (
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     minWidth: 16, height: 16, borderRadius: 8,
-                    background: '#E41E3F', color: 'white',
+                    background: BRAND_PRIMARY, color: 'white',
                     fontSize: 10, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 3px', border: '2px solid white',
@@ -129,7 +149,7 @@ export default function Layout({ children }) {
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '4px 8px 4px 4px',
                   borderRadius: 20, border: 'none', cursor: 'pointer',
-                  background: showUserMenu ? '#E0F2F2' : 'transparent',
+                  background: showUserMenu ? '#FADBD8' : 'transparent',
                   transition: 'background 0.15s',
                 }}
               >
@@ -138,13 +158,6 @@ export default function Layout({ children }) {
                   alt="avatar"
                   style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: '#E4E6EB' }}
                 />
-                <span style={{
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14,
-                  color: '#1c1e21', maxWidth: 96, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  display: 'none',
-                }} className="sm-show">
-                  {profile?.display_name?.split(' ')[0] || 'User'}
-                </span>
                 <ChevronDown size={14} color="#65676B" />
               </button>
 
@@ -157,7 +170,6 @@ export default function Layout({ children }) {
                   overflow: 'hidden', zIndex: 100,
                   animation: 'slideDown 0.2s ease',
                 }}>
-                  {/* Profile preview */}
                   <div style={{ padding: '12px 16px', borderBottom: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <img
                       src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
@@ -173,7 +185,6 @@ export default function Layout({ children }) {
                       </p>
                     </div>
                   </div>
-
                   <MenuAction icon={<Settings size={16} />} label="Profile Settings" onClick={() => { navigate('/profile'); setShowUserMenu(false) }} />
                   <MenuAction icon={<LogOut size={16} />} label="Log Out" onClick={handleSignOut} danger />
                 </div>
@@ -192,8 +203,8 @@ export default function Layout({ children }) {
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
         background: 'white',
-        borderTop: '1px solid #DADDE1',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.06)',
+        borderTop: `2px solid ${BRAND_PRIMARY}`,
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.08)',
       }}>
         <div style={{
           maxWidth: 680, margin: '0 auto',
@@ -212,18 +223,18 @@ export default function Layout({ children }) {
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
                   gap: 3, padding: '6px 0',
-                  borderTop: isActive ? '2px solid #0D7377' : '2px solid transparent',
-                  marginTop: -1,
+                  borderTop: isActive ? `2px solid ${BRAND_PRIMARY}` : '2px solid transparent',
+                  marginTop: -2,
                   transition: 'all 0.15s ease',
                 }}>
                   <Icon
                     size={22}
-                    color={isActive ? '#0D7377' : '#65676B'}
+                    color={isActive ? BRAND_PRIMARY : '#65676B'}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   <span style={{
                     fontSize: 10, fontWeight: isActive ? 700 : 500,
-                    color: isActive ? '#0D7377' : '#65676B',
+                    color: isActive ? BRAND_PRIMARY : '#65676B',
                     fontFamily: '"Instrument Sans", system-ui',
                     letterSpacing: 0.1,
                   }}>
@@ -237,7 +248,6 @@ export default function Layout({ children }) {
       </nav>
 
       <style>{`
-        @media (min-width: 480px) { .sm-show { display: block !important; } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
@@ -255,7 +265,7 @@ function MenuAction({ icon, label, onClick, danger }) {
         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
         background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent',
-        color: danger ? '#E41E3F' : '#1c1e21',
+        color: danger ? '#C0392B' : '#1c1e21',
         fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 14,
         transition: 'background 0.12s',
       }}
@@ -277,19 +287,21 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px', borderBottom: '1px solid #F0F2F5',
+        padding: '12px 16px', borderBottom: `3px solid ${BRAND_PRIMARY}`,
+        background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
       }}>
-        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#1c1e21' }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: 'white' }}>
           Notifications
         </span>
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#0D7377', fontSize: 12, fontWeight: 600,
+              background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer',
+              color: 'white', fontSize: 12, fontWeight: 600,
               fontFamily: '"Instrument Sans", system-ui',
               display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', borderRadius: 20,
             }}
           >
             <Check size={12} /> Mark all read
@@ -328,7 +340,7 @@ function NotifItem({ notif, onRead, onClose, navigate }) {
       style={{
         width: '100%', display: 'flex', alignItems: 'flex-start', gap: 12,
         padding: '10px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
-        background: hovered ? '#F7F8FA' : notif.is_read ? 'white' : '#E6F4F4',
+        background: hovered ? '#F7F8FA' : notif.is_read ? 'white' : '#FADBD8',
         transition: 'background 0.12s',
       }}
     >
@@ -342,7 +354,7 @@ function NotifItem({ notif, onRead, onClose, navigate }) {
         </p>
       </div>
       {!notif.is_read && (
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#0D7377', flexShrink: 0, marginTop: 6 }} />
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: BRAND_PRIMARY, flexShrink: 0, marginTop: 6 }} />
       )}
     </button>
   )
