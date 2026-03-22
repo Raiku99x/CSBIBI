@@ -2,19 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','5C4A7A','6B5B8A','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','4A3A7A','3E3068']
-const AVATAR_BG  = ['#E0F0F0','#D6ECED','#DDE4EA','#E2E8EE','#D8EDE6','#DCEAF5','#D8E8F4','#E4E0EB','#E0DCE8','#EDE4D8','#EBE0D4','#EDDDDE','#EBD9DA','#E3E8D4','#DDE4CC','#D8ECED','#D4E8EA','#D8DDE8','#D6DBE6','#ECDBD8','#E8D8D4','#D8EDE8','#DAEfEB','#DDD8EC','#D8D4E8']
-const AVATAR_TXT = ['#074749','#065457','#2C3E50','#2C3E50','#1B4332','#1A3A5C','#1A3A5C','#3D2B5E','#3D2B5E','#4A3728','#4A3728','#5C2B2C','#5C2B2C','#3A4A20','#3A4A20','#0A4A4E','#0A4A4E','#1A2A4A','#1A2A4A','#4A1E1A','#4A1E1A','#0A3D3F','#074749','#2A1E5C','#2A1E5C']
-
-function getAvatarIdx(name = '') {
-  const c = (name.trim()[0] || 'A').toUpperCase()
-  return Math.max(0, c.charCodeAt(0) - 65) % AVATAR_HEX.length
-}
-function avatarHex(name)  { return AVATAR_HEX[getAvatarIdx(name)] }
-function avatarBg(name)   { return AVATAR_BG[getAvatarIdx(name)] }
-function avatarText(name) { return AVATAR_TXT[getAvatarIdx(name)] }
 function dicebearUrl(name = '') {
-  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${avatarHex(name)}&textColor=ffffff`
+  const c = (name.trim()[0] || 'A').toUpperCase()
+  const hex = AVATAR_HEX[Math.max(0, c.charCodeAt(0) - 65) % AVATAR_HEX.length]
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
+
+// CSB Brand Colors
+const BRAND_RED  = '#C0392B'
+const BRAND_BLUE = '#1A5276'
+
 import {
   FileText, Download, Calendar, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
@@ -68,20 +65,15 @@ function Lightbox({ photos, initialIndex, onClose }) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      {/* Close */}
-      <button
-        onClick={onClose}
-        style={{
-          position: 'absolute', top: 16, right: 16,
-          width: 40, height: 40, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.12)', border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
+      <button onClick={onClose} style={{
+        position: 'absolute', top: 16, right: 16,
+        width: 40, height: 40, borderRadius: '50%',
+        background: 'rgba(255,255,255,0.12)', border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
         <X size={20} color="white" />
       </button>
 
-      {/* Counter */}
       {photos.length > 1 && (
         <div style={{
           position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
@@ -93,40 +85,32 @@ function Lightbox({ photos, initialIndex, onClose }) {
         </div>
       )}
 
-      {/* Image */}
       <img
         src={photos[activeIdx]}
         alt={`Photo ${activeIdx + 1}`}
         style={{ maxWidth: '92vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8 }}
       />
 
-      {/* Prev / Next */}
       {photos.length > 1 && (
         <>
-          <button
-            onClick={() => setActiveIdx(i => Math.max(i - 1, 0))}
-            disabled={activeIdx === 0}
+          <button onClick={() => setActiveIdx(i => Math.max(i - 1, 0))} disabled={activeIdx === 0}
             style={{
               position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
               width: 40, height: 40, borderRadius: '50%',
               background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: activeIdx === 0 ? 0.3 : 1,
-            }}
-          >
+            }}>
             <ChevronLeft size={20} color="white" />
           </button>
-          <button
-            onClick={() => setActiveIdx(i => Math.min(i + 1, photos.length - 1))}
-            disabled={activeIdx === photos.length - 1}
+          <button onClick={() => setActiveIdx(i => Math.min(i + 1, photos.length - 1))} disabled={activeIdx === photos.length - 1}
             style={{
               position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
               width: 40, height: 40, borderRadius: '50%',
               background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: activeIdx === photos.length - 1 ? 0.3 : 1,
-            }}
-          >
+            }}>
             <ChevronRight size={20} color="white" />
           </button>
         </>
@@ -135,25 +119,16 @@ function Lightbox({ photos, initialIndex, onClose }) {
   )
 }
 
-/* ─── Photo Grid — Facebook-style ── */
+/* ─── Photo Grid ── */
 function PhotoGrid({ photos, onPhotoClick }) {
   const display = photos.slice(0, 5)
   const remaining = photos.length - 5
-  const count = display.length
 
-  const cellStyle = {
-    overflow: 'hidden', cursor: 'pointer', position: 'relative',
-  }
-  const imgStyle = {
-    width: '100%', height: '100%', objectFit: 'cover',
-    transition: 'filter 0.15s',
-    display: 'block',
-  }
+  const cellStyle = { overflow: 'hidden', cursor: 'pointer', position: 'relative' }
+  const imgStyle = { width: '100%', height: '100%', objectFit: 'cover', transition: 'filter 0.15s', display: 'block' }
 
   const wrap = (url, i, extraStyle = {}) => (
-    <div
-      key={i}
-      style={{ ...cellStyle, ...extraStyle }}
+    <div key={i} style={{ ...cellStyle, ...extraStyle }}
       onClick={() => onPhotoClick(i)}
       onMouseEnter={e => e.currentTarget.querySelector('img').style.filter = 'brightness(0.88)'}
       onMouseLeave={e => e.currentTarget.querySelector('img').style.filter = 'brightness(1)'}
@@ -165,49 +140,28 @@ function PhotoGrid({ photos, onPhotoClick }) {
           background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ color: 'white', fontSize: 28, fontWeight: 800, fontFamily: '"Instrument Sans", system-ui' }}>
-            +{remaining}
-          </span>
+          <span style={{ color: 'white', fontSize: 28, fontWeight: 800, fontFamily: '"Instrument Sans", system-ui' }}>+{remaining}</span>
         </div>
       )}
     </div>
   )
 
+  const count = display.length
   if (count === 1) return (
-    <div style={{ maxHeight: 400, overflow: 'hidden' }} onClick={() => onPhotoClick(0)} onMouseEnter={e => e.currentTarget.querySelector('img').style.filter = 'brightness(0.88)'} onMouseLeave={e => e.currentTarget.querySelector('img').style.filter = 'brightness(1)'} style={{ cursor: 'pointer' }}>
-      <img src={display[0]} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block', cursor: 'pointer' }} loading="lazy" />
+    <div onClick={() => onPhotoClick(0)} style={{ cursor: 'pointer' }}
+      onMouseEnter={e => e.currentTarget.querySelector('img').style.filter = 'brightness(0.88)'}
+      onMouseLeave={e => e.currentTarget.querySelector('img').style.filter = 'brightness(1)'}
+    >
+      <img src={display[0]} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} loading="lazy" />
     </div>
   )
-
-  if (count === 2) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, height: 300 }}>
-      {display.map((url, i) => wrap(url, i, {}))}
-    </div>
-  )
-
-  if (count === 3) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2, height: 300 }}>
-      {wrap(display[0], 0, { gridRow: '1 / 3' })}
-      {wrap(display[1], 1, {})}
-      {wrap(display[2], 2, {})}
-    </div>
-  )
-
-  if (count === 4) return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2, height: 300 }}>
-      {display.map((url, i) => wrap(url, i, {}))}
-    </div>
-  )
-
-  // 5+
+  if (count === 2) return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, height: 300 }}>{display.map((url, i) => wrap(url, i))}</div>
+  if (count === 3) return <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2, height: 300 }}>{wrap(display[0], 0, { gridRow: '1 / 3' })}{wrap(display[1], 1)}{wrap(display[2], 2)}</div>
+  if (count === 4) return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 2, height: 300 }}>{display.map((url, i) => wrap(url, i))}</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, height: 220 }}>
-        {display.slice(0, 2).map((url, i) => wrap(url, i, {}))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, height: 150 }}>
-        {display.slice(2, 5).map((url, i) => wrap(url, i + 2, {}))}
-      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, height: 220 }}>{display.slice(0, 2).map((url, i) => wrap(url, i))}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, height: 150 }}>{display.slice(2, 5).map((url, i) => wrap(url, i + 2))}</div>
     </div>
   )
 }
@@ -221,6 +175,9 @@ export default function PostCard({ post, currentUserId }) {
   const [expanded, setExpanded] = useState(false)
 
   const isAnnouncement = post.post_type === 'announcement'
+  const isDeadline = post.sub_type === 'deadline'
+  const isReminder = post.sub_type === 'reminder'
+
   const photos = parsePhotos(post.photo_url)
   const files = parseFiles(post.file_url, post.file_name)
 
@@ -231,6 +188,13 @@ export default function PostCard({ post, currentUserId }) {
   function toggleLike() {
     setLiked(l => !l)
     setLikeCount(c => liked ? c - 1 : c + 1)
+  }
+
+  // Banner gradient: Red for deadline, Blue for reminder, Red→Blue for general announcement
+  const getBannerStyle = () => {
+    if (isDeadline) return `linear-gradient(90deg, ${BRAND_RED}, #A93226)`
+    if (isReminder) return `linear-gradient(90deg, ${BRAND_BLUE}, #154360)`
+    return `linear-gradient(90deg, ${BRAND_RED}, ${BRAND_BLUE})`
   }
 
   return (
@@ -247,21 +211,27 @@ export default function PostCard({ post, currentUserId }) {
         {/* ── Announcement banner ── */}
         {isAnnouncement && (
           <div style={{
-            background: 'linear-gradient(90deg, #0D7377, #0A5C60)',
+            background: getBannerStyle(),
             padding: '8px 16px',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <Megaphone size={14} color="white" style={{ opacity: 0.9 }} />
-            <span style={{ color: 'white', fontSize: 12, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-              {post.sub_type === 'deadline' ? 'Deadline' : post.sub_type === 'reminder' ? 'Reminder' : 'Announcement'}
+            <span style={{
+              color: 'white', fontSize: 12, fontWeight: 700,
+              fontFamily: '"Instrument Sans", system-ui',
+              letterSpacing: 0.5, textTransform: 'uppercase',
+            }}>
+              {isDeadline ? 'Deadline' : isReminder ? 'Reminder' : 'Announcement'}
               {post.announcement_type ? ` · ${post.announcement_type}` : ''}
             </span>
-            <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{
+              marginLeft: 'auto', color: 'rgba(255,255,255,0.9)',
+              fontSize: 12, fontFamily: '"Instrument Sans", system-ui',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
               {post.due_date
                 ? <><Calendar size={11} /> Due {format(new Date(post.due_date), 'MMM d, yyyy')}</>
-                : post.sub_type === 'reminder'
-                  ? <>🔔 Reminder</>
-                  : null
+                : isReminder ? <>🔔 Reminder</> : null
               }
             </span>
           </div>
@@ -282,7 +252,7 @@ export default function PostCard({ post, currentUserId }) {
               {post.subjects && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
-                  background: '#E6F4F4', color: '#0D7377',
+                  background: '#D6EAF8', color: BRAND_BLUE,
                   fontSize: 11, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui',
                   padding: '2px 8px', borderRadius: 20,
                 }}>
@@ -292,16 +262,13 @@ export default function PostCard({ post, currentUserId }) {
             </div>
             <p style={{ margin: 0, fontSize: 12, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              {!isAnnouncement && (
-                <span style={{ marginLeft: 4, color: '#BCC0C4' }}>· Status</span>
-              )}
+              {!isAnnouncement && <span style={{ marginLeft: 4, color: '#BCC0C4' }}>· Status</span>}
             </p>
           </div>
           <button style={{
             width: 36, height: 36, borderRadius: '50%',
             background: 'transparent', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#65676B', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#65676B', flexShrink: 0,
           }}
             onMouseEnter={e => e.currentTarget.style.background = '#F0F2F5'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -320,10 +287,8 @@ export default function PostCard({ post, currentUserId }) {
             }}>
               {displayCaption}
               {isLong && (
-                <button
-                  onClick={() => setExpanded(e => !e)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#65676B', fontWeight: 600, fontSize: 14, fontFamily: '"Instrument Sans", system-ui', marginLeft: 4, padding: 0 }}
-                >
+                <button onClick={() => setExpanded(e => !e)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#65676B', fontWeight: 600, fontSize: 14, fontFamily: '"Instrument Sans", system-ui', marginLeft: 4, padding: 0 }}>
                   {expanded ? ' See less' : ' See more'}
                 </button>
               )}
@@ -342,11 +307,7 @@ export default function PostCard({ post, currentUserId }) {
         {files.length > 0 && (
           <div style={{ padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {files.map((file, i) => (
-              <a
-                key={i}
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <a key={i} href={file.url} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 14px', borderRadius: 10,
@@ -358,18 +319,16 @@ export default function PostCard({ post, currentUserId }) {
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 8,
-                  background: '#E6F4F4', flexShrink: 0,
+                  background: '#D6EAF8', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <FileText size={16} color="#0D7377" />
+                  <FileText size={16} color={BRAND_BLUE} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#050505', fontFamily: '"Instrument Sans", system-ui', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {file.name}
                   </p>
-                  <p style={{ margin: 0, fontSize: 12, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
-                    Tap to open
-                  </p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>Tap to open</p>
                 </div>
                 <Download size={15} color="#BCC0C4" />
               </a>
@@ -377,19 +336,13 @@ export default function PostCard({ post, currentUserId }) {
           </div>
         )}
 
-        {/* ── Like count row ── */}
+        {/* ── Like count ── */}
         {likeCount > 0 && (
           <div style={{ padding: '8px 16px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: '#E41E3F',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', background: BRAND_RED, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Heart size={10} color="white" fill="white" />
             </div>
-            <span style={{ fontSize: 13, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
-              {likeCount}
-            </span>
+            <span style={{ fontSize: 13, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>{likeCount}</span>
           </div>
         )}
 
@@ -400,22 +353,15 @@ export default function PostCard({ post, currentUserId }) {
         <div style={{ display: 'flex', alignItems: 'center', padding: '2px 8px' }}>
           <ActionBtn
             onClick={toggleLike}
-            icon={<Heart size={18} fill={liked ? '#E41E3F' : 'none'} color={liked ? '#E41E3F' : '#65676B'} />}
-            label="Like"
-            active={liked}
+            icon={<Heart size={18} fill={liked ? BRAND_RED : 'none'} color={liked ? BRAND_RED : '#65676B'} />}
+            label="Like" active={liked} activeColor={BRAND_RED}
           />
-          <ActionBtn
-            icon={<MessageCircle size={18} color="#65676B" />}
-            label="Comment"
-          />
-          <ActionBtn
-            icon={<Share2 size={18} color="#65676B" />}
-            label="Share"
-          />
+          <ActionBtn icon={<MessageCircle size={18} color="#65676B" />} label="Comment" />
+          <ActionBtn icon={<Share2 size={18} color="#65676B" />} label="Share" />
           <div style={{ marginLeft: 'auto' }}>
             <ActionBtn
               onClick={() => setSaved(s => !s)}
-              icon={<Bookmark size={18} fill={saved ? '#0D7377' : 'none'} color={saved ? '#0D7377' : '#65676B'} />}
+              icon={<Bookmark size={18} fill={saved ? BRAND_BLUE : 'none'} color={saved ? BRAND_BLUE : '#65676B'} />}
               label=""
             />
           </div>
@@ -429,7 +375,7 @@ export default function PostCard({ post, currentUserId }) {
   )
 }
 
-function ActionBtn({ onClick, icon, label, active }) {
+function ActionBtn({ onClick, icon, label, active, activeColor }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button
@@ -443,7 +389,7 @@ function ActionBtn({ onClick, icon, label, active }) {
         background: hovered ? '#F0F2F5' : 'transparent',
         borderRadius: 8, transition: 'background 0.12s',
         fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14,
-        color: active ? '#E41E3F' : '#65676B',
+        color: active ? (activeColor || BRAND_RED) : '#65676B',
       }}
     >
       {icon}
