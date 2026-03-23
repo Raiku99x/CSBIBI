@@ -183,7 +183,8 @@ export default function CreatePostModal({
 
       toast.success(
         isDeadline ? '📅 Deadline posted!'
-        : isAnnouncement ? '🔔 Reminder posted!'
+        : form.sub_type === 'reminder' ? '🔔 Reminder posted!'
+        : isAnnouncement ? '📢 Announcement posted!'
         : isMaterial ? '📁 Material shared!'
         : 'Posted!'
       )
@@ -262,7 +263,7 @@ export default function CreatePostModal({
                 }}>
                   <Globe size={11} color="#050505" />
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
-                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : 'Status'} · Class
+                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : 'Status'} · Class
                   </span>
                 </div>
               </div>
@@ -282,7 +283,7 @@ export default function CreatePostModal({
                   type="button"
                   onClick={() => {
                     set('post_type', key)
-                    const newSub = key === 'status' ? 'status' : 'reminder'
+                    const newSub = key === 'status' ? 'status' : 'announcement'
                     set('sub_type', newSub)
                     set('announcement_type', '')
                     if (key === 'status') { set('due_date', ''); setAttachFiles([]) }
@@ -315,6 +316,7 @@ export default function CreatePostModal({
             }}>
               {(isAnnouncement
                 ? [
+                    { key: 'announcement', label: '📢 Announcement' },
                     { key: 'reminder', label: '🔔 Reminder' },
                     { key: 'deadline', label: '📅 Deadline' },
                   ]
@@ -379,7 +381,8 @@ export default function CreatePostModal({
             <textarea
               placeholder={
                 isDeadline ? "Describe this deadline…"
-                  : isAnnouncement ? "What's the reminder about?"
+                  : form.sub_type === 'reminder' ? "What's the reminder about?"
+                  : isAnnouncement ? "What's the announcement about?"
                   : isMaterial ? "Add a description for this material…"
                   : `What's on your mind, ${profile?.display_name?.split(' ')[0] || 'there'}?`
               }
