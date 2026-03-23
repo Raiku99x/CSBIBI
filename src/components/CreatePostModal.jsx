@@ -56,6 +56,7 @@ export default function CreatePostModal({
   const [attachFiles, setAttachFiles] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
+  const [showSubTypeError, setShowSubTypeError] = useState(false)
   const photoRef = useRef()
   const fileRef = useRef()
   const uploadCounter = useRef(0)
@@ -121,6 +122,7 @@ export default function CreatePostModal({
       return
     }
     if (isAnnouncement && !form.sub_type) {
+      setShowSubTypeError(true)
       toast.error('Please select an announcement type')
       return
     }
@@ -267,7 +269,7 @@ export default function CreatePostModal({
                 }}>
                   <Globe size={11} color="#050505" />
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
-                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : isAnnouncement ? 'Select type…' : 'Status'} · Class
+                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : isAnnouncement ? (showSubTypeError ? '⚠️ Select type' : 'Select type…') : 'Status'} · Class
                   </span>
                 </div>
               </div>
@@ -290,6 +292,7 @@ export default function CreatePostModal({
                     const newSub = key === 'status' ? 'status' : ''
                     set('sub_type', newSub)
                     set('announcement_type', '')
+                    setShowSubTypeError(false)
                     if (key === 'status') { set('due_date', ''); setAttachFiles([]) }
                   }}
                   style={{
@@ -312,7 +315,7 @@ export default function CreatePostModal({
             </div>
 
             {/* Sub-type toggle */}
-            {isAnnouncement && !form.sub_type && (
+            {showSubTypeError && !form.sub_type && (
               <p style={{ margin: '0 0 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#E41E3F', fontWeight: 600 }}>
                 ⚠️ Pick an announcement type to continue
               </p>
@@ -320,7 +323,7 @@ export default function CreatePostModal({
             <div style={{
               display: 'flex', gap: 5, padding: '3px 3px',
               background: '#F7F8FA', borderRadius: 8,
-              border: `1px solid ${isAnnouncement && !form.sub_type ? '#E41E3F' : '#E4E6EB'}`,
+              border: `1px solid ${showSubTypeError && !form.sub_type ? '#E41E3F' : '#E4E6EB'}`,
               marginBottom: 14,
             }}>
               {(isAnnouncement
@@ -339,6 +342,7 @@ export default function CreatePostModal({
                   type="button"
                   onClick={() => {
                     set('sub_type', key)
+                    setShowSubTypeError(false)
                     if (key !== 'deadline') set('due_date', '')
                     if (key !== 'material' && !isAnnouncement) setAttachFiles([])
                   }}
@@ -428,7 +432,7 @@ export default function CreatePostModal({
             </div>
 
             {/* Due date — required for Deadline, optional for other announcement types */}
-            {(isDeadline || (isAnnouncement && form.sub_type && form.sub_type !== 'deadline')) && (
+            {(isDeadline || (isAnnouncement && form.sub_type === 'announcement')) && (
               <div style={{ marginTop: 10 }}>
                 <label style={{
                   fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 700,
