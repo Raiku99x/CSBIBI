@@ -47,16 +47,18 @@ export default function AuthPage() {
       <style>{`
         @keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
         @keyframes floatA {
-          0%,100% { transform: translate(0px, 0px) scale(1); }
-          50% { transform: translate(18px, -22px) scale(1.06); }
+          0%,100% { transform: translate(0px,0px) scale(1); }
+          33% { transform: translate(20px,-25px) scale(1.05); }
+          66% { transform: translate(-10px,15px) scale(0.97); }
         }
         @keyframes floatB {
-          0%,100% { transform: translate(0px, 0px) scale(1); }
-          50% { transform: translate(-14px, 16px) scale(0.95); }
+          0%,100% { transform: translate(0px,0px) scale(1); }
+          40% { transform: translate(-18px,20px) scale(1.08); }
+          70% { transform: translate(12px,-10px) scale(0.95); }
         }
         @keyframes floatC {
-          0%,100% { transform: translate(0px, 0px) scale(1); }
-          50% { transform: translate(10px, 20px) scale(1.04); }
+          0%,100% { transform: translate(0px,0px) scale(1); }
+          50% { transform: translate(15px,22px) scale(1.06); }
         }
 
         .auth-page {
@@ -64,19 +66,20 @@ export default function AuthPage() {
           display: flex;
           position: relative;
           overflow: hidden;
-          background: #F0F2F5;
+          font-family: 'Instrument Sans', system-ui, sans-serif;
         }
 
-        /* ── Left colored panel ── */
+        /* Left colored panel */
         .auth-left {
           display: none;
           flex: 0 0 46%;
           background: linear-gradient(160deg, #7B241C 0%, #C0392B 42%, #1A5276 100%);
           flex-direction: column;
           justify-content: center;
-          padding: 56px 52px 56px 52px;
+          padding: 56px 52px;
           position: relative;
           z-index: 2;
+          overflow: hidden;
         }
         .auth-left-dots {
           position: absolute; inset: 0; pointer-events: none;
@@ -84,19 +87,7 @@ export default function AuthPage() {
           background-size: 26px 26px;
         }
 
-        /* ── The wavy SVG divider — positioned over the seam ── */
-        .auth-wave-divider {
-          display: none;
-          position: absolute;
-          left: calc(46% - 60px);
-          top: 0;
-          width: 120px;
-          height: 100%;
-          z-index: 3;
-          pointer-events: none;
-        }
-
-        /* ── Right panel ── */
+        /* Right panel */
         .auth-right {
           flex: 1;
           display: flex;
@@ -107,59 +98,62 @@ export default function AuthPage() {
           min-height: 100vh;
           position: relative;
           z-index: 2;
-          background: #F0F2F5;
+          background: #ECEEF1;
+          overflow: hidden;
         }
 
-        /* Blobs on the right side */
-        .blob-red-top {
-          position: absolute;
-          top: -80px; right: -60px;
-          width: 320px; height: 320px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(192,57,43,0.13) 0%, transparent 70%);
-          animation: floatA 8s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .blob-blue-mid {
-          position: absolute;
-          top: 35%; right: 20px;
-          width: 260px; height: 260px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(26,82,118,0.1) 0%, transparent 70%);
-          animation: floatB 10s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .blob-red-bottom {
-          position: absolute;
-          bottom: -60px; right: 80px;
-          width: 280px; height: 280px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(192,57,43,0.09) 0%, transparent 70%);
-          animation: floatC 9s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .blob-accent {
-          position: absolute;
-          top: 20%; left: 10%;
-          width: 180px; height: 180px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(26,82,118,0.07) 0%, transparent 70%);
-          animation: floatA 12s ease-in-out infinite reverse;
-          pointer-events: none;
-        }
-
-        /* Dot grid on right */
+        /* Dot grid texture on right */
         .auth-right-dots {
           position: absolute; inset: 0; pointer-events: none; z-index: 0;
-          background-image: radial-gradient(rgba(192,57,43,0.08) 1px, transparent 1px);
+          background-image: radial-gradient(rgba(192,57,43,0.1) 1px, transparent 1px);
           background-size: 22px 22px;
+        }
+
+        /* Blobs — more visible now */
+        .blob-1 {
+          position: absolute;
+          top: -120px; right: -80px;
+          width: 420px; height: 420px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 40% 40%, rgba(192,57,43,0.28) 0%, rgba(192,57,43,0.08) 50%, transparent 72%);
+          animation: floatA 9s ease-in-out infinite;
+          pointer-events: none;
+          filter: blur(2px);
+        }
+        .blob-2 {
+          position: absolute;
+          bottom: -100px; right: 40px;
+          width: 380px; height: 380px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 50% 60%, rgba(26,82,118,0.3) 0%, rgba(26,82,118,0.1) 50%, transparent 72%);
+          animation: floatB 11s ease-in-out infinite;
+          pointer-events: none;
+          filter: blur(2px);
+        }
+        .blob-3 {
+          position: absolute;
+          top: 38%; left: -60px;
+          width: 300px; height: 300px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 60% 40%, rgba(192,57,43,0.18) 0%, rgba(192,57,43,0.05) 55%, transparent 72%);
+          animation: floatC 13s ease-in-out infinite;
+          pointer-events: none;
+          filter: blur(1px);
+        }
+        .blob-4 {
+          position: absolute;
+          top: 15%; right: 25%;
+          width: 200px; height: 200px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(26,82,118,0.15) 0%, transparent 70%);
+          animation: floatA 15s ease-in-out infinite reverse;
+          pointer-events: none;
         }
 
         .auth-mobile-logo { display: flex; }
 
         @media (min-width: 900px) {
           .auth-left { display: flex; }
-          .auth-wave-divider { display: block; }
           .auth-mobile-logo { display: none; }
         }
       `}</style>
@@ -169,8 +163,6 @@ export default function AuthPage() {
         {/* ── Left Panel ── */}
         <div className="auth-left">
           <div className="auth-left-dots" />
-
-          {/* Glow blobs on left */}
           <div style={{
             position: 'absolute', top: -100, right: -80,
             width: 300, height: 300, borderRadius: '50%',
@@ -183,6 +175,50 @@ export default function AuthPage() {
             background: 'rgba(26,82,118,0.3)', filter: 'blur(60px)',
             pointerEvents: 'none',
           }} />
+
+          {/* The organic SVG shape that bleeds into right at top & bottom */}
+          <svg
+            style={{
+              position: 'absolute',
+              top: 0, right: -1,
+              height: '100%',
+              width: '110px',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+            viewBox="0 0 110 800"
+            preserveAspectRatio="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="#7B241C" />
+                <stop offset="42%"  stopColor="#C0392B" />
+                <stop offset="100%" stopColor="#1A5276" />
+              </linearGradient>
+            </defs>
+            {/*
+              This shape starts at top-right (110,0), flows left with
+              organic curves — bleeding far right at top & bottom,
+              gentle pulls toward center in the middle.
+              Uses smooth cubic beziers with long handles for natural feel.
+            */}
+            <path
+              d={`
+                M 110,0
+                L 0,0
+                L 0,800
+                L 110,800
+                C 110,800  60,750  55,680
+                C 50,610   95,570  90,490
+                C 85,415   30,380  28,310
+                C 26,240   88,200  85,130
+                C 82,65    110,30  110,0
+                Z
+              `}
+              fill="url(#panelGrad)"
+            />
+          </svg>
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             {/* Logo */}
@@ -251,74 +287,18 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* ── Wavy SVG Divider ── */}
-        {/*
-          SVG is 120px wide, 100vh tall.
-          Left half is filled with the gradient color (matching the left panel).
-          The right edge is a multi-ripple wave path.
-          Top and bottom waves bleed further right (infiltrating the white side).
-          Middle stays closer to the seam.
-        */}
-        <div className="auth-wave-divider">
-          <svg
-            viewBox="0 0 120 900"
-            preserveAspectRatio="none"
-            width="100%"
-            height="100%"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="#7B241C" />
-                <stop offset="42%"  stopColor="#C0392B" />
-                <stop offset="100%" stopColor="#1A5276" />
-              </linearGradient>
-            </defs>
-            {/*
-              Path: starts top-left, goes along the wave edge, ends bottom-left.
-              The wave is defined so it bleeds into the right at top & bottom,
-              and pulls back near the middle — multiple soft ripples.
-
-              Coordinates in 120×900 space:
-              - Left edge is x=0
-              - Center seam is x=60
-              - "Bleeding right" means x > 60 (into the grey side)
-              - "Pulling back" means x < 60
-            */}
-            <path
-              d={`
-                M 0,0
-                L 60,0
-                C 100,0  110,40  90,80
-                C 70,120  50,140  68,200
-                C 86,260  105,290  88,360
-                C 71,430  45,460  62,530
-                C 79,600  108,630  92,700
-                C 76,770  50,800  68,860
-                C 86,900  100,900  60,900
-                L 0,900
-                Z
-              `}
-              fill="url(#waveGrad)"
-            />
-          </svg>
-        </div>
-
         {/* ── Right Panel ── */}
         <div className="auth-right">
-          {/* Background texture */}
           <div className="auth-right-dots" />
-
-          {/* Floating blobs */}
-          <div className="blob-red-top" />
-          <div className="blob-blue-mid" />
-          <div className="blob-red-bottom" />
-          <div className="blob-accent" />
+          <div className="blob-1" />
+          <div className="blob-2" />
+          <div className="blob-3" />
+          <div className="blob-4" />
 
           {/* Mobile logo */}
           <div className="auth-mobile-logo" style={{
-            flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 28,
-            position: 'relative', zIndex: 1,
+            flexDirection: 'column', alignItems: 'center', gap: 8,
+            marginBottom: 28, position: 'relative', zIndex: 1,
           }}>
             <div style={{
               width: 72, height: 72, borderRadius: 18, overflow: 'hidden',
@@ -345,7 +325,7 @@ export default function AuthPage() {
             width: '100%', maxWidth: 420,
             background: 'white', borderRadius: 20,
             padding: '32px 30px',
-            boxShadow: '0 8px 48px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.07)',
+            boxShadow: '0 12px 52px rgba(0,0,0,0.13), 0 2px 10px rgba(0,0,0,0.07)',
             border: '1px solid rgba(255,255,255,0.9)',
             position: 'relative', zIndex: 1,
           }}>
