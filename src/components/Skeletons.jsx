@@ -1,4 +1,4 @@
-function Shimmer({ width, height, radius = 8, style = {} }) {
+function Shimmer({ width, height, radius = 6, style = {} }) {
   return (
     <div style={{
       width, height, borderRadius: radius, flexShrink: 0,
@@ -14,35 +14,38 @@ export function PostSkeleton() {
   return (
     <div style={{
       background: 'white',
-      borderRadius: 14,
-      border: '1px solid #E4E6EB',
+      borderTop: '1px solid #E4E6EB',
+      borderBottom: '1px solid #E4E6EB',
+      marginBottom: 6,
       overflow: 'hidden',
-      marginBottom: 8,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
     }}>
       {/* Header */}
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Shimmer width={42} height={42} radius={12} />
+      <div style={{ padding: '10px 12px 8px', display: 'flex', alignItems: 'center', gap: 9 }}>
+        <Shimmer width={40} height={40} radius={10} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
-          <Shimmer width={130} height={13} />
-          <Shimmer width={80} height={11} />
+          <Shimmer width={120} height={12} />
+          <Shimmer width={80} height={10} />
         </div>
-        <Shimmer width={34} height={34} radius={8} />
+        <Shimmer width={32} height={32} radius={7} />
       </div>
-      {/* Content */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+
+      {/* Content lines */}
+      <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Shimmer width="100%" height={13} />
-        <Shimmer width="88%" height={13} />
-        <Shimmer width="65%" height={13} />
+        <Shimmer width="85%" height={13} />
+        <Shimmer width="60%" height={13} />
       </div>
+
       {/* Divider */}
-      <div style={{ height: 1, background: '#F0F2F5', margin: '14px 14px 0' }} />
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: 6, padding: '10px 12px 12px' }}>
-        <Shimmer width="30%" height={32} radius={8} />
-        <Shimmer width="30%" height={32} radius={8} />
-        <Shimmer width="30%" height={32} radius={8} />
+      <div style={{ height: 1, background: '#F0F2F5', margin: '12px 12px 0' }} />
+
+      {/* Action row */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 10px 10px' }}>
+        <Shimmer width="30%" height={30} radius={7} />
+        <Shimmer width="30%" height={30} radius={7} />
+        <Shimmer width="30%" height={30} radius={7} />
       </div>
+
       <style>{`@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }`}</style>
     </div>
   )
@@ -52,19 +55,18 @@ export function SubjectSkeleton() {
   return (
     <div style={{
       background: 'white',
-      borderRadius: 14,
-      border: '1px solid #E4E6EB',
-      padding: '12px 14px',
+      borderTop: '1px solid #E4E6EB',
+      borderBottom: '1px solid #E4E6EB',
+      padding: '12px 12px',
       display: 'flex', alignItems: 'center', gap: 12,
       marginBottom: 6,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
     }}>
-      <Shimmer width={44} height={44} radius={12} />
+      <Shimmer width={44} height={44} radius={11} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <Shimmer width="50%" height={14} />
-        <Shimmer width="72%" height={11} />
+        <Shimmer width="50%" height={13} />
+        <Shimmer width="70%" height={11} />
       </div>
-      <Shimmer width={64} height={34} radius={8} />
+      <Shimmer width={60} height={32} radius={7} />
       <style>{`@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }`}</style>
     </div>
   )
