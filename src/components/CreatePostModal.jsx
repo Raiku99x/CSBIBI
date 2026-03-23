@@ -47,7 +47,7 @@ export default function CreatePostModal({
     caption: '',
     subject_id: '',
     post_type: defaultType,
-    sub_type: defaultSubType,
+    sub_type: defaultType === 'status' ? '' : defaultSubType,
     due_date: '',
     announcement_type: '',
   })
@@ -121,9 +121,9 @@ export default function CreatePostModal({
       toast.error('Add a caption, photo, or file')
       return
     }
-    if (isAnnouncement && !form.sub_type) {
+    if (!form.sub_type) {
       setShowSubTypeError(true)
-      toast.error('Please select an announcement type')
+      toast.error('Please select a post type')
       return
     }
     if (isDeadline && !form.due_date) {
@@ -269,7 +269,7 @@ export default function CreatePostModal({
                 }}>
                   <Globe size={11} color="#050505" />
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
-                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : isAnnouncement ? (showSubTypeError ? '⚠️ Select type' : 'Select type…') : 'Status'} · Class
+                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : (showSubTypeError ? '⚠️ Select type' : 'Select type…')} · Class
                   </span>
                 </div>
               </div>
@@ -289,8 +289,7 @@ export default function CreatePostModal({
                   type="button"
                   onClick={() => {
                     set('post_type', key)
-                    const newSub = key === 'status' ? 'status' : ''
-                    set('sub_type', newSub)
+                    set('sub_type', '')
                     set('announcement_type', '')
                     setShowSubTypeError(false)
                     if (key === 'status') { set('due_date', ''); setAttachFiles([]) }
@@ -317,7 +316,7 @@ export default function CreatePostModal({
             {/* Sub-type toggle */}
             {showSubTypeError && !form.sub_type && (
               <p style={{ margin: '0 0 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#E41E3F', fontWeight: 600 }}>
-                ⚠️ Pick an announcement type to continue
+                ⚠️ Pick a type to continue
               </p>
             )}
             <div style={{
@@ -393,7 +392,7 @@ export default function CreatePostModal({
             {/* Textarea */}
             <textarea
               placeholder={
-                !form.sub_type && isAnnouncement ? "Select an announcement type above first…"
+                !form.sub_type ? "Select a type above to continue…"
                   : isDeadline ? "Describe this deadline…"
                   : form.sub_type === 'reminder' ? "What's the reminder about?"
                   : isAnnouncement ? "What's the announcement about?"
