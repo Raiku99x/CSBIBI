@@ -8,10 +8,10 @@ const DARK = '#922B21'
 const BLUE = '#1A5276'
 
 const FEATURES = [
-  { icon: <Bell size={16} />, text: 'Class announcements & reminders' },
-  { icon: <BookOpen size={16} />, text: 'Subject materials & deadlines' },
-  { icon: <MessageSquare size={16} />, text: 'Real-time group chat' },
-  { icon: <FileText size={16} />, text: 'File & media sharing' },
+  { icon: <Bell size={15} />, text: 'Class announcements & reminders' },
+  { icon: <BookOpen size={15} />, text: 'Subject materials & deadlines' },
+  { icon: <MessageSquare size={15} />, text: 'Real-time group chat' },
+  { icon: <FileText size={15} />, text: 'File & media sharing' },
 ]
 
 export default function AuthPage() {
@@ -43,190 +43,218 @@ export default function AuthPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F0F2F5',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      padding: 16,
-    }}>
+    <>
+      <style>{`
+        @keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
+        .auth-wrapper {
+          min-height: 100vh;
+          display: flex;
+          background: #F4F6F8;
+        }
+        /* Left branding panel — hidden on mobile */
+        .auth-left {
+          display: none;
+          flex: 0 0 42%;
+          background: linear-gradient(160deg, #7B241C 0%, #C0392B 40%, #1A5276 100%);
+          flex-direction: column;
+          justify-content: center;
+          padding: 56px 52px;
+          position: relative;
+          overflow: hidden;
+        }
+        .auth-left-dots {
+          position: absolute; inset: 0; pointer-events: none;
+          background-image: radial-gradient(rgba(255,255,255,0.07) 1.5px, transparent 1.5px);
+          background-size: 26px 26px;
+        }
+        .auth-left-blob1 {
+          position: absolute; top: -100px; right: -100px;
+          width: 340px; height: 340px; border-radius: 50%;
+          background: rgba(255,255,255,0.05); filter: blur(50px); pointer-events: none;
+        }
+        .auth-left-blob2 {
+          position: absolute; bottom: -80px; left: -80px;
+          width: 280px; height: 280px; border-radius: 50%;
+          background: rgba(26,82,118,0.35); filter: blur(60px); pointer-events: none;
+        }
+        /* Right form panel */
+        .auth-right {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 32px 20px;
+          min-height: 100vh;
+        }
+        .auth-mobile-logo { display: flex; }
+        @media (min-width: 900px) {
+          .auth-left { display: flex; }
+          .auth-mobile-logo { display: none; }
+        }
+      `}</style>
 
-      {/* Background decorations */}
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: 240,
-        background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`,
-        zIndex: 0,
-      }} />
-      <div style={{
-        position: 'fixed', inset: 0,
-        backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)',
-        backgroundSize: '28px 28px', zIndex: 0, pointerEvents: 'none',
-      }} />
+      <div className="auth-wrapper">
 
-      <div style={{
-        width: '100%', maxWidth: 960,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 64, position: 'relative', zIndex: 1,
-      }}>
+        {/* ── Left branding panel ── */}
+        <div className="auth-left">
+          <div className="auth-left-dots" />
+          <div className="auth-left-blob1" />
+          <div className="auth-left-blob2" />
 
-        {/* ── Left branding (desktop) ── */}
-        <div style={{ display: 'none', flexDirection: 'column', gap: 24, flex: 1, maxWidth: 380 }}
-          className="lg-show">
-
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 64, height: 64, borderRadius: 18, overflow: 'hidden',
-              boxShadow: '0 6px 24px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.2)',
-              border: '3px solid rgba(255,255,255,0.3)',
-            }}>
-              <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-            <div>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {/* Logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 44 }}>
               <div style={{
-                fontFamily: '"Bricolage Grotesque", system-ui',
-                fontWeight: 800, fontSize: 38, color: 'white',
-                letterSpacing: '-1.5px', lineHeight: 1,
-                textShadow: '0 2px 12px rgba(0,0,0,0.2)',
-              }}>CSB</div>
-              <div style={{
-                fontFamily: '"Instrument Sans", system-ui',
-                fontWeight: 600, fontSize: 11,
-                color: 'rgba(255,255,255,0.8)',
-                letterSpacing: '1.5px', textTransform: 'uppercase',
-              }}>Computer Science Board</div>
-            </div>
-          </div>
-
-          <p style={{
-            fontFamily: '"Instrument Sans", system-ui',
-            fontSize: 18, color: 'rgba(255,255,255,0.92)',
-            lineHeight: 1.55, margin: 0, fontWeight: 400,
-          }}>
-            Your official platform for CS class announcements, deadlines & collaboration.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {FEATURES.map((f, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '11px 16px', borderRadius: 12,
-                background: 'rgba(255,255,255,0.12)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: 'rgba(255,255,255,0.9)',
+                width: 62, height: 62, borderRadius: 16, overflow: 'hidden', flexShrink: 0,
+                border: '2.5px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
               }}>
-                <span style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>{f.icon}</span>
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 14 }}>
-                  {f.text}
-                </span>
+                <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
-            ))}
+              <div>
+                <div style={{
+                  fontFamily: '"Bricolage Grotesque", system-ui',
+                  fontWeight: 800, fontSize: 38, color: 'white',
+                  letterSpacing: '-1.5px', lineHeight: 1,
+                }}>CSB</div>
+                <div style={{
+                  fontFamily: '"Instrument Sans", system-ui',
+                  fontWeight: 600, fontSize: 10.5, color: 'rgba(255,255,255,0.6)',
+                  letterSpacing: '1.8px', textTransform: 'uppercase', marginTop: 3,
+                }}>Computer Science Board</div>
+              </div>
+            </div>
+
+            <p style={{
+              fontFamily: '"Instrument Sans", system-ui',
+              fontSize: 21, fontWeight: 700, color: 'white',
+              lineHeight: 1.45, margin: '0 0 10px',
+            }}>
+              Your official hub for CS class coordination.
+            </p>
+            <p style={{
+              fontFamily: '"Instrument Sans", system-ui',
+              fontSize: 14, color: 'rgba(255,255,255,0.6)',
+              lineHeight: 1.65, margin: '0 0 40px', fontWeight: 400,
+            }}>
+              Announcements, deadlines, materials, and class chat — all in one place.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {FEATURES.map((f, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 13,
+                  padding: '12px 16px', borderRadius: 12,
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                    background: 'rgba(255,255,255,0.18)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white',
+                  }}>
+                    {f.icon}
+                  </div>
+                  <span style={{
+                    fontFamily: '"Instrument Sans", system-ui',
+                    fontSize: 13.5, color: 'rgba(255,255,255,0.85)', fontWeight: 500,
+                  }}>
+                    {f.text}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ── Right: Form card ── */}
-        <div style={{ width: '100%', maxWidth: 420 }}>
+        {/* ── Right form panel ── */}
+        <div className="auth-right">
 
           {/* Mobile logo */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 28 }}
-            className="lg-hide">
+          <div className="auth-mobile-logo" style={{
+            flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 28,
+          }}>
             <div style={{
-              width: 72, height: 72, borderRadius: 20, overflow: 'hidden',
-              boxShadow: '0 6px 24px rgba(255,255,255,0.3)',
-              border: '3px solid rgba(255,255,255,0.4)',
+              width: 72, height: 72, borderRadius: 18, overflow: 'hidden',
+              border: '3px solid white',
+              boxShadow: '0 4px 20px rgba(192,57,43,0.25)',
             }}>
               <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{
                 fontFamily: '"Bricolage Grotesque", system-ui',
-                fontWeight: 800, fontSize: 30, color: 'white', letterSpacing: '-1px',
+                fontWeight: 800, fontSize: 28, color: RED, letterSpacing: '-1px',
               }}>CSB</div>
               <div style={{
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10,
-                color: 'rgba(255,255,255,0.75)', letterSpacing: '1.2px', textTransform: 'uppercase',
+                fontFamily: '"Instrument Sans", system-ui',
+                fontWeight: 600, fontSize: 10, color: BLUE,
+                letterSpacing: '1.5px', textTransform: 'uppercase',
               }}>Computer Science Board</div>
             </div>
           </div>
 
           {/* Card */}
           <div style={{
-            background: 'white',
-            borderRadius: 20,
-            padding: '28px',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.1)',
-            border: '1px solid rgba(255,255,255,0.8)',
+            width: '100%', maxWidth: 420,
+            background: 'white', borderRadius: 20,
+            padding: '32px 30px',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06)',
+            border: '1px solid #E4E6EB',
           }}>
-            {/* Heading */}
-            <div style={{ marginBottom: 24, textAlign: 'center' }}>
+            <div style={{ marginBottom: 26, textAlign: 'center' }}>
               <h1 style={{
-                margin: '0 0 4px',
+                margin: '0 0 5px',
                 fontFamily: '"Bricolage Grotesque", system-ui',
-                fontWeight: 800, fontSize: 22, color: '#050505',
+                fontWeight: 800, fontSize: 23, color: '#050505',
               }}>
-                {mode === 'login' ? 'Welcome back' : 'Create account'}
+                {mode === 'login' ? 'Welcome back 👋' : 'Create account'}
               </h1>
-              <p style={{
-                margin: 0, fontFamily: '"Instrument Sans", system-ui',
-                fontSize: 13.5, color: '#65676B',
-              }}>
-                {mode === 'login'
-                  ? 'Log in to your CSB account'
-                  : 'Join the CS community today'
-                }
+              <p style={{ margin: 0, fontSize: 13.5, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
+                {mode === 'login' ? 'Sign in to your CSB account' : 'Join the CS community today'}
               </p>
             </div>
 
-            {/* Mode tabs */}
+            {/* Tabs */}
             <div style={{
               display: 'flex', gap: 4, padding: 4,
               background: '#F0F2F5', borderRadius: 12, marginBottom: 24,
             }}>
-              {['login', 'register'].map(m => (
-                <button key={m} onClick={() => setMode(m)} style={{
-                  flex: 1, padding: '9px 0', borderRadius: 9,
-                  fontSize: 13.5, fontWeight: 700,
+              {[{ key: 'login', label: 'Log In' }, { key: 'register', label: 'Sign Up' }].map(m => (
+                <button key={m.key} onClick={() => setMode(m.key)} style={{
+                  flex: 1, padding: '10px 0', borderRadius: 9,
+                  fontSize: 14, fontWeight: 700,
                   fontFamily: '"Instrument Sans", system-ui',
-                  background: mode === m
-                    ? 'white'
-                    : 'transparent',
-                  color: mode === m ? '#050505' : '#65676B',
+                  background: mode === m.key ? 'white' : 'transparent',
+                  color: mode === m.key ? '#050505' : '#8A8D91',
                   border: 'none', cursor: 'pointer',
-                  boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                  boxShadow: mode === m.key ? '0 1px 5px rgba(0,0,0,0.12)' : 'none',
                   transition: 'all 0.18s ease',
                 }}>
-                  {m === 'login' ? 'Log In' : 'Sign Up'}
+                  {m.label}
                 </button>
               ))}
             </div>
 
+            {/* Fields */}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {mode === 'register' && (
-                <InputField
-                  icon={<User size={16} color="#BCC0C4" />}
-                  type="text" placeholder="Full name"
-                  value={form.displayName}
-                  onChange={e => set('displayName', e.target.value)}
-                  required
-                />
+                <InputField icon={<User size={16} />} type="text" placeholder="Full name"
+                  value={form.displayName} onChange={e => set('displayName', e.target.value)} required />
               )}
+              <InputField icon={<Mail size={16} />} type="email" placeholder="Email address"
+                value={form.email} onChange={e => set('email', e.target.value)} required />
               <InputField
-                icon={<Mail size={16} color="#BCC0C4" />}
-                type="email" placeholder="Email address"
-                value={form.email}
-                onChange={e => set('email', e.target.value)}
-                required
-              />
-              <InputField
-                icon={<Lock size={16} color="#BCC0C4" />}
+                icon={<Lock size={16} />}
                 type={showPass ? 'text' : 'password'}
                 placeholder="Password"
                 value={form.password}
                 onChange={e => set('password', e.target.value)}
                 required minLength={6}
                 suffix={
-                  <button type="button" onClick={() => setShowPass(!showPass)} style={{
+                  <button type="button" onClick={() => setShowPass(s => !s)} style={{
                     background: 'none', border: 'none', cursor: 'pointer',
                     padding: '0 2px', display: 'flex', alignItems: 'center',
                     color: '#BCC0C4', transition: 'color 0.12s',
@@ -240,7 +268,7 @@ export default function AuthPage() {
               />
 
               <button type="submit" disabled={loading} style={{
-                marginTop: 6, width: '100%', padding: '13px 0',
+                marginTop: 4, width: '100%', padding: '14px 0',
                 borderRadius: 11, border: 'none',
                 background: loading ? '#E5A39D' : RED,
                 color: 'white',
@@ -248,8 +276,10 @@ export default function AuthPage() {
                 cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: loading ? 'none' : '0 4px 16px rgba(192,57,43,0.3)',
-                transition: 'all 0.15s',
+                transition: 'background 0.15s, transform 0.1s',
               }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = DARK }}
+                onMouseLeave={e => { if (!loading) e.currentTarget.style.background = RED }}
                 onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.98)' }}
                 onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
               >
@@ -258,22 +288,17 @@ export default function AuthPage() {
               </button>
             </form>
 
-            {/* Divider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 18px' }}>
-              <div style={{ flex: 1, height: 1, background: '#E4E6EB' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '22px 0 18px' }}>
+              <div style={{ flex: 1, height: 1, background: '#EAECEF' }} />
               <span style={{ color: '#BCC0C4', fontSize: 12, fontFamily: '"Instrument Sans", system-ui' }}>or</span>
-              <div style={{ flex: 1, height: 1, background: '#E4E6EB' }} />
+              <div style={{ flex: 1, height: 1, background: '#EAECEF' }} />
             </div>
 
-            <p style={{
-              textAlign: 'center', fontSize: 13.5, color: '#65676B',
-              fontFamily: '"Instrument Sans", system-ui', margin: 0,
-            }}>
+            <p style={{ textAlign: 'center', fontSize: 14, color: '#65676B', margin: 0, fontFamily: '"Instrument Sans", system-ui' }}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} style={{
                 background: 'none', border: 'none', color: RED, fontWeight: 700,
-                fontSize: 13.5, cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui',
-                padding: 0,
+                fontSize: 14, cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', padding: 0,
               }}>
                 {mode === 'login' ? 'Sign up free' : 'Log in'}
               </button>
@@ -281,19 +306,14 @@ export default function AuthPage() {
           </div>
 
           <p style={{
-            textAlign: 'center', fontSize: 11.5, color: 'rgba(255,255,255,0.5)',
-            marginTop: 20, fontFamily: '"Instrument Sans", system-ui',
+            textAlign: 'center', fontSize: 11.5, color: '#BCC0C4',
+            marginTop: 24, fontFamily: '"Instrument Sans", system-ui',
           }}>
             CSB · Computer Science Board · Announcement Platform
           </p>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
-        @media (min-width:1024px) { .lg-show{display:flex!important} .lg-hide{display:none!important} }
-      `}</style>
-    </div>
+    </>
   )
 }
 
@@ -302,13 +322,16 @@ function InputField({ icon, type, placeholder, value, onChange, required, minLen
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '0 14px', height: 50, borderRadius: 11,
+      padding: '0 14px', height: 52, borderRadius: 11,
       border: `1.5px solid ${focused ? RED : '#E4E6EB'}`,
       background: focused ? 'white' : '#F7F8FA',
       boxShadow: focused ? '0 0 0 3px rgba(192,57,43,0.1)' : 'none',
       transition: 'all 0.15s',
     }}>
-      <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', color: focused ? RED : '#BCC0C4', transition: 'color 0.15s' }}>
+      <span style={{
+        flexShrink: 0, display: 'flex', alignItems: 'center',
+        color: focused ? RED : '#BCC0C4', transition: 'color 0.15s',
+      }}>
         {icon}
       </span>
       <input
