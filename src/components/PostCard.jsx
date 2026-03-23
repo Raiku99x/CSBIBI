@@ -17,13 +17,22 @@ import {
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
-// deadline → RED, reminder → RED, material → BLUE
+// Banner for ALL sub_types — not just announcements
 function getBanner(subType, postType) {
-  if (postType !== 'announcement') return null
-  if (subType === 'deadline')  return { bg: `linear-gradient(90deg, ${RED}, #A93226)`,   label: 'DEADLINE',  icon: <Clock size={14} color="white" /> }
-  if (subType === 'reminder')  return { bg: `linear-gradient(90deg, ${RED}, #A93226)`,   label: 'REMINDER',  icon: <Bell size={14} color="white" /> }
-  if (subType === 'material')  return { bg: `linear-gradient(90deg, ${BLUE}, #154360)`,  label: 'MATERIAL',  icon: <FileText size={14} color="white" /> }
-  return { bg: `linear-gradient(90deg, ${RED}, ${BLUE})`, label: 'ANNOUNCEMENT', icon: <Megaphone size={14} color="white" /> }
+  if (subType === 'deadline') return { bg: `linear-gradient(90deg, ${RED}, #A93226)`,  label: 'DEADLINE',  icon: <Clock size={14} color="white" /> }
+  if (subType === 'reminder') return { bg: `linear-gradient(90deg, ${RED}, #A93226)`,  label: 'REMINDER',  icon: <Bell size={14} color="white" /> }
+  if (subType === 'material') return { bg: `linear-gradient(90deg, ${BLUE}, #154360)`, label: 'MATERIAL',  icon: <FileText size={14} color="white" /> }
+  if (postType === 'announcement') return { bg: `linear-gradient(90deg, ${RED}, ${BLUE})`, label: 'ANNOUNCEMENT', icon: <Megaphone size={14} color="white" /> }
+  return null // plain status — no banner
+}
+
+// Label shown below name
+function getTypeLabel(subType, postType) {
+  if (subType === 'material') return 'Material'
+  if (subType === 'deadline') return 'Deadline'
+  if (subType === 'reminder') return 'Reminder'
+  if (postType === 'announcement') return 'Announcement'
+  return 'Status'
 }
 
 function parsePhotos(photo_url) {
@@ -114,7 +123,9 @@ export default function PostCard({ post, currentUserId }) {
   const caption = post.caption || ''
   const isLong = caption.length > 150
   const displayCaption = isLong && !expanded ? caption.slice(0, 150) + '…' : caption
+
   const banner = getBanner(post.sub_type, post.post_type)
+  const typeLabel = getTypeLabel(post.sub_type, post.post_type)
 
   return (
     <>
@@ -149,7 +160,7 @@ export default function PostCard({ post, currentUserId }) {
             </div>
             <p style={{ margin: 0, fontSize: 12, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              {post.post_type !== 'announcement' && <span style={{ marginLeft: 4, color: '#BCC0C4' }}>· Status</span>}
+              <span style={{ marginLeft: 4, color: '#BCC0C4' }}>· {typeLabel}</span>
             </p>
           </div>
           <button style={{ width: 36, height: 36, borderRadius: '50%', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#65676B', flexShrink: 0 }}
