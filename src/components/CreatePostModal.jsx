@@ -120,6 +120,10 @@ export default function CreatePostModal({
       toast.error('Add a caption, photo, or file')
       return
     }
+    if (isAnnouncement && !form.sub_type) {
+      toast.error('Please select an announcement type')
+      return
+    }
     if (isDeadline && !form.due_date) {
       toast.error('Please set a due date for Deadline posts')
       return
@@ -263,7 +267,7 @@ export default function CreatePostModal({
                 }}>
                   <Globe size={11} color="#050505" />
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
-                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : 'Status'} · Class
+                    {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : isAnnouncement ? 'Select type…' : 'Status'} · Class
                   </span>
                 </div>
               </div>
@@ -283,7 +287,7 @@ export default function CreatePostModal({
                   type="button"
                   onClick={() => {
                     set('post_type', key)
-                    const newSub = key === 'status' ? 'status' : 'announcement'
+                    const newSub = key === 'status' ? 'status' : ''
                     set('sub_type', newSub)
                     set('announcement_type', '')
                     if (key === 'status') { set('due_date', ''); setAttachFiles([]) }
@@ -308,10 +312,15 @@ export default function CreatePostModal({
             </div>
 
             {/* Sub-type toggle */}
+            {isAnnouncement && !form.sub_type && (
+              <p style={{ margin: '0 0 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#E41E3F', fontWeight: 600 }}>
+                ⚠️ Pick an announcement type to continue
+              </p>
+            )}
             <div style={{
               display: 'flex', gap: 5, padding: '3px 3px',
               background: '#F7F8FA', borderRadius: 8,
-              border: '1px solid #E4E6EB',
+              border: `1px solid ${isAnnouncement && !form.sub_type ? '#E41E3F' : '#E4E6EB'}`,
               marginBottom: 14,
             }}>
               {(isAnnouncement
@@ -380,7 +389,8 @@ export default function CreatePostModal({
             {/* Textarea */}
             <textarea
               placeholder={
-                isDeadline ? "Describe this deadline…"
+                !form.sub_type && isAnnouncement ? "Select an announcement type above first…"
+                  : isDeadline ? "Describe this deadline…"
                   : form.sub_type === 'reminder' ? "What's the reminder about?"
                   : isAnnouncement ? "What's the announcement about?"
                   : isMaterial ? "Add a description for this material…"
@@ -417,26 +427,29 @@ export default function CreatePostModal({
               <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             </div>
 
-            {/* Due date — only for Deadline sub-type */}
-            {isDeadline && (
+            {/* Due date — required for Deadline, optional for other announcement types */}
+            {(isDeadline || (isAnnouncement && form.sub_type && form.sub_type !== 'deadline')) && (
               <div style={{ marginTop: 10 }}>
                 <label style={{
                   fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 700,
-                  color: '#E41E3F', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6,
+                  color: isDeadline ? '#E41E3F' : '#65676B',
+                  display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6,
                 }}>
-                  📅 Due Date <span style={{ color: '#E41E3F' }}>*</span>
-                  <span style={{ fontWeight: 400, color: '#65676B', fontSize: 11 }}>(required for Deadline)</span>
+                  📅 Due Date
+                  {isDeadline
+                    ? <><span style={{ color: '#E41E3F' }}>*</span><span style={{ fontWeight: 400, color: '#65676B', fontSize: 11 }}>(required for Deadline)</span></>
+                    : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 11 }}>(optional)</span>
+                  }
                 </label>
                 <input
                   type="date"
                   value={form.due_date}
                   onChange={e => set('due_date', e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  required
                   style={{
                     width: '100%', padding: '10px 14px',
                     borderRadius: 10,
-                    border: `1px solid ${form.due_date ? '#0D7377' : '#E41E3F'}`,
+                    border: `1px solid ${form.due_date ? '#0D7377' : isDeadline ? '#E41E3F' : '#E4E6EB'}`,
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
                     background: '#F7F8FA', outline: 'none',
                     boxSizing: 'border-box',
