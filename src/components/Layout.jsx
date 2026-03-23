@@ -52,7 +52,7 @@ export default function Layout({ children }) {
   return (
     <div style={{ minHeight: '100vh', background: '#F4F6F8', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Top Header — subtle 1px red shadow line ── */}
+      {/* ── Top Header ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
         background: 'white',
@@ -66,15 +66,18 @@ export default function Layout({ children }) {
         }}>
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_BLUE})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(192,57,43,0.35)',
-            }}>
-              <span style={{ fontSize: 20 }}>📢</span>
-            </div>
+            {/* Real logo image */}
+            <img
+              src="/announce.png"
+              alt="CSB Logo"
+              style={{
+                width: 38, height: 38,
+                borderRadius: '50%',
+                objectFit: 'cover',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(192,57,43,0.35)',
+              }}
+            />
             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
               <span style={{
                 fontFamily: '"Bricolage Grotesque", system-ui',
@@ -185,7 +188,7 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      {/* ── Bottom Nav — subtle 1px red shadow line ── */}
+      {/* ── Bottom Nav ── */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
         background: 'white',
@@ -205,8 +208,7 @@ export default function Layout({ children }) {
                   alignItems: 'center', justifyContent: 'center',
                   gap: 3, padding: '6px 0',
                   borderTop: isActive ? `2px solid ${BRAND_PRIMARY}` : '2px solid transparent',
-                  marginTop: -1,
-                  transition: 'all 0.15s ease',
+                  marginTop: -1, transition: 'all 0.15s ease',
                 }}>
                   <Icon size={22} color={isActive ? BRAND_PRIMARY : '#65676B'} strokeWidth={isActive ? 2.5 : 2} />
                   <span style={{
@@ -243,8 +245,7 @@ function MenuAction({ icon, label, onClick, danger }) {
         color: danger ? '#C0392B' : '#1c1e21',
         fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 14,
         transition: 'background 0.12s',
-      }}
-    >
+      }}>
       {icon} {label}
     </button>
   )
@@ -297,13 +298,11 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
 function NotifItem({ notif, onRead, onClose, navigate }) {
   const [hovered, setHovered] = useState(false)
   const icons = { announcement: '📢', tag: '🏷️', whisper: '💬' }
-
   function handleClick() {
     onRead(notif.id)
     onClose()
     if (notif.post_id) navigate(`/?post=${notif.post_id}`)
   }
-
   return (
     <button onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
@@ -313,20 +312,15 @@ function NotifItem({ notif, onRead, onClose, navigate }) {
         padding: '10px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
         background: hovered ? '#F7F8FA' : notif.is_read ? 'white' : '#FADBD8',
         transition: 'background 0.12s',
-      }}
-    >
+      }}>
       <span style={{ fontSize: 22, flexShrink: 0, marginTop: 2 }}>{icons[notif.type] || '🔔'}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 13, color: '#1c1e21', fontFamily: '"Instrument Sans", system-ui', lineHeight: 1.4 }}>
-          {notif.message}
-        </p>
+        <p style={{ margin: 0, fontSize: 13, color: '#1c1e21', fontFamily: '"Instrument Sans", system-ui', lineHeight: 1.4 }}>{notif.message}</p>
         <p style={{ margin: '3px 0 0', fontSize: 11, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
           {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
         </p>
       </div>
-      {!notif.is_read && (
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: BRAND_PRIMARY, flexShrink: 0, marginTop: 6 }} />
-      )}
+      {!notif.is_read && <div style={{ width: 10, height: 10, borderRadius: '50%', background: BRAND_PRIMARY, flexShrink: 0, marginTop: 6 }} />}
     </button>
   )
 }
