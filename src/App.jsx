@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import AuthPage from './pages/AuthPage'
 import FeedPage from './pages/FeedPage'
-import ChatPage from './pages/ChatPage'
+import MessagesPage from './pages/MessagesPage'
 import AnnouncementsPage from './pages/AnnouncementsPage'
 import EnrolledSubjectsPage from './pages/EnrolledSubjectsPage'
 import AppsPage from './pages/AppsPage'
@@ -14,12 +14,14 @@ function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center animate-pulse">
-            <span className="text-white text-xl">📚</span>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F2F5' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
+            <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <p className="text-sm text-slate-400 font-medium">Loading EduBoard…</p>
+          <p style={{ fontSize: 13, color: '#8A8D91', fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, margin: 0 }}>
+            Loading CSB…
+          </p>
         </div>
       </div>
     )
@@ -34,11 +36,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/" element={<ProtectedRoute><Layout><FeedPage /></Layout></ProtectedRoute>} />
-      <Route path="/chat" element={<ProtectedRoute><Layout><ChatPage /></Layout></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><Layout><MessagesPage /></Layout></ProtectedRoute>} />
       <Route path="/announcements" element={<ProtectedRoute><Layout><AnnouncementsPage /></Layout></ProtectedRoute>} />
       <Route path="/subjects" element={<ProtectedRoute><Layout><EnrolledSubjectsPage /></Layout></ProtectedRoute>} />
       <Route path="/apps" element={<ProtectedRoute><Layout><AppsPage /></Layout></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Layout><ProfilePage /></Layout></ProtectedRoute>} />
+      {/* old /chat route redirects to /messages so no broken links */}
+      <Route path="/chat" element={<Navigate to="/messages" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
