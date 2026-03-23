@@ -18,6 +18,22 @@ import toast from 'react-hot-toast'
 const MAX_PHOTOS = 20
 const MAX_FILES = 10
 
+// Accepted file types for material posts
+const FILE_ACCEPT = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
+  // also allow images in material
+  'image/*',
+].join(',')
+
 export default function CreatePostModal({
   onClose,
   onCreated,
@@ -60,6 +76,7 @@ export default function CreatePostModal({
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const isAnnouncement = form.post_type === 'announcement'
   const isDeadline = isAnnouncement && form.sub_type === 'deadline'
+  const isMaterial = form.sub_type === 'material'
 
   function handlePhoto(e) {
     const chosen = Array.from(e.target.files || [])
@@ -169,7 +186,7 @@ export default function CreatePostModal({
       toast.success(
         isDeadline ? '📅 Deadline posted!'
         : isAnnouncement ? '🔔 Reminder posted!'
-        : form.sub_type === 'material' ? '📁 Material shared!'
+        : isMaterial ? '📁 Material shared!'
         : 'Posted!'
       )
       onCreated(post)
@@ -314,7 +331,8 @@ export default function CreatePostModal({
                   onClick={() => {
                     set('sub_type', key)
                     if (key !== 'deadline') set('due_date', '')
-                    if (key === 'status') setAttachFiles([])
+                    // clear file attachments when switching away from material
+                    if (key !== 'material') setAttachFiles([])
                   }}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -365,7 +383,7 @@ export default function CreatePostModal({
               placeholder={
                 isDeadline ? "Describe this deadline…"
                   : isAnnouncement ? "What's the reminder about?"
-                  : form.sub_type === 'material' ? "Add a description for this material…"
+                  : isMaterial ? "Add a description for this material…"
                   : `What's on your mind, ${profile?.display_name?.split(' ')[0] || 'there'}?`
               }
               rows={4}
@@ -493,8 +511,23 @@ export default function CreatePostModal({
           </div>
 
           {/* Hidden inputs */}
-          <input ref={photoRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }} onChange={handlePhoto} />
-          <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={handleFile} />
+          {/* Status: photos only (images) | Material: images + documents */}
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif"
+            multiple
+            style={{ display: 'none' }}
+            onChange={handlePhoto}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept={FILE_ACCEPT}
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleFile}
+          />
 
           {/* Add to post bar */}
           <div style={{
@@ -507,21 +540,35 @@ export default function CreatePostModal({
               Add to your post
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
+              {/* Photo button — always visible */}
               <MediaBtn
                 icon={<Image size={22} color="#45BD62" />}
-                title="Photos/Videos"
+                title="Photos"
                 onClick={() => photoRef.current.click()}
                 badge={photoFiles.length > 0 ? photoFiles.length : null}
               />
-              {/* Files always visible */}
-              <MediaBtn
-                icon={<Paperclip size={22} color="#1877F2" />}
-                title="Files"
-                onClick={() => fileRef.current.click()}
-                badge={attachFiles.length > 0 ? attachFiles.length : null}
-              />
+              {/* File attach — ONLY for Material posts */}
+              {isMaterial && (
+                <MediaBtn
+                  icon={<Paperclip size={22} color="#1877F2" />}
+                  title="Attach files (PDF, DOCX, PPT…)"
+                  onClick={() => fileRef.current.click()}
+                  badge={attachFiles.length > 0 ? attachFiles.length : null}
+                />
+              )}
             </div>
           </div>
+
+          {/* Material hint */}
+          {!isMaterial && form.post_type === 'status' && (
+            <p style={{
+              margin: '-4px 16px 12px',
+              fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91',
+              lineHeight: 1.4,
+            }}>
+              💡 Switch to <strong>Material</strong> to attach PDF, DOCX, PPT, and other files.
+            </p>
+          )}
 
           {/* Submit */}
           <div style={{ padding: '0 16px 16px' }}>
