@@ -46,38 +46,57 @@ export default function AuthPage() {
     <>
       <style>{`
         @keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
-        .auth-wrapper {
+        @keyframes floatA {
+          0%,100% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(18px, -22px) scale(1.06); }
+        }
+        @keyframes floatB {
+          0%,100% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(-14px, 16px) scale(0.95); }
+        }
+        @keyframes floatC {
+          0%,100% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(10px, 20px) scale(1.04); }
+        }
+
+        .auth-page {
           min-height: 100vh;
           display: flex;
-          background: #F4F6F8;
-        }
-        /* Left branding panel — hidden on mobile */
-        .auth-left {
-          display: none;
-          flex: 0 0 42%;
-          background: linear-gradient(160deg, #7B241C 0%, #C0392B 40%, #1A5276 100%);
-          flex-direction: column;
-          justify-content: center;
-          padding: 56px 52px;
           position: relative;
           overflow: hidden;
+          background: #F0F2F5;
+        }
+
+        /* ── Left colored panel ── */
+        .auth-left {
+          display: none;
+          flex: 0 0 46%;
+          background: linear-gradient(160deg, #7B241C 0%, #C0392B 42%, #1A5276 100%);
+          flex-direction: column;
+          justify-content: center;
+          padding: 56px 52px 56px 52px;
+          position: relative;
+          z-index: 2;
         }
         .auth-left-dots {
           position: absolute; inset: 0; pointer-events: none;
           background-image: radial-gradient(rgba(255,255,255,0.07) 1.5px, transparent 1.5px);
           background-size: 26px 26px;
         }
-        .auth-left-blob1 {
-          position: absolute; top: -100px; right: -100px;
-          width: 340px; height: 340px; border-radius: 50%;
-          background: rgba(255,255,255,0.05); filter: blur(50px); pointer-events: none;
+
+        /* ── The wavy SVG divider — positioned over the seam ── */
+        .auth-wave-divider {
+          display: none;
+          position: absolute;
+          left: calc(46% - 60px);
+          top: 0;
+          width: 120px;
+          height: 100%;
+          z-index: 3;
+          pointer-events: none;
         }
-        .auth-left-blob2 {
-          position: absolute; bottom: -80px; left: -80px;
-          width: 280px; height: 280px; border-radius: 50%;
-          background: rgba(26,82,118,0.35); filter: blur(60px); pointer-events: none;
-        }
-        /* Right form panel */
+
+        /* ── Right panel ── */
         .auth-right {
           flex: 1;
           display: flex;
@@ -86,21 +105,84 @@ export default function AuthPage() {
           justify-content: center;
           padding: 32px 20px;
           min-height: 100vh;
+          position: relative;
+          z-index: 2;
+          background: #F0F2F5;
         }
+
+        /* Blobs on the right side */
+        .blob-red-top {
+          position: absolute;
+          top: -80px; right: -60px;
+          width: 320px; height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(192,57,43,0.13) 0%, transparent 70%);
+          animation: floatA 8s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .blob-blue-mid {
+          position: absolute;
+          top: 35%; right: 20px;
+          width: 260px; height: 260px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(26,82,118,0.1) 0%, transparent 70%);
+          animation: floatB 10s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .blob-red-bottom {
+          position: absolute;
+          bottom: -60px; right: 80px;
+          width: 280px; height: 280px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(192,57,43,0.09) 0%, transparent 70%);
+          animation: floatC 9s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .blob-accent {
+          position: absolute;
+          top: 20%; left: 10%;
+          width: 180px; height: 180px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(26,82,118,0.07) 0%, transparent 70%);
+          animation: floatA 12s ease-in-out infinite reverse;
+          pointer-events: none;
+        }
+
+        /* Dot grid on right */
+        .auth-right-dots {
+          position: absolute; inset: 0; pointer-events: none; z-index: 0;
+          background-image: radial-gradient(rgba(192,57,43,0.08) 1px, transparent 1px);
+          background-size: 22px 22px;
+        }
+
         .auth-mobile-logo { display: flex; }
+
         @media (min-width: 900px) {
           .auth-left { display: flex; }
+          .auth-wave-divider { display: block; }
           .auth-mobile-logo { display: none; }
         }
       `}</style>
 
-      <div className="auth-wrapper">
+      <div className="auth-page">
 
-        {/* ── Left branding panel ── */}
+        {/* ── Left Panel ── */}
         <div className="auth-left">
           <div className="auth-left-dots" />
-          <div className="auth-left-blob1" />
-          <div className="auth-left-blob2" />
+
+          {/* Glow blobs on left */}
+          <div style={{
+            position: 'absolute', top: -100, right: -80,
+            width: 300, height: 300, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.05)', filter: 'blur(50px)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', bottom: -80, left: -60,
+            width: 260, height: 260, borderRadius: '50%',
+            background: 'rgba(26,82,118,0.3)', filter: 'blur(60px)',
+            pointerEvents: 'none',
+          }} />
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             {/* Logo */}
@@ -169,12 +251,74 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* ── Right form panel ── */}
+        {/* ── Wavy SVG Divider ── */}
+        {/*
+          SVG is 120px wide, 100vh tall.
+          Left half is filled with the gradient color (matching the left panel).
+          The right edge is a multi-ripple wave path.
+          Top and bottom waves bleed further right (infiltrating the white side).
+          Middle stays closer to the seam.
+        */}
+        <div className="auth-wave-divider">
+          <svg
+            viewBox="0 0 120 900"
+            preserveAspectRatio="none"
+            width="100%"
+            height="100%"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="#7B241C" />
+                <stop offset="42%"  stopColor="#C0392B" />
+                <stop offset="100%" stopColor="#1A5276" />
+              </linearGradient>
+            </defs>
+            {/*
+              Path: starts top-left, goes along the wave edge, ends bottom-left.
+              The wave is defined so it bleeds into the right at top & bottom,
+              and pulls back near the middle — multiple soft ripples.
+
+              Coordinates in 120×900 space:
+              - Left edge is x=0
+              - Center seam is x=60
+              - "Bleeding right" means x > 60 (into the grey side)
+              - "Pulling back" means x < 60
+            */}
+            <path
+              d={`
+                M 0,0
+                L 60,0
+                C 100,0  110,40  90,80
+                C 70,120  50,140  68,200
+                C 86,260  105,290  88,360
+                C 71,430  45,460  62,530
+                C 79,600  108,630  92,700
+                C 76,770  50,800  68,860
+                C 86,900  100,900  60,900
+                L 0,900
+                Z
+              `}
+              fill="url(#waveGrad)"
+            />
+          </svg>
+        </div>
+
+        {/* ── Right Panel ── */}
         <div className="auth-right">
+          {/* Background texture */}
+          <div className="auth-right-dots" />
+
+          {/* Floating blobs */}
+          <div className="blob-red-top" />
+          <div className="blob-blue-mid" />
+          <div className="blob-red-bottom" />
+          <div className="blob-accent" />
 
           {/* Mobile logo */}
           <div className="auth-mobile-logo" style={{
             flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 28,
+            position: 'relative', zIndex: 1,
           }}>
             <div style={{
               width: 72, height: 72, borderRadius: 18, overflow: 'hidden',
@@ -201,8 +345,9 @@ export default function AuthPage() {
             width: '100%', maxWidth: 420,
             background: 'white', borderRadius: 20,
             padding: '32px 30px',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06)',
-            border: '1px solid #E4E6EB',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.07)',
+            border: '1px solid rgba(255,255,255,0.9)',
+            position: 'relative', zIndex: 1,
           }}>
             <div style={{ marginBottom: 26, textAlign: 'center' }}>
               <h1 style={{
@@ -212,7 +357,10 @@ export default function AuthPage() {
               }}>
                 {mode === 'login' ? 'Welcome back 👋' : 'Create account'}
               </h1>
-              <p style={{ margin: 0, fontSize: 13.5, color: '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>
+              <p style={{
+                margin: 0, fontSize: 13.5, color: '#65676B',
+                fontFamily: '"Instrument Sans", system-ui',
+              }}>
                 {mode === 'login' ? 'Sign in to your CSB account' : 'Join the CS community today'}
               </p>
             </div>
@@ -294,7 +442,10 @@ export default function AuthPage() {
               <div style={{ flex: 1, height: 1, background: '#EAECEF' }} />
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: 14, color: '#65676B', margin: 0, fontFamily: '"Instrument Sans", system-ui' }}>
+            <p style={{
+              textAlign: 'center', fontSize: 14, color: '#65676B', margin: 0,
+              fontFamily: '"Instrument Sans", system-ui',
+            }}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} style={{
                 background: 'none', border: 'none', color: RED, fontWeight: 700,
@@ -308,6 +459,7 @@ export default function AuthPage() {
           <p style={{
             textAlign: 'center', fontSize: 11.5, color: '#BCC0C4',
             marginTop: 24, fontFamily: '"Instrument Sans", system-ui',
+            position: 'relative', zIndex: 1,
           }}>
             CSB · Computer Science Board · Announcement Platform
           </p>
