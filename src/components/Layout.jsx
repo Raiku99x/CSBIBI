@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../hooks/useNotifications'
+import { supabase } from '../lib/supabase'
 import {
   Home, MessageSquare, Bell, BookMarked, Grid3X3,
   LogOut, Settings, Check, ChevronDown, X
@@ -15,35 +16,64 @@ function dicebearUrl(name = '') {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
 
-const RED = '#C0392B'
+const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [showNotifs, setShowNotifs] = useState(false)
-  const menuRef = useRef(null)
+  const [showNotifs, setShowNotifs]     = useState(false)
+  const [dmUnread, setDmUnread]         = useState(0)
+  const menuRef  = useRef(null)
   const notifRef = useRef(null)
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
 
+  // Close menus on outside click
   useEffect(() => {
     function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setShowUserMenu(false)
+      if (menuRef.current  && !menuRef.current.contains(e.target))  setShowUserMenu(false)
       if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // DM unread badge
+  useEffect(() => {
+    if (!profile) return
+    supabase.from('direct_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', profile.id).eq('is_read', false)
+      .then(({ count }) => setDmUnread(count || 0))
+
+    const ch = supabase.channel('dm-badge-' + profile.id)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'direct_messages',
+        filter: `receiver_id=eq.${profile.id}`,
+      }, () => setDmUnread(c => c + 1))
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'direct_messages',
+        filter: `receiver_id=eq.${profile.id}`,
+      }, async () => {
+        const { count } = await supabase.from('direct_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', profile.id).eq('is_read', false)
+        setDmUnread(count || 0)
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [profile])
+
   async function handleSignOut() {
     await signOut()
     navigate('/auth')
   }
 
+  // Chat replaced with Messages (unified inbox + group chat)
   const navItems = [
     { to: '/', icon: Home, label: 'Feed', exact: true },
-    { to: '/chat', icon: MessageSquare, label: 'Chat' },
+    { to: '/messages', icon: MessageSquare, label: 'Messages', badge: dmUnread },
     { to: '/announcements', icon: Bell, label: 'Announce' },
     { to: '/subjects', icon: BookMarked, label: 'Subjects' },
     { to: '/apps', icon: Grid3X3, label: 'Apps' },
@@ -107,8 +137,7 @@ export default function Layout({ children }) {
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button onClick={() => { setShowUserMenu(v => !v); setShowNotifs(false) }} style={{
                 display: 'flex', alignItems: 'center', gap: 7,
-                padding: '3px 8px 3px 3px',
-                borderRadius: 9,
+                padding: '3px 8px 3px 3px', borderRadius: 9,
                 border: `1.5px solid ${showUserMenu ? '#F5B7B1' : '#E4E6EB'}`,
                 background: showUserMenu ? '#FADBD8' : '#F4F6F8',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -149,13 +178,7 @@ export default function Layout({ children }) {
       </header>
 
       {/* ── Main — no horizontal padding, cards go edge to edge on mobile ── */}
-      <main style={{
-        flex: 1,
-        maxWidth: 680,
-        margin: '0 auto',
-        width: '100%',
-        paddingBottom: 64,
-      }}>
+      <main style={{ flex: 1, maxWidth: 680, margin: '0 auto', width: '100%', paddingBottom: 64 }}>
         {children}
       </main>
 
@@ -172,7 +195,7 @@ export default function Layout({ children }) {
           height: 52, display: 'flex', alignItems: 'center',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
-          {navItems.map(({ to, icon: Icon, label, exact }) => (
+          {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
             <NavLink key={to} to={to} end={exact} style={{ flex: 1, textDecoration: 'none' }}>
               {({ isActive }) => (
                 <div style={{
@@ -181,24 +204,27 @@ export default function Layout({ children }) {
                   gap: 2, padding: '6px 4px', position: 'relative',
                 }}>
                   {isActive && (
-                    <div style={{
-                      position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-                      width: 20, height: 2.5, borderRadius: 2, background: RED,
-                    }} />
+                    <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 20, height: 2.5, borderRadius: 2, background: RED }} />
                   )}
-                  <div style={{
-                    width: 34, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 7,
-                    background: isActive ? '#FADBD8' : 'transparent',
-                    transition: 'background 0.15s',
-                  }}>
-                    <Icon size={19} color={isActive ? RED : '#65676B'} strokeWidth={isActive ? 2.5 : 2} />
+                  {/* Icon wrapper with optional badge */}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ width: 34, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, background: isActive ? '#FADBD8' : 'transparent', transition: 'background 0.15s' }}>
+                      <Icon size={19} color={isActive ? RED : '#65676B'} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
+                    {badge > 0 && (
+                      <div style={{
+                        position: 'absolute', top: -4, right: -5,
+                        minWidth: 16, height: 16, borderRadius: 8,
+                        background: RED, color: 'white',
+                        fontSize: 9, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '0 3px', border: '1.5px solid white',
+                      }}>
+                        {badge > 9 ? '9+' : badge}
+                      </div>
+                    )}
                   </div>
-                  <span style={{
-                    fontSize: 9.5, fontWeight: isActive ? 700 : 500,
-                    color: isActive ? RED : '#8A8D91',
-                    fontFamily: '"Instrument Sans", system-ui',
-                  }}>
+                  <span style={{ fontSize: 9.5, fontWeight: isActive ? 700 : 500, color: isActive ? RED : '#8A8D91', fontFamily: '"Instrument Sans", system-ui' }}>
                     {label}
                   </span>
                 </div>
@@ -208,9 +234,7 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      <style>{`
-        @keyframes slideDown { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }
-      `}</style>
+      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   )
 }
@@ -241,10 +265,7 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
       overflow: 'hidden', zIndex: 100,
       animation: 'slideDown 0.18s ease',
     }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '11px 14px 10px', borderBottom: '1px solid #F0F2F5',
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px 10px', borderBottom: '1px solid #F0F2F5' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Bell size={15} color={RED} strokeWidth={2.5} />
           <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>Notifications</span>
@@ -262,12 +283,10 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
         </div>
       </div>
       <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-        {notifications.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', color: '#65676B', fontSize: 13, fontFamily: '"Instrument Sans", system-ui' }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>🔔</div>
-            You're all caught up!
-          </div>
-        ) : notifications.map(n => <NotifItem key={n.id} notif={n} onRead={markRead} onClose={onClose} navigate={navigate} />)}
+        {notifications.length === 0
+          ? <div style={{ padding: '32px 16px', textAlign: 'center', color: '#65676B', fontSize: 13, fontFamily: '"Instrument Sans", system-ui' }}><div style={{ fontSize: 28, marginBottom: 6 }}>🔔</div>You're all caught up!</div>
+          : notifications.map(n => <NotifItem key={n.id} notif={n} onRead={markRead} onClose={onClose} navigate={navigate} />)
+        }
       </div>
     </div>
   )
