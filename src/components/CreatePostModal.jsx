@@ -165,7 +165,7 @@ export default function CreatePostModal({
           post_type: form.post_type,
           sub_type: form.sub_type || null,
           announcement_type: isAnnouncement && form.announcement_type ? form.announcement_type : null,
-          due_date: isDeadline && form.due_date ? form.due_date : null,
+          due_date: form.due_date || null,
         })
         .select('*, profiles(*), subjects(*)')
         .single()
@@ -342,7 +342,7 @@ export default function CreatePostModal({
                   onClick={() => {
                     set('sub_type', key)
                     setShowSubTypeError(false)
-                    if (key !== 'deadline') set('due_date', '')
+                    if (key !== 'deadline' && key !== 'announcement') set('due_date', '')
                     if (key !== 'material' && !isAnnouncement) setAttachFiles([])
                   }}
                   style={{
