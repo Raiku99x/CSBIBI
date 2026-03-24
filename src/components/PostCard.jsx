@@ -16,10 +16,19 @@ function dicebearUrl(name = '') {
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
+function formatTime12(timeStr) {
+  if (!timeStr) return null
+  const [h, m] = timeStr.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 || 12
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
 function getBanner(subType, postType) {
   if (subType === 'deadline')      return { bg: `linear-gradient(90deg,#B03A2E,#922B21)`, label: 'DEADLINE',      icon: <Clock size={12} color="white" /> }
   if (subType === 'reminder')      return { bg: `linear-gradient(90deg,${RED},#A93226)`,  label: 'REMINDER',      icon: <Bell size={12} color="white" /> }
   if (subType === 'material')      return { bg: `linear-gradient(90deg,${BLUE},#154360)`, label: 'MATERIAL',      icon: <FileText size={12} color="white" /> }
+  if (subType === 'announcement')  return { bg: `linear-gradient(90deg,${RED},${BLUE})`,  label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
   if (postType === 'announcement') return { bg: `linear-gradient(90deg,${RED},${BLUE})`,  label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
   return null
 }
@@ -28,6 +37,7 @@ function getTypeLabel(subType, postType) {
   if (subType === 'material')      return 'Material'
   if (subType === 'deadline')      return 'Deadline'
   if (subType === 'reminder')      return 'Reminder'
+  if (subType === 'announcement')  return 'Announcement'
   if (postType === 'announcement') return 'Announcement'
   return 'Post'
 }
@@ -117,11 +127,10 @@ export default function PostCard({ post, currentUserId }) {
 
   const banner = getBanner(post.sub_type, post.post_type)
   const typeLabel = getTypeLabel(post.sub_type, post.post_type)
-  const isPastDue = post.sub_type==='deadline' && post.due_date && new Date(post.due_date) < new Date()
+  const isPastDue = post.due_date && new Date(post.due_date) < new Date()
 
   return (
     <>
-      {/* Card: no border-radius, full width, thin border top/bottom like FB */}
       <article style={{
         background: 'white',
         borderTop: '1px solid #E4E6EB',
@@ -143,7 +152,9 @@ export default function PostCard({ post, currentUserId }) {
               <div style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20 }}>
                 {isPastDue && <AlertCircle size={10} color="white" />}
                 <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:600 }}>
-                  {isPastDue?'Past due · ':'Due · '}{format(new Date(post.due_date),'MMM d, yyyy')}
+                  {isPastDue ? 'Past due · ' : 'Due · '}
+                  {format(new Date(post.due_date), 'MMM d, yyyy')}
+                  {post.due_time ? ` · ${formatTime12(post.due_time)}` : ''}
                 </span>
               </div>
             )}
