@@ -537,6 +537,15 @@ export default function CreatePostModal({
             {/* File list */}
             {attachFiles.length > 0 && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#65676B' }}>
+                    {attachFiles.length}/{MAX_FILES} files
+                  </span>
+                  <button type="button" onClick={() => setAttachFiles([])}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>
+                    Remove all
+                  </button>
+                </div>
                 {attachFiles.map((file, i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -552,6 +561,22 @@ export default function CreatePostModal({
                     </button>
                   </div>
                 ))}
+                {/* Add more files button */}
+                {attachFiles.length < MAX_FILES && (
+                  <button type="button" onClick={() => fileRef.current.click()}
+                    style={{
+                      padding: '9px 0', borderRadius: 10,
+                      border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      color: '#65676B', transition: 'border-color 0.15s, color 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#0D7377'; e.currentTarget.style.color = '#0D7377' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#CED0D4'; e.currentTarget.style.color = '#65676B' }}
+                  >
+                    <Plus size={15} />
+                    <span style={{ fontSize: 12, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add more files</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
