@@ -410,7 +410,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           onCommentCountChange={setCommentCount}
         />
       )}
-      <style>{\`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}\`}</style>
+      <style dangerouslySetInnerHTML={{ __html: '@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}' }} />
     </>
   )
 }
