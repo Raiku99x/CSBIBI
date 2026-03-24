@@ -110,7 +110,7 @@ export default function FeedPage() {
         <EmptyFeed onPost={() => openCreate('status', '')} />
       ) : (
         <div>
-          {posts.map(post => <PostCard key={post.id} post={post} currentUserId={user?.id} subjects={subjects} />)}
+          {posts.map(post => <PostCard key={post.id} post={post} currentUserId={user?.id} subjects={subjects} profile={profile} />)}
           <div style={{ padding: '16px 0 8px', textAlign: 'center' }}>
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#BCC0C4' }}>
               · {posts.length} posts · You're all caught up ·
