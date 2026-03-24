@@ -22,7 +22,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [createType, setCreateType] = useState('status')
-  const [createSubType, setCreateSubType] = useState('status')
+  const [createSubType, setCreateSubType] = useState('')
   const [autoOpenPhoto, setAutoOpenPhoto] = useState(false)
   const [autoOpenFile, setAutoOpenFile] = useState(false)
 
@@ -45,11 +45,13 @@ export default function FeedPage() {
     return () => supabase.removeChannel(channel)
   }, [fetchPosts])
 
-  function openCreate(type = 'status', subType = 'status') {
-    setCreateType(type); setCreateSubType(subType); setShowCreate(true)
+  function openCreate(type = 'status', subType = '') {
+    setCreateType(type)
+    setCreateSubType(subType)
+    setShowCreate(true)
   }
-  function handlePhotoClick() { setAutoOpenPhoto(true); setAutoOpenFile(false); openCreate('status', 'status') }
-  function handleFileClick() { setAutoOpenFile(true); setAutoOpenPhoto(false); openCreate('status', 'material') }
+  function handlePhotoClick() { setAutoOpenPhoto(true); setAutoOpenFile(false); openCreate('status', '') }
+  function handleFileClick() { setAutoOpenFile(true); setAutoOpenPhoto(false); openCreate('status', '') }
   function handleModalClose() { setShowCreate(false); setAutoOpenPhoto(false); setAutoOpenFile(false) }
 
   const firstName = profile?.display_name?.split(' ')[0] || 'there'
@@ -72,7 +74,7 @@ export default function FeedPage() {
             style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1.5px solid #F0F2F5' }}
           />
           <button
-            onClick={() => openCreate('status', 'status')}
+            onClick={() => openCreate('status', '')}
             style={{
               flex: 1, height: 38,
               background: '#F0F2F5', border: 'none',
@@ -96,7 +98,8 @@ export default function FeedPage() {
         <div style={{ display: 'flex', padding: '4px 6px 6px' }}>
           <ComposeBtn icon={<Paperclip size={18} />} color="#1877F2" bg="#EBF5FD" label="File" onClick={handleFileClick} />
           <ComposeBtn icon={<Image size={18} />} color="#16A34A" bg="#DCFCE7" label="Photo" onClick={handlePhotoClick} />
-          <ComposeBtn icon={<Megaphone size={18} />} color={RED} bg="#FADBD8" label="Announce" onClick={() => openCreate('announcement', 'reminder')} />
+          {/* Pass empty subType so modal opens with no sub-type pre-selected */}
+          <ComposeBtn icon={<Megaphone size={18} />} color={RED} bg="#FADBD8" label="Announce" onClick={() => openCreate('announcement', '')} />
         </div>
       </div>
 
@@ -104,11 +107,10 @@ export default function FeedPage() {
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i} />)}</div>
       ) : posts.length === 0 ? (
-        <EmptyFeed onPost={() => openCreate('status', 'status')} />
+        <EmptyFeed onPost={() => openCreate('status', '')} />
       ) : (
         <div>
           {posts.map(post => <PostCard key={post.id} post={post} currentUserId={user?.id} />)}
-          {/* End of feed */}
           <div style={{ padding: '16px 0 8px', textAlign: 'center' }}>
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#BCC0C4' }}>
               · {posts.length} posts · You're all caught up ·
