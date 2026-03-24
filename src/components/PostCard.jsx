@@ -115,13 +115,14 @@ function PhotoGrid({ photos, onPhotoClick }) {
   return <div style={{display:'flex',flexDirection:'column',gap:2}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,height:200}}>{display.slice(0,2).map((u,i)=>wrap(u,i))}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,height:130}}>{display.slice(2,5).map((u,i)=>wrap(u,i+2))}</div></div>
 }
 
+
 // ── PostCard ──────────────────────────────────────────────────
 export default function PostCard({ post, currentUserId, subjects = [], profile }) {
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [likeAvatars, setLikeAvatars] = useState([])
+  const [liking, setLiking] = useState(false)
   const [commentCount, setCommentCount] = useState(0)
-  const [previewComments, setPreviewComments] = useState([])
   const [showComments, setShowComments] = useState(false)
   const [saved, setSaved] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
@@ -142,16 +143,44 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
     }
   }
 
+  // Real like toggle — persists to Supabase, visible to everyone
+  async function handleLike() {
+    if (liking) return
+    setLiking(true)
+    const nowLiked = !liked
+    setLiked(nowLiked)
+    setLikeCount(c => nowLiked ? c + 1 : Math.max(0, c - 1))
+    try {
+      if (nowLiked) {
+        await supabase.from('likes').insert({ post_id: postData.id, user_id: currentUserId })
+      } else {
+        await supabase.from('likes').delete()
+          .eq('post_id', postData.id).eq('user_id', currentUserId)
+      }
+      const { data } = await supabase
+        .from('likes').select('user_id, profiles(avatar_url, display_name)')
+        .eq('post_id', postData.id)
+      if (data) {
+        setLikeCount(data.length)
+        setLikeAvatars(data.slice(0, 3).map(l => l.profiles))
+        setLiked(data.some(l => l.user_id === currentUserId))
+      }
+    } catch {
+      setLiked(!nowLiked)
+      setLikeCount(c => nowLiked ? Math.max(0, c - 1) : c + 1)
+    } finally {
+      setLiking(false)
+    }
+  }
+
   useEffect(() => {
     function h(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  // Fetch initial likes and comments
   useEffect(() => {
     async function fetchCounts() {
-      // Likes
       const { data: likesData } = await supabase
         .from('likes').select('user_id, profiles(avatar_url, display_name)')
         .eq('post_id', post.id)
@@ -160,17 +189,30 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
         setLikeAvatars(likesData.slice(0, 3).map(l => l.profiles))
         setLiked(likesData.some(l => l.user_id === currentUserId))
       }
-      // Comment count + preview (latest 2)
-      const { data: commentsData } = await supabase
-        .from('comments').select('id, content, profiles(display_name, avatar_url), created_at')
-        .eq('post_id', post.id).order('created_at', { ascending: false }).limit(2)
-      if (commentsData) {
-        const { count } = await supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
-        setCommentCount(count || 0)
-        setPreviewComments(commentsData.reverse())
-      }
+      const { count } = await supabase
+        .from('comments').select('id', { count: 'exact', head: true })
+        .eq('post_id', post.id)
+      setCommentCount(count || 0)
     }
     fetchCounts()
+
+    // Live like updates for all users
+    const ch = supabase.channel('likes-' + post.id)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'likes',
+        filter: `post_id=eq.${post.id}`,
+      }, async () => {
+        const { data } = await supabase
+          .from('likes').select('user_id, profiles(avatar_url, display_name)')
+          .eq('post_id', post.id)
+        if (data) {
+          setLikeCount(data.length)
+          setLikeAvatars(data.slice(0, 3).map(l => l.profiles))
+          setLiked(data.some(l => l.user_id === currentUserId))
+        }
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
   }, [post.id, currentUserId])
 
   if (deleted) return null
@@ -330,7 +372,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
         {/* ── Likes + comment count row ── */}
         {(likeCount > 0 || commentCount > 0) && (
           <div style={{ padding:'8px 12px 0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            {/* Like avatars + count */}
             {likeCount > 0 ? (
               <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                 <div style={{ display:'flex' }}>
@@ -345,37 +386,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
                 <span style={{ fontSize:12.5, color:'#65676B', fontFamily:'"Instrument Sans",system-ui' }}>{likeCount}</span>
               </div>
             ) : <div />}
-            {/* Comment count */}
             {commentCount > 0 && (
               <button onClick={() => setShowComments(true)}
                 style={{ background:'none', border:'none', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontSize:12.5, color:'#65676B', padding:0 }}>
                 {commentCount} comment{commentCount !== 1 ? 's' : ''}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ── Comment preview ── */}
-        {previewComments.length > 0 && (
-          <div style={{ padding:'8px 12px 0', display:'flex', flexDirection:'column', gap:6 }}>
-            {previewComments.map(c => (
-              <div key={c.id} style={{ display:'flex', gap:7, alignItems:'flex-start' }}>
-                <img src={c.profiles?.avatar_url || dicebearUrl(c.profiles?.display_name)} alt=""
-                  style={{ width:26, height:26, borderRadius:8, objectFit:'cover', flexShrink:0 }} />
-                <div style={{ background:'#F0F2F5', borderRadius:'4px 12px 12px 12px', padding:'5px 10px', minWidth:0 }}>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#050505' }}>
-                    {c.profiles?.display_name}
-                  </span>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#1c1e21', marginLeft:5 }}>
-                    {c.content}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {commentCount > 2 && (
-              <button onClick={() => setShowComments(true)}
-                style={{ background:'none', border:'none', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontSize:12.5, color:'#65676B', textAlign:'left', padding:'0 0 0 2px' }}>
-                View all {commentCount} comments
               </button>
             )}
           </div>
@@ -386,10 +400,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
 
         {/* ── Actions ── */}
         <div style={{ display:'flex',alignItems:'center',padding:'0 6px 2px' }}>
-          <ActionBtn onClick={()=>{setLiked(l=>!l);setLikeCount(c=>liked?c-1:c+1)}} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
+          <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
           <ActionBtn onClick={() => setShowComments(true)} icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
           <ActionBtn icon={<Share2 size={17} color="#65676B"/>} label="Share" />
-
         </div>
       </article>
 
