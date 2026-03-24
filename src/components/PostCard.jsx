@@ -220,30 +220,44 @@ export default function PostCard({ post, currentUserId, subjects = [] }) {
               onMouseLeave={e=>{if(!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color='#BCC0C4'}}}>
               <MoreHorizontal size={17} />
             </button>
-            {showMenu && postData.author_id === currentUserId && (
+            {showMenu && (
               <div style={{
                 position: 'absolute', right: 0, top: 'calc(100% + 4px)',
                 background: 'white', borderRadius: 10, border: '1px solid #E4E6EB',
                 boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden',
-                zIndex: 20, minWidth: 140, animation: 'slideDown 0.15s ease',
+                zIndex: 20, minWidth: 155, animation: 'slideDown 0.15s ease',
               }}>
-                <button
-                  onClick={() => { setShowMenu(false); setShowEdit(true) }}
-                  style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#050505', textAlign:'left', transition:'background 0.1s' }}
-                  onMouseEnter={e=>e.currentTarget.style.background='#F7F8FA'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
-                >
-                  <Pencil size={14} color="#65676B" /> Edit post
-                </button>
-                <div style={{ height:1, background:'#F0F2F5' }} />
-                <button
-                  onClick={() => { setShowMenu(false); if (window.confirm('Delete this post? This cannot be undone.')) handleDelete() }}
-                  style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#C0392B', textAlign:'left', transition:'background 0.1s' }}
-                  onMouseEnter={e=>e.currentTarget.style.background='#FFF5F5'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
-                >
-                  <Trash2 size={14} color="#C0392B" /> Delete post
-                </button>
+                {postData.author_id === currentUserId ? (
+                  <>
+                    <button
+                      onClick={() => { setShowMenu(false); setShowEdit(true) }}
+                      style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#050505', textAlign:'left', transition:'background 0.1s' }}
+                      onMouseEnter={e=>e.currentTarget.style.background='#F7F8FA'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                    >
+                      <Pencil size={14} color="#65676B" /> Edit post
+                    </button>
+                    <div style={{ height:1, background:'#F0F2F5' }} />
+                    <button
+                      onClick={() => { setShowMenu(false); if (window.confirm('Delete this post? This cannot be undone.')) handleDelete() }}
+                      style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#C0392B', textAlign:'left', transition:'background 0.1s' }}
+                      onMouseEnter={e=>e.currentTarget.style.background='#FFF5F5'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                    >
+                      <Trash2 size={14} color="#C0392B" /> Delete post
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => { setSaved(s => !s); setShowMenu(false) }}
+                    style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color: saved ? '#1A5276' : '#050505', textAlign:'left', transition:'background 0.1s' }}
+                    onMouseEnter={e=>e.currentTarget.style.background='#F7F8FA'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                  >
+                    <Bookmark size={14} color={saved ? '#1A5276' : '#65676B'} fill={saved ? '#1A5276' : 'none'} />
+                    {saved ? 'Saved' : 'Save post'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -301,9 +315,7 @@ export default function PostCard({ post, currentUserId, subjects = [] }) {
           <ActionBtn onClick={()=>{setLiked(l=>!l);setLikeCount(c=>liked?c-1:c+1)}} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
           <ActionBtn icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
           <ActionBtn icon={<Share2 size={17} color="#65676B"/>} label="Share" />
-          <div style={{marginLeft:'auto'}}>
-            <ActionBtn onClick={()=>setSaved(s=>!s)} icon={<Bookmark size={17} fill={saved?BLUE:'none'} color={saved?BLUE:'#65676B'}/>} label="" noflex />
-          </div>
+
         </div>
       </article>
 
