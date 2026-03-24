@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
-  FileText, Download, Calendar, BookOpen, Megaphone,
+  FileText, Download, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
   MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2
 } from 'lucide-react'
@@ -387,7 +387,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
         {/* ── Actions ── */}
         <div style={{ display:'flex',alignItems:'center',padding:'0 6px 2px' }}>
           <ActionBtn onClick={()=>{setLiked(l=>!l);setLikeCount(c=>liked?c-1:c+1)}} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
-          <ActionBtn icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
+          <ActionBtn onClick={() => setShowComments(true)} icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
           <ActionBtn icon={<Share2 size={17} color="#65676B"/>} label="Share" />
 
         </div>
