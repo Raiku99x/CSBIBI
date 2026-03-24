@@ -364,30 +364,30 @@ export default function CreatePostModal({
               ))}
             </div>
 
-            {/* Announcement type selector */}
-            {isAnnouncement && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 }}>
-                  Announcement Type
-                </label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {['Quiz','Activity','Output','Exam','Fees','Info','Learning Task'].map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => set('announcement_type', form.announcement_type === type ? '' : type)}
-                      style={{
-                        padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                        fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12,
-                        background: form.announcement_type === type ? '#0D7377' : '#F0F2F5',
-                        color: form.announcement_type === type ? 'white' : '#65676B',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {type}
-                    </button>
+            {/* Announcement type dropdown */}
+            {isAnnouncement && form.sub_type && (
+              <div style={{ position: 'relative', marginBottom: 14 }}>
+                <select
+                  value={form.announcement_type}
+                  onChange={e => set('announcement_type', e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 36px 10px 14px',
+                    borderRadius: 10, border: '1px solid #E4E6EB',
+                    background: form.announcement_type ? '#E6F4F4' : '#F7F8FA',
+                    appearance: 'none',
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 14,
+                    color: form.announcement_type ? '#0D7377' : '#8A8D91',
+                    fontWeight: form.announcement_type ? 700 : 400,
+                    cursor: 'pointer', outline: 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <option value="">Type (optional)</option>
+                  {['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting'].map(type => (
+                    <option key={type} value={type}>{type}</option>
                   ))}
-                </div>
+                </select>
+                <ChevronDown size={15} color={form.announcement_type ? '#0D7377' : '#65676B'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               </div>
             )}
 
@@ -432,58 +432,61 @@ export default function CreatePostModal({
               <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             </div>
 
-            {/* Due date — required for Deadline, optional for other announcement types */}
+            {/* Due date + time — side by side compact layout */}
             {(isDeadline || (isAnnouncement && form.sub_type === 'announcement')) && (
               <div style={{ marginTop: 10 }}>
                 <label style={{
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 700,
+                  fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
                   color: isDeadline ? '#E41E3F' : '#65676B',
                   display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6,
+                  textTransform: 'uppercase', letterSpacing: 0.4,
                 }}>
-                  📅 Due Date
+                  📅 Due Date &amp; Time
                   {isDeadline
-                    ? <><span style={{ color: '#E41E3F' }}>*</span><span style={{ fontWeight: 400, color: '#65676B', fontSize: 11 }}>(required for Deadline)</span></>
-                    : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 11 }}>(optional)</span>
+                    ? <span style={{ color: '#E41E3F', fontWeight: 700 }}>*</span>
+                    : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                   }
                 </label>
-                <input
-                  type="date"
-                  value={form.due_date}
-                  onChange={e => set('due_date', e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  style={{
-                    width: '100%', padding: '10px 14px',
-                    borderRadius: 10,
-                    border: `1px solid ${form.due_date ? '#0D7377' : isDeadline ? '#E41E3F' : '#E4E6EB'}`,
-                    fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
-                    background: '#F7F8FA', outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                {/* Optional time input — only show when date is set */}
-                {form.due_date && (
-                  <div style={{ marginTop: 8 }}>
-                    <label style={{
-                      fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
-                      color: '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5,
-                      textTransform: 'uppercase', letterSpacing: 0.5,
-                    }}>
-                      🕐 Time <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 11, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={form.due_time}
-                      onChange={e => set('due_time', e.target.value)}
-                      style={{
-                        width: '100%', padding: '10px 14px',
-                        borderRadius: 10,
-                        border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`,
-                        fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
-                        background: '#F7F8FA', outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {/* Date — takes more space */}
+                  <input
+                    type="date"
+                    value={form.due_date}
+                    onChange={e => set('due_date', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    style={{
+                      flex: 3, padding: '10px 12px',
+                      borderRadius: 10,
+                      border: `1px solid ${form.due_date ? '#0D7377' : isDeadline ? '#E41E3F' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
+                      background: '#F7F8FA', outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {/* Time — only active when date is set */}
+                  <input
+                    type="time"
+                    value={form.due_time}
+                    onChange={e => set('due_time', e.target.value)}
+                    disabled={!form.due_date}
+                    placeholder="Time"
+                    style={{
+                      flex: 2, padding: '10px 12px',
+                      borderRadius: 10,
+                      border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
+                      color: form.due_date ? '#050505' : '#BCC0C4',
+                      background: form.due_date ? '#F7F8FA' : '#F0F2F5',
+                      outline: 'none', boxSizing: 'border-box',
+                      cursor: form.due_date ? 'text' : 'not-allowed',
+                      opacity: form.due_date ? 1 : 0.5,
+                    }}
+                  />
+                </div>
+                {!form.due_date && !isDeadline && (
+                  <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>
+                    Pick a date first to enable the time field
+                  </p>
                 )}
               </div>
             )}
