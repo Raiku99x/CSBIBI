@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
   FileText, Download, Calendar, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
-  MoreHorizontal, Bookmark, Bell, Clock, AlertCircle
+  MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2
 } from 'lucide-react'
+
+import EditPostModal from './EditPostModal'
+import { supabase } from '../lib/supabase'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -112,22 +115,45 @@ function PhotoGrid({ photos, onPhotoClick }) {
 }
 
 // ── PostCard ──────────────────────────────────────────────────
-export default function PostCard({ post, currentUserId }) {
+export default function PostCard({ post, currentUserId, subjects = [] }) {
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [saved, setSaved] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [expanded, setExpanded] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [deleted, setDeleted] = useState(false)
+  const [postData, setPostData] = useState(post)
+  const menuRef = useRef(null)
 
-  const photos = parsePhotos(post.photo_url)
-  const files  = parseFiles(post.file_url, post.file_name)
-  const caption = post.caption || ''
+  async function handleDelete() {
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postData.id)
+      if (error) throw error
+      setDeleted(true)
+    } catch (err) {
+      alert(err.message || 'Failed to delete')
+    }
+  }
+
+  useEffect(() => {
+    function h(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  if (deleted) return null
+
+  const photos = parsePhotos(postData.photo_url)
+  const files  = parseFiles(postData.file_url, postData.file_name)
+  const caption = postData.caption || ''
   const isLong = caption.length > 220
   const displayCaption = isLong && !expanded ? caption.slice(0,220)+'…' : caption
 
-  const banner = getBanner(post.sub_type, post.post_type)
-  const typeLabel = getTypeLabel(post.sub_type, post.post_type)
-  const isPastDue = post.due_date && new Date(post.due_date) < new Date()
+  const banner = getBanner(postData.sub_type, postData.post_type)
+  const typeLabel = getTypeLabel(postData.sub_type, postData.post_type)
+  const isPastDue = postData.due_date && new Date(postData.due_date) < new Date()
 
   return (
     <>
@@ -146,15 +172,15 @@ export default function PostCard({ post, currentUserId }) {
               {banner.icon}
             </div>
             <span style={{ color: 'white', fontSize: 11, fontWeight: 700, fontFamily: '"Instrument Sans",system-ui', letterSpacing: 0.7, textTransform: 'uppercase', flex: 1 }}>
-              {banner.label}{post.announcement_type ? ` · ${post.announcement_type}` : ''}
+              {banner.label}{postData.announcement_type ? ` · ${postData.announcement_type}` : ''}
             </span>
-            {post.due_date && (
+            {postData.due_date && (
               <div style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20 }}>
                 {isPastDue && <AlertCircle size={10} color="white" />}
                 <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:600 }}>
                   {isPastDue ? 'Past due · ' : 'Due · '}
-                  {format(new Date(post.due_date), 'MMM d, yyyy')}
-                  {post.due_time ? ` · ${formatTime12(post.due_time)}` : ''}
+                  {format(new Date(postData.due_date), 'MMM d, yyyy')}
+                  {postData.due_time ? ` · ${formatTime12(postData.due_time)}` : ''}
                 </span>
               </div>
             )}
@@ -164,32 +190,63 @@ export default function PostCard({ post, currentUserId }) {
         {/* ── Header ── */}
         <div style={{ padding: '10px 12px 8px', display: 'flex', alignItems: 'center', gap: 9 }}>
           <img
-            src={post.profiles?.avatar_url || dicebearUrl(post.profiles?.display_name)}
+            src={postData.profiles?.avatar_url || dicebearUrl(postData.profiles?.display_name)}
             alt=""
             style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1.5px solid #F0F2F5' }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: '"Instrument Sans",system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>
-                {post.profiles?.display_name || 'Unknown'}
+                {postData.profiles?.display_name || 'Unknown'}
               </span>
-              {post.subjects && (
+              {postData.subjects && (
                 <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,fontSize:10.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',padding:'2px 7px',borderRadius:20,border:'1px solid #D6EAF8' }}>
-                  <BookOpen size={9} /> {post.subjects.name}
+                  <BookOpen size={9} /> {postData.subjects.name}
                 </span>
               )}
             </div>
             <p style={{ margin:'1px 0 0',fontSize:11.5,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>
-              {formatDistanceToNow(new Date(post.created_at),{addSuffix:true})}
+              {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
               <span style={{margin:'0 4px',color:'#D4D6DA'}}>·</span>
               <span style={{color:'#BCC0C4'}}>{typeLabel}</span>
+              {postData.is_edited && <><span style={{margin:'0 4px',color:'#D4D6DA'}}>·</span><span style={{color:'#BCC0C4',fontStyle:'italic',fontSize:11}}>Edited</span></>}
             </p>
           </div>
-          <button style={{ width:32,height:32,borderRadius:7,background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#BCC0C4',flexShrink:0,transition:'background 0.12s,color 0.12s' }}
-            onMouseEnter={e=>{e.currentTarget.style.background='#F0F2F5';e.currentTarget.style.color='#65676B'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#BCC0C4'}}>
-            <MoreHorizontal size={17} />
-          </button>
+          <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setShowMenu(v => !v)}
+              style={{ width:32,height:32,borderRadius:7,background:showMenu?'#F0F2F5':'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:showMenu?'#65676B':'#BCC0C4',transition:'background 0.12s,color 0.12s' }}
+              onMouseEnter={e=>{e.currentTarget.style.background='#F0F2F5';e.currentTarget.style.color='#65676B'}}
+              onMouseLeave={e=>{if(!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color='#BCC0C4'}}}>
+              <MoreHorizontal size={17} />
+            </button>
+            {showMenu && postData.author_id === currentUserId && (
+              <div style={{
+                position: 'absolute', right: 0, top: 'calc(100% + 4px)',
+                background: 'white', borderRadius: 10, border: '1px solid #E4E6EB',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden',
+                zIndex: 20, minWidth: 140, animation: 'slideDown 0.15s ease',
+              }}>
+                <button
+                  onClick={() => { setShowMenu(false); setShowEdit(true) }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#050505', textAlign:'left', transition:'background 0.1s' }}
+                  onMouseEnter={e=>e.currentTarget.style.background='#F7F8FA'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                >
+                  <Pencil size={14} color="#65676B" /> Edit post
+                </button>
+                <div style={{ height:1, background:'#F0F2F5' }} />
+                <button
+                  onClick={() => { setShowMenu(false); if (window.confirm('Delete this post? This cannot be undone.')) handleDelete() }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:'#C0392B', textAlign:'left', transition:'background 0.1s' }}
+                  onMouseEnter={e=>e.currentTarget.style.background='#FFF5F5'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                >
+                  <Trash2 size={14} color="#C0392B" /> Delete post
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Caption ── */}
@@ -251,6 +308,16 @@ export default function PostCard({ post, currentUserId }) {
       </article>
 
       {lightboxIndex!==null && <Lightbox photos={photos} initialIndex={lightboxIndex} onClose={()=>setLightboxIndex(null)} />}
+      {showEdit && (
+        <EditPostModal
+          post={postData}
+          profile={postData.profiles}
+          subjects={subjects}
+          onClose={() => setShowEdit(false)}
+          onUpdated={(updated) => { setPostData(updated); setShowEdit(false) }}
+        />
+      )}
+      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </>
   )
 }
