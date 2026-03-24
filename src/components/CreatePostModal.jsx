@@ -49,6 +49,7 @@ export default function CreatePostModal({
     post_type: defaultType,
     sub_type: defaultType === 'status' ? '' : defaultSubType,
     due_date: '',
+    due_time: '',
     announcement_type: '',
   })
   const [photoFiles, setPhotoFiles] = useState([])
@@ -166,6 +167,7 @@ export default function CreatePostModal({
           sub_type: form.sub_type || null,
           announcement_type: isAnnouncement && form.announcement_type ? form.announcement_type : null,
           due_date: form.due_date || null,
+          due_time: form.due_time || null,
         })
         .select('*, profiles(*), subjects(*)')
         .single()
@@ -292,7 +294,7 @@ export default function CreatePostModal({
                     set('sub_type', '')
                     set('announcement_type', '')
                     setShowSubTypeError(false)
-                    if (key === 'status') { set('due_date', ''); setAttachFiles([]) }
+                    if (key === 'status') { set('due_date', ''); set('due_time', ''); setAttachFiles([]) }
                   }}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -342,7 +344,7 @@ export default function CreatePostModal({
                   onClick={() => {
                     set('sub_type', key)
                     setShowSubTypeError(false)
-                    if (key !== 'deadline' && key !== 'announcement') set('due_date', '')
+                    if (key !== 'deadline' && key !== 'announcement') { set('due_date', ''); set('due_time', '') }
                     if (key !== 'material' && !isAnnouncement) setAttachFiles([])
                   }}
                   style={{
@@ -458,6 +460,31 @@ export default function CreatePostModal({
                     boxSizing: 'border-box',
                   }}
                 />
+                {/* Optional time input — only show when date is set */}
+                {form.due_date && (
+                  <div style={{ marginTop: 8 }}>
+                    <label style={{
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                      color: '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5,
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                    }}>
+                      🕐 Time <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 11, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={form.due_time}
+                      onChange={e => set('due_time', e.target.value)}
+                      style={{
+                        width: '100%', padding: '10px 14px',
+                        borderRadius: 10,
+                        border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`,
+                        fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
+                        background: '#F7F8FA', outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
