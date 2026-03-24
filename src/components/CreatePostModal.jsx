@@ -30,7 +30,6 @@ const FILE_ACCEPT = [
   'text/plain',
   'application/zip',
   'application/x-zip-compressed',
-  'image/*',
 ].join(',')
 
 export default function CreatePostModal({
