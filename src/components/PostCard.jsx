@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
   FileText, Download, Calendar, BookOpen, Megaphone,
@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
-import CommentsSheet from './CommentsSheet'
 import { supabase } from '../lib/supabase'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
@@ -116,13 +115,9 @@ function PhotoGrid({ photos, onPhotoClick }) {
 }
 
 // ── PostCard ──────────────────────────────────────────────────
-export default function PostCard({ post, currentUserId, subjects = [], profile }) {
+export default function PostCard({ post, currentUserId, subjects = [] }) {
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
-  const [likeAvatars, setLikeAvatars] = useState([])
-  const [commentCount, setCommentCount] = useState(0)
-  const [previewComments, setPreviewComments] = useState([])
-  const [showComments, setShowComments] = useState(false)
   const [saved, setSaved] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [expanded, setExpanded] = useState(false)
@@ -147,31 +142,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
-
-  // Fetch initial likes and comments
-  useEffect(() => {
-    async function fetchCounts() {
-      // Likes
-      const { data: likesData } = await supabase
-        .from('likes').select('user_id, profiles(avatar_url, display_name)')
-        .eq('post_id', post.id)
-      if (likesData) {
-        setLikeCount(likesData.length)
-        setLikeAvatars(likesData.slice(0, 3).map(l => l.profiles))
-        setLiked(likesData.some(l => l.user_id === currentUserId))
-      }
-      // Comment count + preview (latest 2)
-      const { data: commentsData } = await supabase
-        .from('comments').select('id, content, profiles(display_name, avatar_url), created_at')
-        .eq('post_id', post.id).order('created_at', { ascending: false }).limit(2)
-      if (commentsData) {
-        const { count } = await supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
-        setCommentCount(count || 0)
-        setPreviewComments(commentsData.reverse())
-      }
-    }
-    fetchCounts()
-  }, [post.id, currentUserId])
 
   if (deleted) return null
 
@@ -327,57 +297,13 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           </div>
         )}
 
-        {/* ── Likes + comment count row ── */}
-        {(likeCount > 0 || commentCount > 0) && (
-          <div style={{ padding:'8px 12px 0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            {/* Like avatars + count */}
-            {likeCount > 0 ? (
-              <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                <div style={{ display:'flex' }}>
-                  {likeAvatars.map((a, i) => (
-                    <img key={i} src={a?.avatar_url || dicebearUrl(a?.display_name)} alt=""
-                      style={{ width:18, height:18, borderRadius:'50%', objectFit:'cover', border:'1.5px solid white', marginLeft: i > 0 ? -5 : 0 }} />
-                  ))}
-                </div>
-                <div style={{ width:18, height:18, borderRadius:'50%', background:`linear-gradient(135deg,${RED},#E74C3C)`, display:'flex', alignItems:'center', justifyContent:'center', marginLeft: likeAvatars.length > 0 ? -5 : 0, border:'1.5px solid white' }}>
-                  <Heart size={9} color="white" fill="white" />
-                </div>
-                <span style={{ fontSize:12.5, color:'#65676B', fontFamily:'"Instrument Sans",system-ui' }}>{likeCount}</span>
-              </div>
-            ) : <div />}
-            {/* Comment count */}
-            {commentCount > 0 && (
-              <button onClick={() => setShowComments(true)}
-                style={{ background:'none', border:'none', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontSize:12.5, color:'#65676B', padding:0 }}>
-                {commentCount} comment{commentCount !== 1 ? 's' : ''}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ── Comment preview ── */}
-        {previewComments.length > 0 && (
-          <div style={{ padding:'8px 12px 0', display:'flex', flexDirection:'column', gap:6 }}>
-            {previewComments.map(c => (
-              <div key={c.id} style={{ display:'flex', gap:7, alignItems:'flex-start' }}>
-                <img src={c.profiles?.avatar_url || dicebearUrl(c.profiles?.display_name)} alt=""
-                  style={{ width:26, height:26, borderRadius:8, objectFit:'cover', flexShrink:0 }} />
-                <div style={{ background:'#F0F2F5', borderRadius:'4px 12px 12px 12px', padding:'5px 10px', minWidth:0 }}>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#050505' }}>
-                    {c.profiles?.display_name}
-                  </span>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#1c1e21', marginLeft:5 }}>
-                    {c.content}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {commentCount > 2 && (
-              <button onClick={() => setShowComments(true)}
-                style={{ background:'none', border:'none', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontSize:12.5, color:'#65676B', textAlign:'left', padding:'0 0 0 2px' }}>
-                View all {commentCount} comments
-              </button>
-            )}
+        {/* ── Like count ── */}
+        {likeCount>0 && (
+          <div style={{ padding:'8px 12px 0',display:'flex',alignItems:'center',gap:5 }}>
+            <div style={{ width:18,height:18,borderRadius:'50%',background:`linear-gradient(135deg,${RED},#E74C3C)`,display:'flex',alignItems:'center',justifyContent:'center' }}>
+              <Heart size={9} color="white" fill="white" />
+            </div>
+            <span style={{ fontSize:12.5,color:'#65676B',fontFamily:'"Instrument Sans",system-ui' }}>{likeCount}</span>
           </div>
         )}
 
@@ -403,14 +329,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           onUpdated={(updated) => { setPostData(updated); setShowEdit(false) }}
         />
       )}
-      {showComments && (
-        <CommentsSheet
-          postId={postData.id}
-          onClose={() => setShowComments(false)}
-          onCommentCountChange={setCommentCount}
-        />
-      )}
-      <style>{\`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}\`}</style>
+      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </>
   )
 }
