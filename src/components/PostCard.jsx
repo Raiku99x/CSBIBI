@@ -3,7 +3,8 @@ import { formatDistanceToNow, format } from 'date-fns'
 import {
   FileText, Download, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
-  MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2
+  MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2,
+  Link, MessageSquare, Check
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
@@ -60,6 +61,182 @@ function parseFiles(file_url, file_name) {
     if (Array.isArray(urls)) return urls.map((url, i) => ({ url, name: names[i] || 'Attachment' }))
     return [{ url: file_url, name: file_name || 'Attachment' }]
   } catch { return [{ url: file_url, name: file_name || 'Attachment' }] }
+}
+
+// ── Share Sheet ───────────────────────────────────────────────
+function ShareSheet({ post, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const sheetRef = useRef()
+
+  // Build share text
+  const author = post.profiles?.display_name || 'Someone'
+  const subject = post.subjects?.name ? ` [${post.subjects.name}]` : ''
+  const caption = post.caption ? post.caption.slice(0, 100) + (post.caption.length > 100 ? '…' : '') : ''
+  const shareText = `${author}${subject}: ${caption}`
+  // Use current URL + post anchor as the shareable link
+  const shareUrl = `${window.location.origin}/?post=${post.id}`
+
+  // Messenger deep link
+  const messengerUrl = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=966242223397198&redirect_uri=${encodeURIComponent(shareUrl)}`
+  // Facebook share (fallback, opens post link)
+  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`
+
+  async function handleNativeShare() {
+    try {
+      await navigator.share({ title: 'CSB Post', text: shareText, url: shareUrl })
+      onClose()
+    } catch {
+      // user cancelled or not supported — do nothing
+    }
+  }
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => { setCopied(false); onClose() }, 1400)
+    } catch {
+      // fallback
+      const ta = document.createElement('textarea')
+      ta.value = shareUrl
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => { setCopied(false); onClose() }, 1400)
+    }
+  }
+
+  function handleMessenger() {
+    window.open(messengerUrl, '_blank', 'noopener,noreferrer')
+    onClose()
+  }
+
+  function handleFacebook() {
+    window.open(facebookUrl, '_blank', 'noopener,noreferrer')
+    onClose()
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    function h(e) {
+      if (sheetRef.current && !sheetRef.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [onClose])
+
+  const hasNativeShare = !!navigator.share
+
+  return (
+    <div ref={sheetRef} style={{
+      position: 'absolute',
+      bottom: 'calc(100% + 8px)',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 240,
+      background: 'white',
+      borderRadius: 14,
+      border: '1px solid #E4E6EB',
+      boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
+      overflow: 'hidden',
+      zIndex: 30,
+      animation: 'slideUp 0.18s ease',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '11px 14px 8px',
+        borderBottom: '1px solid #F0F2F5',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 13, color: '#050505' }}>
+          Share post
+        </span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 2 }}>
+          <X size={13} color="#65676B" />
+        </button>
+      </div>
+
+      {/* Options */}
+      <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+        {/* Messenger */}
+        <ShareOption
+          icon={
+            <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="24" fill="url(#msgGrad)"/>
+              <path d="M24 8C15.163 8 8 14.716 8 23c0 4.388 1.88 8.337 4.926 11.118V40l5.87-3.226A16.38 16.38 0 0 0 24 38c8.837 0 16-6.716 16-15S32.837 8 24 8Z" fill="white"/>
+              <path d="M13 26l6.5-7 4 4.5 6-4.5 6.5 7-6.5-7-4 4.5-4-4.5L13 26Z" fill="url(#msgGrad)"/>
+              <defs>
+                <linearGradient id="msgGrad" x1="0" y1="48" x2="48" y2="0" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#0099FF"/>
+                  <stop offset="1" stopColor="#A033FF"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          }
+          label="Send via Messenger"
+          onClick={handleMessenger}
+        />
+
+        {/* Facebook */}
+        <ShareOption
+          icon={
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
+              <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073Z"/>
+            </svg>
+          }
+          label="Share to Facebook"
+          onClick={handleFacebook}
+        />
+
+        {/* Native share (mobile) */}
+        {hasNativeShare && (
+          <ShareOption
+            icon={<Share2 size={18} color="#65676B" />}
+            label="More options…"
+            onClick={handleNativeShare}
+          />
+        )}
+
+        {/* Copy link */}
+        <ShareOption
+          icon={copied
+            ? <Check size={18} color="#16a34a" />
+            : <Link size={18} color="#65676B" />
+          }
+          label={copied ? 'Link copied!' : 'Copy link'}
+          onClick={handleCopyLink}
+          success={copied}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ShareOption({ icon, label, onClick, success }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 11px', border: 'none', cursor: 'pointer', textAlign: 'left',
+        background: hovered ? '#F0F2F5' : 'transparent',
+        borderRadius: 9, transition: 'background 0.12s',
+        fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5,
+        color: success ? '#16a34a' : '#1c1e21',
+      }}
+    >
+      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {icon}
+      </div>
+      {label}
+    </button>
+  )
 }
 
 // ── Lightbox ──────────────────────────────────────────────────
@@ -129,9 +306,11 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
   const [expanded, setExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [deleted, setDeleted] = useState(false)
   const [postData, setPostData] = useState(post)
-  const menuRef = useRef(null)
+  const menuRef  = useRef(null)
+  const shareRef = useRef(null)
 
   async function handleDelete() {
     try {
@@ -143,7 +322,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
     }
   }
 
-  // Real like toggle — persists to Supabase, visible to everyone
   async function handleLike() {
     if (liking) return
     setLiking(true)
@@ -174,7 +352,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
   }
 
   useEffect(() => {
-    function h(e) { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false) }
+    function h(e) {
+      if (menuRef.current  && !menuRef.current.contains(e.target))  setShowMenu(false)
+      if (shareRef.current && !shareRef.current.contains(e.target)) setShowShare(false)
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
@@ -196,7 +377,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
     }
     fetchCounts()
 
-    // Live like updates for all users
     const ch = supabase.channel('likes-' + post.id)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'likes',
@@ -402,7 +582,24 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
         <div style={{ display:'flex',alignItems:'center',padding:'0 6px 2px' }}>
           <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
           <ActionBtn onClick={() => setShowComments(true)} icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
-          <ActionBtn icon={<Share2 size={17} color="#65676B"/>} label="Share" />
+
+          {/* Share button — relative wrapper for the popover */}
+          <div ref={shareRef} style={{ flex:1, position:'relative' }}>
+            <ActionBtn
+              onClick={() => setShowShare(v => !v)}
+              icon={<Share2 size={17} color={showShare ? RED : '#65676B'}/>}
+              label="Share"
+              active={showShare}
+              activeColor={RED}
+              noflex
+            />
+            {showShare && (
+              <ShareSheet
+                post={postData}
+                onClose={() => setShowShare(false)}
+              />
+            )}
+          </div>
         </div>
       </article>
 
@@ -423,7 +620,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           onCommentCountChange={setCommentCount}
         />
       )}
-      <style dangerouslySetInnerHTML={{ __html: '@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}' }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      ` }} />
     </>
   )
 }
@@ -437,6 +637,7 @@ function ActionBtn({ onClick, icon, label, active, activeColor, noflex }) {
       background:hovered?'#F5F6F7':'transparent',borderRadius:7,transition:'background 0.12s',
       fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,
       color:active?(activeColor||RED):'#65676B',
+      width: noflex ? '100%' : undefined,
     }}>
       {icon}{label&&<span>{label}</span>}
     </button>
