@@ -68,25 +68,18 @@ function ShareSheet({ post, onClose }) {
   const [copied, setCopied] = useState(false)
   const sheetRef = useRef()
 
-  // Build share text
   const author = post.profiles?.display_name || 'Someone'
   const subject = post.subjects?.name ? ` [${post.subjects.name}]` : ''
   const caption = post.caption ? post.caption.slice(0, 100) + (post.caption.length > 100 ? '…' : '') : ''
   const shareText = `${author}${subject}: ${caption}`
-  // Use current URL + post anchor as the shareable link
   const shareUrl = `${window.location.origin}/?post=${post.id}`
-
-  // Messenger deep link
-  const messengerUrl = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareUrl)}&app_id=966242223397198&redirect_uri=${encodeURIComponent(shareUrl)}`
-  // Facebook share (fallback, opens post link)
-  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`
 
   async function handleNativeShare() {
     try {
       await navigator.share({ title: 'CSB Post', text: shareText, url: shareUrl })
       onClose()
     } catch {
-      // user cancelled or not supported — do nothing
+      // user cancelled or not supported
     }
   }
 
@@ -96,7 +89,6 @@ function ShareSheet({ post, onClose }) {
       setCopied(true)
       setTimeout(() => { setCopied(false); onClose() }, 1400)
     } catch {
-      // fallback
       const ta = document.createElement('textarea')
       ta.value = shareUrl
       document.body.appendChild(ta)
@@ -106,16 +98,6 @@ function ShareSheet({ post, onClose }) {
       setCopied(true)
       setTimeout(() => { setCopied(false); onClose() }, 1400)
     }
-  }
-
-  function handleMessenger() {
-    window.open(messengerUrl, '_blank', 'noopener,noreferrer')
-    onClose()
-  }
-
-  function handleFacebook() {
-    window.open(facebookUrl, '_blank', 'noopener,noreferrer')
-    onClose()
   }
 
   // Close on outside click
@@ -135,7 +117,7 @@ function ShareSheet({ post, onClose }) {
       bottom: 'calc(100% + 8px)',
       left: '50%',
       transform: 'translateX(-50%)',
-      width: 240,
+      width: 210,
       background: 'white',
       borderRadius: 14,
       border: '1px solid #E4E6EB',
@@ -160,36 +142,6 @@ function ShareSheet({ post, onClose }) {
 
       {/* Options */}
       <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-
-        {/* Messenger */}
-        <ShareOption
-          icon={
-            <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="24" fill="url(#msgGrad)"/>
-              <path d="M24 8C15.163 8 8 14.716 8 23c0 4.388 1.88 8.337 4.926 11.118V40l5.87-3.226A16.38 16.38 0 0 0 24 38c8.837 0 16-6.716 16-15S32.837 8 24 8Z" fill="white"/>
-              <path d="M13 26l6.5-7 4 4.5 6-4.5 6.5 7-6.5-7-4 4.5-4-4.5L13 26Z" fill="url(#msgGrad)"/>
-              <defs>
-                <linearGradient id="msgGrad" x1="0" y1="48" x2="48" y2="0" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#0099FF"/>
-                  <stop offset="1" stopColor="#A033FF"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          }
-          label="Send via Messenger"
-          onClick={handleMessenger}
-        />
-
-        {/* Facebook */}
-        <ShareOption
-          icon={
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
-              <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.513c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073Z"/>
-            </svg>
-          }
-          label="Share to Facebook"
-          onClick={handleFacebook}
-        />
 
         {/* Native share (mobile) */}
         {hasNativeShare && (
