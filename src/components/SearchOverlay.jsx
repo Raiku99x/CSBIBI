@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "../lib/supabase";
 import PostCard from "./PostCard";
+import { useAuth } from "../contexts/AuthContext";
 
 const TYPES = [
   { label: "All", value: "all" },
@@ -17,10 +19,10 @@ const DATE_PRESETS = [
   { label: "Custom", value: "custom" },
 ];
 
-function CollapsibleSection({ title, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
+function CollapsibleSection({ title, children, activeCount = 0 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -30,71 +32,137 @@ function CollapsibleSection({ title, children, defaultOpen = false }) {
           justifyContent: "space-between",
           background: "none",
           border: "none",
-          padding: "10px 0",
+          padding: "9px 0",
           cursor: "pointer",
           color: "#fff",
-          fontSize: "13px",
+          fontSize: "12px",
           fontWeight: 600,
-          letterSpacing: "0.04em",
+          letterSpacing: "0.05em",
           textTransform: "uppercase",
-          opacity: 0.7,
+          opacity: 0.65,
         }}
       >
-        <span>{title}</span>
-        <span
-          style={{
-            fontSize: "18px",
-            lineHeight: 1,
-            transition: "transform 0.2s",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            opacity: 0.6,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span>{title}</span>
+          {activeCount > 0 && (
+            <span style={{
+              background: "#6366f1",
+              color: "#fff",
+              borderRadius: "50%",
+              width: 14,
+              height: 14,
+              fontSize: 9,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              {activeCount}
+            </span>
+          )}
+        </div>
+        <span style={{
+          fontSize: "16px",
+          lineHeight: 1,
+          transition: "transform 0.2s",
+          transform: open ? "rotate(90deg)" : "rotate(0deg)",
+          opacity: 0.5,
+        }}>
           ›
         </span>
       </button>
-      {open && (
-        <div style={{ paddingBottom: "12px" }}>{children}</div>
-      )}
+      {open && <div style={{ paddingBottom: "10px" }}>{children}</div>}
     </div>
   );
 }
 
-export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
+const PillBtn = ({ label, active, onClick }) => (
+  <button
+    onClick={onClick}
+    style={{
+      padding: "4px 11px",
+      borderRadius: "20px",
+      border: "1px solid rgba(255,255,255,0.18)",
+      background: active ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.07)",
+      color: "#fff",
+      fontSize: "12px",
+      cursor: "pointer",
+      fontWeight: active ? 700 : 400,
+      transition: "background 0.15s",
+    }}
+  >
+    {label}
+  </button>
+);
+
+export default function SearchOverlay({ onClose, subjects = [] }) {
+  const { user } = useAuth();
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [activeType, setActiveType] = useState("all");
-  const [activeSubject, setActiveSubject] = useState("all");
+  const [activeSubjectId, setActiveSubjectId] = useState("all");
   const [activeDatePreset, setActiveDatePreset] = useState(null);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const inputRef = useRef(null);
+
+  // Fetch all posts once on mount
+  useEffect(() => {
+    supabase
+      .from("posts")
+      .select("*, profiles(*), subjects(*)")
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .then(({ data }) => {
+        if (data) setPosts(data);
+        setPostsLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    const t = setTimeout(() => setDebouncedQuery(query), 280);
     return () => clearTimeout(t);
   }, [query]);
 
   const activeFilterCount = [
     activeType !== "all",
-    activeSubject !== "all",
+    activeSubjectId !== "all",
     activeDatePreset !== null,
   ].filter(Boolean).length;
 
   const filtered = posts.filter((post) => {
-    const text = `${post.content || ""} ${post.authorName || ""} ${post.subject || ""}`.toLowerCase();
-    const q = debouncedQuery.toLowerCase();
-    if (q && !text.includes(q)) return false;
-    if (activeType !== "all" && post.type !== activeType) return false;
-    if (activeSubject !== "all" && post.subject !== activeSubject) return false;
+    if (debouncedQuery) {
+      const q = debouncedQuery.toLowerCase();
+      const haystack = [
+        post.caption || "",
+        post.profiles?.display_name || "",
+        post.subjects?.name || "",
+        post.announcement_type || "",
+      ].join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
+    if (activeType !== "all") {
+      const match =
+        post.sub_type === activeType ||
+        (activeType === "announcement" &&
+          post.post_type === "announcement" &&
+          !post.sub_type);
+      if (!match) return false;
+    }
+
+    if (activeSubjectId !== "all" && post.subject_id !== activeSubjectId) return false;
+
     if (activeDatePreset) {
       const now = new Date();
-      const postDate = new Date(post.createdAt || post.date || Date.now());
+      const postDate = new Date(post.created_at);
       if (activeDatePreset === "today") {
         if (postDate.toDateString() !== now.toDateString()) return false;
       } else if (activeDatePreset === "week") {
@@ -115,6 +183,8 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
     return true;
   });
 
+  const showResults = debouncedQuery || activeFilterCount > 0;
+
   return (
     <div
       style={{
@@ -123,20 +193,21 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+        background:
+          "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
         color: "#fff",
         overflow: "hidden",
       }}
     >
-      {/* ── TOP BAR ── */}
+      {/* TOP BAR */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          padding: "12px 14px",
-          paddingTop: "calc(12px + env(safe-area-inset-top))",
-          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          padding: "10px 12px",
+          paddingTop: "calc(10px + env(safe-area-inset-top))",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
           flexShrink: 0,
         }}
       >
@@ -148,16 +219,19 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
             alignItems: "center",
             background: "rgba(255,255,255,0.1)",
             borderRadius: "10px",
-            padding: "0 12px",
-            gap: "8px",
+            padding: "0 10px",
+            gap: "7px",
+            minWidth: 0,
           }}
         >
-          <span style={{ fontSize: "16px", opacity: 0.6 }}>🔍</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search posts..."
+            placeholder="Search posts…"
             style={{
               flex: 1,
               background: "none",
@@ -165,7 +239,8 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
               outline: "none",
               color: "#fff",
               fontSize: "15px",
-              padding: "10px 0",
+              padding: "9px 0",
+              minWidth: 0,
             }}
           />
           {query.length > 0 && (
@@ -174,11 +249,12 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.5)",
+                color: "rgba(255,255,255,0.4)",
                 fontSize: "18px",
                 cursor: "pointer",
-                padding: "0",
+                padding: 0,
                 lineHeight: 1,
+                flexShrink: 0,
               }}
             >
               ×
@@ -186,41 +262,39 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
           )}
         </div>
 
-        {/* Filter icon button — icon only, badge if filters active */}
+        {/* Filter button — icon only, no text */}
         <button
           onClick={() => setShowFilters((s) => !s)}
           style={{
             position: "relative",
             background: showFilters
-              ? "rgba(99,102,241,0.35)"
+              ? "rgba(99,102,241,0.4)"
               : "rgba(255,255,255,0.1)",
-            border: showFilters
-              ? "1px solid rgba(99,102,241,0.6)"
-              : "1px solid rgba(255,255,255,0.15)",
+            border: `1px solid ${showFilters ? "rgba(99,102,241,0.7)" : "rgba(255,255,255,0.15)"}`,
             borderRadius: "10px",
-            width: "40px",
-            height: "40px",
+            width: "38px",
+            height: "38px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
             flexShrink: 0,
-            transition: "all 0.2s",
+            transition: "all 0.18s",
           }}
           title="Filters"
         >
-          {/* Filter / X icon */}
           {showFilters ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            /* X to close filter panel */
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.8" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            /* Funnel */
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
             </svg>
           )}
-          {/* Active count badge */}
           {!showFilters && activeFilterCount > 0 && (
             <span
               style={{
@@ -230,9 +304,9 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
                 background: "#6366f1",
                 color: "#fff",
                 borderRadius: "50%",
-                width: "16px",
-                height: "16px",
-                fontSize: "10px",
+                width: "15px",
+                height: "15px",
+                fontSize: "9px",
                 fontWeight: 700,
                 display: "flex",
                 alignItems: "center",
@@ -244,190 +318,84 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
           )}
         </button>
 
-        {/* Close overlay */}
+        {/* Back / close */}
         <button
           onClick={onClose}
           style={{
             background: "rgba(255,255,255,0.1)",
             border: "1px solid rgba(255,255,255,0.15)",
             borderRadius: "10px",
-            width: "40px",
-            height: "40px",
+            width: "38px",
+            height: "38px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
             flexShrink: 0,
-            color: "#fff",
-            fontSize: "20px",
-            lineHeight: 1,
           }}
           title="Close"
         >
-          ←
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
         </button>
       </div>
 
-      {/* ── FILTER PANEL (collapsible dropdowns) ── */}
+      {/* FILTER PANEL */}
       {showFilters && (
         <div
           style={{
-            padding: "4px 16px 4px",
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
-            background: "rgba(0,0,0,0.2)",
+            padding: "2px 14px 4px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(0,0,0,0.25)",
             flexShrink: 0,
             overflowY: "auto",
-            maxHeight: "55vh",
+            maxHeight: "48vh",
           }}
         >
-          {/* By Type */}
-          <CollapsibleSection title="By Type">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          <CollapsibleSection title="By Type" activeCount={activeType !== "all" ? 1 : 0}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
               {TYPES.map((t) => (
-                <button
-                  key={t.value}
-                  onClick={() => setActiveType(t.value)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: "20px",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    background:
-                      activeType === t.value
-                        ? "rgba(99,102,241,0.5)"
-                        : "rgba(255,255,255,0.07)",
-                    color: "#fff",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    fontWeight: activeType === t.value ? 600 : 400,
-                  }}
-                >
-                  {t.label}
-                </button>
+                <PillBtn key={t.value} label={t.label} active={activeType === t.value} onClick={() => setActiveType(t.value)} />
               ))}
             </div>
           </CollapsibleSection>
 
-          {/* By Subject */}
-          <CollapsibleSection title="By Subject">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {["all", ...subjects].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setActiveSubject(s)}
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: "20px",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    background:
-                      activeSubject === s
-                        ? "rgba(99,102,241,0.5)"
-                        : "rgba(255,255,255,0.07)",
-                    color: "#fff",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    fontWeight: activeSubject === s ? 600 : 400,
-                    textTransform: s === "all" ? "none" : "capitalize",
-                  }}
-                >
-                  {s === "all" ? "All Subjects" : s}
-                </button>
+          <CollapsibleSection title="By Subject" activeCount={activeSubjectId !== "all" ? 1 : 0}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+              <PillBtn label="All" active={activeSubjectId === "all"} onClick={() => setActiveSubjectId("all")} />
+              {subjects.map((s) => (
+                <PillBtn key={s.id} label={s.name} active={activeSubjectId === s.id} onClick={() => setActiveSubjectId(s.id)} />
               ))}
             </div>
           </CollapsibleSection>
 
-          {/* By Date */}
-          <CollapsibleSection title="By Date">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+          <CollapsibleSection title="By Date" activeCount={activeDatePreset ? 1 : 0}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
               {DATE_PRESETS.map((d) => (
-                <button
+                <PillBtn
                   key={d.value}
-                  onClick={() =>
-                    setActiveDatePreset((p) =>
-                      p === d.value ? null : d.value
-                    )
-                  }
-                  style={{
-                    padding: "5px 12px",
-                    borderRadius: "20px",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    background:
-                      activeDatePreset === d.value
-                        ? "rgba(99,102,241,0.5)"
-                        : "rgba(255,255,255,0.07)",
-                    color: "#fff",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    fontWeight: activeDatePreset === d.value ? 600 : 400,
-                  }}
-                >
-                  {d.label}
-                </button>
+                  label={d.label}
+                  active={activeDatePreset === d.value}
+                  onClick={() => setActiveDatePreset((p) => p === d.value ? null : d.value)}
+                />
               ))}
             </div>
             {activeDatePreset === "custom" && (
-              <div
-                style={{
-                  marginTop: "10px",
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: "rgba(255,255,255,0.1)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                    padding: "6px 8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <span style={{ opacity: 0.5, fontSize: "12px" }}>to</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: "rgba(255,255,255,0.1)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: "8px",
-                    color: "#fff",
-                    padding: "6px 8px",
-                    fontSize: "12px",
-                  }}
-                />
+              <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+                  style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", color: "#fff", padding: "5px 7px", fontSize: "12px", outline: "none" }} />
+                <span style={{ opacity: 0.4, fontSize: "11px" }}>–</span>
+                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+                  style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", color: "#fff", padding: "5px 7px", fontSize: "12px", outline: "none" }} />
               </div>
             )}
           </CollapsibleSection>
 
-          {/* Reset filters */}
           {activeFilterCount > 0 && (
             <button
-              onClick={() => {
-                setActiveType("all");
-                setActiveSubject("all");
-                setActiveDatePreset(null);
-                setCustomStart("");
-                setCustomEnd("");
-              }}
-              style={{
-                marginTop: "10px",
-                marginBottom: "6px",
-                background: "none",
-                border: "1px solid rgba(255,100,100,0.4)",
-                borderRadius: "8px",
-                color: "rgba(255,150,150,1)",
-                padding: "6px 14px",
-                fontSize: "12px",
-                cursor: "pointer",
-                width: "100%",
-              }}
+              onClick={() => { setActiveType("all"); setActiveSubjectId("all"); setActiveDatePreset(null); setCustomStart(""); setCustomEnd(""); }}
+              style={{ marginTop: "8px", marginBottom: "4px", background: "none", border: "1px solid rgba(255,100,100,0.35)", borderRadius: "8px", color: "rgba(255,160,160,1)", padding: "5px 12px", fontSize: "11px", cursor: "pointer", width: "100%", fontWeight: 600 }}
             >
               Clear all filters
             </button>
@@ -435,57 +403,38 @@ export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
         </div>
       )}
 
-      {/* ── RESULTS ── */}
+      {/* RESULTS */}
       <div
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "12px 14px",
-          paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+          padding: "10px 0",
+          paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
         }}
       >
-        {debouncedQuery || activeFilterCount > 0 ? (
+        {!showResults ? (
+          <div style={{ textAlign: "center", marginTop: "70px", opacity: 0.3, fontSize: "15px" }}>
+            <div style={{ fontSize: "38px", marginBottom: "8px" }}>🔍</div>
+            Type to search posts
+          </div>
+        ) : postsLoading ? (
+          <div style={{ textAlign: "center", marginTop: "60px", opacity: 0.4, fontSize: "14px" }}>Loading…</div>
+        ) : (
           <>
-            <p
-              style={{
-                fontSize: "12px",
-                opacity: 0.45,
-                marginBottom: "10px",
-                marginTop: 0,
-              }}
-            >
+            <p style={{ fontSize: "11px", opacity: 0.4, margin: "0 14px 6px" }}>
               {filtered.length} result{filtered.length !== 1 ? "s" : ""}
             </p>
             {filtered.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  marginTop: "60px",
-                  opacity: 0.4,
-                  fontSize: "15px",
-                }}
-              >
-                <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔍</div>
+              <div style={{ textAlign: "center", marginTop: "50px", opacity: 0.35, fontSize: "14px" }}>
+                <div style={{ fontSize: "36px", marginBottom: "8px" }}>🫙</div>
                 No posts found
               </div>
             ) : (
               filtered.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard key={post.id} post={post} currentUserId={user?.id} />
               ))
             )}
           </>
-        ) : (
-          <div
-            style={{
-              textAlign: "center",
-              marginTop: "60px",
-              opacity: 0.3,
-              fontSize: "15px",
-            }}
-          >
-            <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔍</div>
-            Type to search posts
-          </div>
         )}
       </div>
     </div>
