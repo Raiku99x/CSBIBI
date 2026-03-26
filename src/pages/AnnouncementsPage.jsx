@@ -531,28 +531,56 @@ export default function AnnouncementsPage() {
           </div>
 
           {/* Type filter */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <button
               onClick={() => setShowTypeFilter(v => !v)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '7px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 background: typeFilter !== 'All Types' ? RED_BG : GREY_BG,
                 color: typeFilter !== 'All Types' ? RED : GREY,
                 fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
                 flexShrink: 0, transition: 'all 0.15s',
               }}
             >
-              <Filter size={12} />
-              {typeFilter === 'All Types' ? 'Type' : typeFilter}
+              <Filter size={13} />
+              {/* Show "Type" label only on wider screens */}
+              <span className="type-label">
+                {typeFilter === 'All Types' ? 'Type' : typeFilter}
+              </span>
               {typeFilter !== 'All Types' && (
-                <span onClick={e => { e.stopPropagation(); setTypeFilter('All Types') }} style={{ marginLeft: 2, display: 'flex', alignItems: 'center' }}>
+                <span onClick={e => { e.stopPropagation(); setTypeFilter('All Types') }} style={{ marginLeft: 1, display: 'flex', alignItems: 'center' }}>
                   <X size={11} />
                 </span>
               )}
             </button>
             {showTypeFilter && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 50, minWidth: 160, overflow: 'hidden', animation: 'slideDown 0.15s ease' }}>
+              // Fixed position so it escapes any overflow:hidden parent
+              <div style={{
+                position: 'fixed',
+                top: 'auto',
+                right: 14,
+                background: 'white',
+                borderRadius: 12,
+                border: '1px solid #E4E6EB',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                zIndex: 9999,
+                minWidth: 170,
+                overflow: 'hidden',
+                animation: 'slideDown 0.15s ease',
+                marginTop: 4,
+              }}
+              ref={el => {
+                if (el) {
+                  // Position it just below the button using getBoundingClientRect
+                  const btn = el.previousSibling
+                  if (btn) {
+                    const rect = btn.getBoundingClientRect()
+                    el.style.top = (rect.bottom + 6) + 'px'
+                    el.style.right = (window.innerWidth - rect.right) + 'px'
+                  }
+                }
+              }}>
                 {TYPE_FILTERS.map(t => (
                   <button key={t} onClick={() => { setTypeFilter(t); setShowTypeFilter(false) }}
                     style={{
@@ -621,6 +649,9 @@ export default function AnnouncementsPage() {
       <style>{`
         @keyframes expandIn  { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+        /* Hide 'Type' text on small screens, show only icon */
+        .type-label { display: none; }
+        @media (min-width: 400px) { .type-label { display: inline; } }
       `}</style>
     </div>
   )
