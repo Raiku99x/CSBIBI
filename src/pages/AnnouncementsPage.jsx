@@ -71,12 +71,10 @@ function DeadlineRow({ post, done, onToggleDone }) {
 
   function handleToggle() {
     if (done) {
-      // Undone — quietly fade out of Done list, reappear in active
       setHiding(true)
       setTimeout(() => onToggleDone(post.id), 320)
       return
     }
-    // Mark done — green flash then slide out
     setAnimating(true)
     setTimeout(() => {
       setAnimating(false)
@@ -117,7 +115,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
             {/* Date block */}
             <div style={{
               flexShrink: 0,
-              minWidth: 54,
+              width: 62,
               textAlign: 'center',
               padding: '5px 6px',
               borderRadius: 8,
@@ -143,7 +141,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
               }}>
                 {format(new Date(post.due_date), 'MMM')}
               </div>
-              {/* Days left — below month, separated by thin line */}
+              {/* Days left */}
               <div style={{
                 fontFamily: '"Instrument Sans", system-ui',
                 fontWeight: 700, fontSize: 9,
@@ -168,7 +166,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
               )}
             </div>
 
-            {/* Info: pills + caption (2-line clamp) */}
+            {/* Info: pills + caption (3-line clamp) */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
                 <span style={{
@@ -200,9 +198,9 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
                   fontWeight: done ? 400 : 500,
                   color: done ? '#9CA3AF' : '#1c1e21',
-                  // Clamp to 2 lines max — Done button is always below
+                  // Clamp to 3 lines max
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: 3,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                   textDecoration: done ? 'line-through' : 'none',
@@ -213,39 +211,41 @@ function DeadlineRow({ post, done, onToggleDone }) {
               )}
             </div>
 
-            {/* Expand toggle — top right */}
+            {/* Expand toggle — top right, text label */}
             {hasDetails && (
               <button
                 onClick={() => setExpanded(e => !e)}
                 style={{
                   flexShrink: 0, marginTop: 1,
-                  width: 28, height: 28, borderRadius: 7,
+                  padding: '4px 9px', borderRadius: 7,
                   background: expanded ? GREY_BG : 'transparent',
                   border: '1px solid #E4E6EB',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                   color: GREY, transition: 'all 0.15s',
+                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
+                  whiteSpace: 'nowrap',
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = GREY_BG}
                 onMouseLeave={e => e.currentTarget.style.background = expanded ? GREY_BG : 'transparent'}
               >
-                {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                {expanded ? 'Close details' : 'See details'}
               </button>
             )}
           </div>
 
-          {/* ── Done button — always on its own row, never hidden ── */}
+          {/* ── Done button — fixed width matching date card ── */}
           <div style={{
-            padding: '0 12px 10px',
-            // indent to align under the info column
-            paddingLeft: 80,
+            padding: '0 12px 10px 12px',
+            display: 'flex',
           }}>
             <button
               onClick={handleToggle}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 14px', borderRadius: 8, border: 'none',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                width: 66, padding: '5px 0', borderRadius: 8, border: 'none',
                 cursor: 'pointer',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12,
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
                 background: animating ? '#DCFCE7' : done ? '#FFF1F2' : '#F0FDF4',
                 color: animating ? '#16a34a' : done ? '#e11d48' : '#4ade80',
                 outline: `2px solid ${animating ? '#86EFAC' : done ? '#FEE2E2' : '#D1FAE5'}`,
@@ -268,8 +268,8 @@ function DeadlineRow({ post, done, onToggleDone }) {
               }}
             >
               {done
-                ? <><RotateCcw size={11} strokeWidth={2.5} /> Undone</>
-                : <><Check size={12} strokeWidth={2.5} /> Done</>
+                ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
+                : <><Check size={11} strokeWidth={2.5} /> Done</>
               }
             </button>
           </div>
@@ -379,14 +379,14 @@ function LoadingSkeleton() {
             <div style={{ width: 4, background: '#E4E6EB' }} />
             <div style={{ flex: 1, padding: '11px 12px 10px' }}>
               <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                {bar(54, 68, 8)}
+                {bar(62, 68, 8)}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
                   <div style={{ display: 'flex', gap: 5 }}>{bar(80, 22, 20)}{bar(60, 22, 20)}</div>
                   {bar('90%', 13)}
                   {bar('70%', 13)}
                 </div>
               </div>
-              <div style={{ paddingLeft: 64 }}>{bar(70, 28, 8)}</div>
+              <div style={{ paddingLeft: 0 }}>{bar(66, 28, 8)}</div>
             </div>
           </div>
         </div>
@@ -470,7 +470,6 @@ export default function AnnouncementsPage() {
     if (past.length)      groups.push({ emoji: '⚠️', label: 'Past Due', items: past })
   }
 
-  // Type filter pills data
   const typeCounts = {}
   activeDeadlines.forEach(d => {
     if (d.announcement_type) typeCounts[d.announcement_type] = (typeCounts[d.announcement_type] || 0) + 1
@@ -500,7 +499,7 @@ export default function AnnouncementsPage() {
             )}
           </div>
 
-          {/* Type filter pills — active pill gets a red × circle on the left */}
+          {/* Type filter pills */}
           {!loading && typeEntries.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {typeEntries.map(([type, count]) => {
@@ -519,7 +518,6 @@ export default function AnnouncementsPage() {
                       cursor: 'pointer', transition: 'all 0.15s',
                     }}
                   >
-                    {/* × indicator — only on active pill */}
                     {isActive && (
                       <span style={{
                         width: 15, height: 15, borderRadius: '50%',
