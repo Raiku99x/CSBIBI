@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { useState } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
+import SearchOverlay from './components/SearchOverlay'
 import AuthPage from './pages/AuthPage'
 import FeedPage from './pages/FeedPage'
 import MessagesPage from './pages/MessagesPage'
@@ -9,6 +11,8 @@ import AnnouncementsPage from './pages/AnnouncementsPage'
 import EnrolledSubjectsPage from './pages/EnrolledSubjectsPage'
 import AppsPage from './pages/AppsPage'
 import ProfilePage from './pages/ProfilePage'
+import { supabase } from './lib/supabase'
+import { useEffect } from 'react'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -32,19 +36,73 @@ function ProtectedRoute({ children }) {
 
 function AppRoutes() {
   const { user } = useAuth()
+  const [showSearch, setShowSearch] = useState(false)
+  const [subjects, setSubjects] = useState([])
+
+  useEffect(() => {
+    supabase.from('subjects').select('*').order('name').then(({ data }) => {
+      if (data) setSubjects(data)
+    })
+  }, [])
+
   return (
-    <Routes>
-      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
-      <Route path="/" element={<ProtectedRoute><Layout><FeedPage /></Layout></ProtectedRoute>} />
-      <Route path="/messages" element={<ProtectedRoute><Layout><MessagesPage /></Layout></ProtectedRoute>} />
-      <Route path="/announcements" element={<ProtectedRoute><Layout><AnnouncementsPage /></Layout></ProtectedRoute>} />
-      <Route path="/subjects" element={<ProtectedRoute><Layout><EnrolledSubjectsPage /></Layout></ProtectedRoute>} />
-      <Route path="/apps" element={<ProtectedRoute><Layout><AppsPage /></Layout></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><Layout><ProfilePage /></Layout></ProtectedRoute>} />
-      {/* old /chat route redirects to /messages so no broken links */}
-      <Route path="/chat" element={<Navigate to="/messages" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <FeedPage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/messages" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <MessagesPage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/announcements" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <AnnouncementsPage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/subjects" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <EnrolledSubjectsPage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/apps" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <AppsPage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Layout onOpenSearch={() => setShowSearch(true)}>
+              <ProfilePage />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/chat" element={<Navigate to="/messages" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      {showSearch && user && (
+        <SearchOverlay
+          onClose={() => setShowSearch(false)}
+          subjects={subjects}
+          currentUserId={user.id}
+        />
+      )}
+    </>
   )
 }
 
