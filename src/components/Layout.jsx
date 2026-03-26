@@ -44,7 +44,6 @@ export default function Layout({ children, onOpenSearch }) {
   useEffect(() => {
     function handleClick(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setShowUserMenu(false)
-      // Only use outside-click to close on desktop; mobile uses backdrop tap
       if (!isMobile && notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
     }
     document.addEventListener('mousedown', handleClick)
@@ -96,7 +95,7 @@ export default function Layout({ children, onOpenSearch }) {
         <div onClick={() => setShowDrawer(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.45)', animation: 'fadeIn 0.2s ease' }} />
       )}
 
-      {/* Mobile notif backdrop — only on mobile, never on desktop */}
+      {/* Mobile notif backdrop */}
       {showNotifs && isMobile && (
         <div
           onClick={() => setShowNotifs(false)}
@@ -171,14 +170,14 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </button>
 
-              {/* Desktop only: dropdown ABOVE the bell */}
+              {/* Desktop: dropdown BELOW the bell */}
               {showNotifs && !isMobile && (
                 <div style={{
                   position: 'absolute',
                   right: 0,
-                  bottom: 'calc(100% + 8px)',
+                  top: 'calc(100% + 8px)',
                   zIndex: 100,
-                  animation: 'slideUp 0.18s ease',
+                  animation: 'slideDown 0.18s ease',
                 }}>
                   <NotifPanel
                     notifications={notifications}
@@ -218,13 +217,15 @@ export default function Layout({ children, onOpenSearch }) {
         </div>
       </header>
 
-      {/* Mobile notif bottom sheet — only on mobile, above backdrop */}
+      {/* Mobile notif — slides DOWN from top (just below header) */}
       {showNotifs && isMobile && (
         <div style={{
           position: 'fixed',
-          left: 0, right: 0, bottom: 0,
+          left: 0,
+          right: 0,
+          top: 52,
           zIndex: 99,
-          animation: 'slideUpSheet 0.28s cubic-bezier(0.16,1,0.3,1)',
+          animation: 'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)',
         }}>
           <NotifPanel
             notifications={notifications}
@@ -273,7 +274,7 @@ export default function Layout({ children, onOpenSearch }) {
         @keyframes fadeIn     { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideDown  { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes slideUp    { from { opacity: 0; transform: translateY(6px)  } to { opacity: 1; transform: translateY(0) } }
-        @keyframes slideUpSheet { from { opacity: 0; transform: translateY(100%) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideDownSheet { from { opacity: 0; transform: translateY(-100%) } to { opacity: 1; transform: translateY(0) } }
       `}</style>
     </div>
   )
@@ -306,24 +307,18 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
   return (
     <div style={{
       background: 'white',
-      borderRadius: mobile ? '16px 16px 0 0' : 13,
+      borderRadius: mobile ? '0 0 16px 16px' : 13,
       border: mobile ? 'none' : '1px solid #E4E6EB',
       boxShadow: mobile
-        ? '0 -4px 32px rgba(0,0,0,0.18)'
-        : '0 -8px 24px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
+        ? '0 8px 32px rgba(0,0,0,0.18)'
+        : '0 8px 24px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
       overflow: 'hidden',
       width: mobile ? '100%' : 310,
       maxHeight: mobile ? '75vh' : 380,
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {mobile && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E4E6EB' }} />
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: mobile ? '4px 16px 12px' : '11px 14px 10px', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: mobile ? '14px 16px 12px' : '11px 14px 10px', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Bell size={15} color={RED} strokeWidth={2.5} />
           <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>Notifications</span>
