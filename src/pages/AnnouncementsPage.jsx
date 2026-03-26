@@ -493,21 +493,50 @@ export default function AnnouncementsPage() {
             )}
           </div>
 
-          {!loading && deadlines.length > 0 && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[
-                { label: 'Upcoming', count: activeDeadlines.filter(d => !isPastDue(d)).length, emoji: '⏰' },
-                { label: 'Due Soon', count: dueSoonCount,  emoji: '🔥' },
-                { label: 'Done',     count: doneCount,     emoji: '✅' },
-              ].map(s => (
-                <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 15, marginBottom: 2 }}>{s.emoji}</div>
-                  <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: 'white', lineHeight: 1 }}>{s.count}</div>
-                  <div style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {!loading && deadlines.length > 0 && (() => {
+            // Count active (non-done) tasks per type, skip blank types
+            const typeCounts = {}
+            activeDeadlines.forEach(d => {
+              if (d.announcement_type) {
+                typeCounts[d.announcement_type] = (typeCounts[d.announcement_type] || 0) + 1
+              }
+            })
+            const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
+            if (typeEntries.length === 0) return null
+            return (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                {typeEntries.map(([type, count]) => (
+                  <button
+                    key={type}
+                    onClick={() => setTypeFilter(t => t === type ? 'All Types' : type)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 13px', borderRadius: 20,
+                      border: `1.5px solid ${typeFilter === type ? 'white' : 'rgba(255,255,255,0.35)'}`,
+                      background: typeFilter === type ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13,
+                      color: typeFilter === type ? RED : 'white',
+                    }}>
+                      {type}
+                    </span>
+                    <span style={{
+                      fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 12,
+                      background: typeFilter === type ? RED : 'rgba(255,255,255,0.25)',
+                      color: 'white',
+                      borderRadius: 10, padding: '1px 7px', lineHeight: 1.6,
+                      minWidth: 20, textAlign: 'center',
+                    }}>
+                      {count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Controls */}
