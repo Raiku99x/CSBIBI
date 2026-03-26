@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format, formatDistanceToNow, isPast, isToday, isTomorrow, differenceInDays } from 'date-fns'
 import {
   Clock, ChevronDown, ChevronUp,
-  BookOpen, FileText, Download, Filter, X, Check
+  BookOpen, FileText, Download, Check
 } from 'lucide-react'
 
 const RED     = '#C0392B'
@@ -377,7 +377,6 @@ export default function AnnouncementsPage() {
   const [loading, setLoading]       = useState(true)
   const [filter, setFilter]         = useState('All')
   const [typeFilter, setTypeFilter] = useState('All Types')
-  const [showTypeFilter, setShowTypeFilter] = useState(false)
   const [doneIds, setDoneIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('csb_done_deadlines') || '[]')) }
     catch { return new Set() }
@@ -504,31 +503,31 @@ export default function AnnouncementsPage() {
             const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
             if (typeEntries.length === 0) return null
             return (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {typeEntries.map(([type, count]) => (
                   <button
                     key={type}
                     onClick={() => setTypeFilter(t => t === type ? 'All Types' : type)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 13px', borderRadius: 20,
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 20,
                       border: `1.5px solid ${typeFilter === type ? 'white' : 'rgba(255,255,255,0.35)'}`,
                       background: typeFilter === type ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)',
                       cursor: 'pointer', transition: 'all 0.15s',
                     }}
                   >
                     <span style={{
-                      fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13,
+                      fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12,
                       color: typeFilter === type ? RED : 'white',
                     }}>
                       {type}
                     </span>
                     <span style={{
-                      fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 12,
+                      fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 11,
                       background: typeFilter === type ? RED : 'rgba(255,255,255,0.25)',
                       color: 'white',
-                      borderRadius: 10, padding: '1px 7px', lineHeight: 1.6,
-                      minWidth: 20, textAlign: 'center',
+                      borderRadius: 10, padding: '1px 6px', lineHeight: 1.6,
+                      minWidth: 18, textAlign: 'center',
                     }}>
                       {count}
                     </span>
@@ -559,76 +558,6 @@ export default function AnnouncementsPage() {
             ))}
           </div>
 
-          {/* Type filter */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <button
-              onClick={() => setShowTypeFilter(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                padding: '7px 9px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: typeFilter !== 'All Types' ? RED_BG : GREY_BG,
-                color: typeFilter !== 'All Types' ? RED : GREY,
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
-                flexShrink: 0, transition: 'all 0.15s',
-              }}
-            >
-              <Filter size={13} />
-              {/* Show "Type" label only on wider screens */}
-              <span className="type-label">
-                {typeFilter === 'All Types' ? 'Type' : typeFilter}
-              </span>
-              {typeFilter !== 'All Types' && (
-                <span onClick={e => { e.stopPropagation(); setTypeFilter('All Types') }} style={{ marginLeft: 1, display: 'flex', alignItems: 'center' }}>
-                  <X size={11} />
-                </span>
-              )}
-            </button>
-            {showTypeFilter && (
-              // Fixed position so it escapes any overflow:hidden parent
-              <div style={{
-                position: 'fixed',
-                top: 'auto',
-                right: 14,
-                background: 'white',
-                borderRadius: 12,
-                border: '1px solid #E4E6EB',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                zIndex: 9999,
-                minWidth: 170,
-                overflow: 'hidden',
-                animation: 'slideDown 0.15s ease',
-                marginTop: 4,
-              }}
-              ref={el => {
-                if (el) {
-                  // Position it just below the button using getBoundingClientRect
-                  const btn = el.previousSibling
-                  if (btn) {
-                    const rect = btn.getBoundingClientRect()
-                    el.style.top = (rect.bottom + 6) + 'px'
-                    el.style.right = (window.innerWidth - rect.right) + 'px'
-                  }
-                }
-              }}>
-                {TYPE_FILTERS.map(t => (
-                  <button key={t} onClick={() => { setTypeFilter(t); setShowTypeFilter(false) }}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center',
-                      padding: '9px 14px', border: 'none', cursor: 'pointer',
-                      background: typeFilter === t ? RED_BG : 'transparent',
-                      color: typeFilter === t ? RED : '#1c1e21',
-                      fontFamily: '"Instrument Sans", system-ui', fontWeight: typeFilter === t ? 700 : 500, fontSize: 13,
-                      textAlign: 'left', transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => { if (typeFilter !== t) e.currentTarget.style.background = GREY_BG }}
-                    onMouseLeave={e => { if (typeFilter !== t) e.currentTarget.style.background = 'transparent' }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -678,9 +607,6 @@ export default function AnnouncementsPage() {
       <style>{`
         @keyframes expandIn  { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
-        /* Hide 'Type' text on small screens, show only icon */
-        .type-label { display: none; }
-        @media (min-width: 400px) { .type-label { display: inline; } }
       `}</style>
     </div>
   )
