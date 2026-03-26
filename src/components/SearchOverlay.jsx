@@ -1,451 +1,493 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
-import { X, Search, SlidersHorizontal, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
-import PostCard from './PostCard'
-import { PostSkeleton } from './Skeletons'
+import { useState, useEffect, useRef, useCallback } from "react";
+import PostCard from "./PostCard";
 
-const RED  = '#C0392B'
-const BLUE = '#1A5276'
-
-const TYPE_OPTIONS = [
-  { key: 'all',          label: 'All',          emoji: '🔍' },
-  { key: 'status',       label: 'Status',        emoji: '💬' },
-  { key: 'announcement', label: 'Announcement',  emoji: '📢' },
-  { key: 'deadline',     label: 'Deadline',      emoji: '📅' },
-  { key: 'reminder',     label: 'Reminder',      emoji: '🔔' },
-  { key: 'material',     label: 'Material',      emoji: '📁' },
-]
+const TYPES = [
+  { label: "All", value: "all" },
+  { label: "Status", value: "status" },
+  { label: "Announcement", value: "announcement" },
+  { label: "Deadline", value: "deadline" },
+  { label: "Reminder", value: "reminder" },
+  { label: "Material", value: "material" },
+];
 
 const DATE_PRESETS = [
-  { key: 'today',   label: 'Today' },
-  { key: 'week',    label: 'This week' },
-  { key: 'month',   label: 'This month' },
-  { key: 'custom',  label: 'Custom range' },
-]
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "week" },
+  { label: "This Month", value: "month" },
+  { label: "Custom", value: "custom" },
+];
 
-function getPresetRange(key) {
-  const now = new Date()
-  if (key === 'today') {
-    const start = new Date(now); start.setHours(0,0,0,0)
-    const end   = new Date(now); end.setHours(23,59,59,999)
-    return { start, end }
-  }
-  if (key === 'week') {
-    const start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0)
-    const end   = new Date(now); end.setHours(23,59,59,999)
-    return { start, end }
-  }
-  if (key === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    const end   = new Date(now); end.setHours(23,59,59,999)
-    return { start, end }
-  }
-  return null
+function CollapsibleSection({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "none",
+          border: "none",
+          padding: "10px 0",
+          cursor: "pointer",
+          color: "#fff",
+          fontSize: "13px",
+          fontWeight: 600,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          opacity: 0.7,
+        }}
+      >
+        <span>{title}</span>
+        <span
+          style={{
+            fontSize: "18px",
+            lineHeight: 1,
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            opacity: 0.6,
+          }}
+        >
+          ›
+        </span>
+      </button>
+      {open && (
+        <div style={{ paddingBottom: "12px" }}>{children}</div>
+      )}
+    </div>
+  );
 }
 
-export default function SearchOverlay({ onClose, subjects = [], currentUserId }) {
-  const [query, setQuery]               = useState('')
-  const [typeFilter, setTypeFilter]     = useState('all')
-  const [subjectFilter, setSubjectFilter] = useState('')
-  const [datePreset, setDatePreset]     = useState('')
-  const [customStart, setCustomStart]   = useState('')
-  const [customEnd, setCustomEnd]       = useState('')
-  const [showFilters, setShowFilters]   = useState(false)
-  const [results, setResults]           = useState([])
-  const [loading, setLoading]           = useState(false)
-  const [searched, setSearched]         = useState(false)
-  const inputRef = useRef()
+export default function SearchOverlay({ onClose, posts = [], subjects = [] }) {
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeType, setActiveType] = useState("all");
+  const [activeSubject, setActiveSubject] = useState("all");
+  const [activeDatePreset, setActiveDatePreset] = useState(null);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const inputRef = useRef(null);
 
-  // Lock body scroll
   useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    inputRef.current?.focus()
-    return () => { document.body.style.overflow = '' }
-  }, [])
+    inputRef.current?.focus();
+  }, []);
 
-  const doSearch = useCallback(async () => {
-    setLoading(true)
-    setSearched(true)
-    try {
-      let q = supabase
-        .from('posts')
-        .select('*, profiles(*), subjects(*)')
-        .order('created_at', { ascending: false })
-        .limit(60)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
-      // Text search
-      if (query.trim()) {
-        q = q.ilike('caption', `%${query.trim()}%`)
+  const activeFilterCount = [
+    activeType !== "all",
+    activeSubject !== "all",
+    activeDatePreset !== null,
+  ].filter(Boolean).length;
+
+  const filtered = posts.filter((post) => {
+    const text = `${post.content || ""} ${post.authorName || ""} ${post.subject || ""}`.toLowerCase();
+    const q = debouncedQuery.toLowerCase();
+    if (q && !text.includes(q)) return false;
+    if (activeType !== "all" && post.type !== activeType) return false;
+    if (activeSubject !== "all" && post.subject !== activeSubject) return false;
+    if (activeDatePreset) {
+      const now = new Date();
+      const postDate = new Date(post.createdAt || post.date || Date.now());
+      if (activeDatePreset === "today") {
+        if (postDate.toDateString() !== now.toDateString()) return false;
+      } else if (activeDatePreset === "week") {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(now.getDate() - 7);
+        if (postDate < weekAgo) return false;
+      } else if (activeDatePreset === "month") {
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(now.getMonth() - 1);
+        if (postDate < monthAgo) return false;
+      } else if (activeDatePreset === "custom" && customStart && customEnd) {
+        const start = new Date(customStart);
+        const end = new Date(customEnd);
+        end.setHours(23, 59, 59);
+        if (postDate < start || postDate > end) return false;
       }
-
-      // Type filter
-      if (typeFilter !== 'all') {
-        if (['announcement','deadline','reminder','material'].includes(typeFilter)) {
-          if (typeFilter === 'announcement') {
-            q = q.eq('post_type', 'announcement')
-          } else {
-            q = q.eq('sub_type', typeFilter)
-          }
-        } else if (typeFilter === 'status') {
-          q = q.eq('sub_type', 'status')
-        }
-      }
-
-      // Subject filter
-      if (subjectFilter) {
-        q = q.eq('subject_id', subjectFilter)
-      }
-
-      // Date filter
-      let dateRange = null
-      if (datePreset && datePreset !== 'custom') {
-        dateRange = getPresetRange(datePreset)
-      } else if (datePreset === 'custom' && customStart) {
-        dateRange = {
-          start: new Date(customStart + 'T00:00:00'),
-          end:   customEnd ? new Date(customEnd + 'T23:59:59') : new Date(),
-        }
-      }
-      if (dateRange) {
-        q = q
-          .gte('created_at', dateRange.start.toISOString())
-          .lte('created_at', dateRange.end.toISOString())
-      }
-
-      const { data } = await q
-      setResults(data || [])
-    } finally {
-      setLoading(false)
     }
-  }, [query, typeFilter, subjectFilter, datePreset, customStart, customEnd])
-
-  // Auto-search when filters change (if already searched)
-  useEffect(() => {
-    if (!searched) return
-    const t = setTimeout(doSearch, 300)
-    return () => clearTimeout(t)
-  }, [typeFilter, subjectFilter, datePreset, customStart, customEnd, doSearch, searched])
-
-  // Auto-search on query change with debounce
-  useEffect(() => {
-    if (!query.trim() && !searched) return
-    const t = setTimeout(doSearch, 350)
-    return () => clearTimeout(t)
-  }, [query]) // eslint-disable-line
-
-  function clearFilters() {
-    setTypeFilter('all')
-    setSubjectFilter('')
-    setDatePreset('')
-    setCustomStart('')
-    setCustomEnd('')
-  }
-
-  const hasActiveFilters = typeFilter !== 'all' || subjectFilter || datePreset
+    return true;
+  });
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 55,
-      background: 'white',
-      display: 'flex', flexDirection: 'column',
-      animation: 'fullscreenIn 0.2s cubic-bezier(0.16,1,0.3,1)',
-    }}>
-
-      {/* ── Top bar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 12px',
-        borderBottom: '1px solid #E4E6EB',
-        flexShrink: 0,
-        background: 'white',
-      }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+        color: "#fff",
+        overflow: "hidden",
+      }}
+    >
+      {/* ── TOP BAR ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "12px 14px",
+          paddingTop: "calc(12px + env(safe-area-inset-top))",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          flexShrink: 0,
+        }}
+      >
         {/* Search input */}
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', gap: 9,
-          background: '#F0F2F5', borderRadius: 22,
-          padding: '0 14px', height: 40,
-          border: '1.5px solid #E4E6EB',
-        }}>
-          <Search size={16} color="#8A8D91" style={{ flexShrink: 0 }} />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            background: "rgba(255,255,255,0.1)",
+            borderRadius: "10px",
+            padding: "0 12px",
+            gap: "8px",
+          }}
+        >
+          <span style={{ fontSize: "16px", opacity: 0.6 }}>🔍</span>
           <input
             ref={inputRef}
-            type="text"
-            placeholder="Search posts…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && doSearch()}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search posts..."
             style={{
-              flex: 1, border: 'none', background: 'transparent', outline: 'none',
-              fontFamily: '"Instrument Sans", system-ui', fontSize: 15, color: '#050505',
+              flex: 1,
+              background: "none",
+              border: "none",
+              outline: "none",
+              color: "#fff",
+              fontSize: "15px",
+              padding: "10px 0",
             }}
           />
-          {query && (
-            <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexShrink: 0 }}>
-              <X size={14} color="#8A8D91" />
+          {query.length > 0 && (
+            <button
+              onClick={() => setQuery("")}
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.5)",
+                fontSize: "18px",
+                cursor: "pointer",
+                padding: "0",
+                lineHeight: 1,
+              }}
+            >
+              ×
             </button>
           )}
         </div>
 
-        {/* Filter toggle */}
+        {/* Filter icon button — icon only, badge if filters active */}
         <button
-          onClick={() => setShowFilters(v => !v)}
+          onClick={() => setShowFilters((s) => !s)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '0 12px', height: 40, borderRadius: 22,
-            border: `1.5px solid ${hasActiveFilters ? RED : '#E4E6EB'}`,
-            background: hasActiveFilters ? '#FADBD8' : '#F4F6F8',
-            cursor: 'pointer', flexShrink: 0,
-            fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-            color: hasActiveFilters ? RED : '#65676B',
-            transition: 'all 0.15s',
-            position: 'relative',
+            position: "relative",
+            background: showFilters
+              ? "rgba(99,102,241,0.35)"
+              : "rgba(255,255,255,0.1)",
+            border: showFilters
+              ? "1px solid rgba(99,102,241,0.6)"
+              : "1px solid rgba(255,255,255,0.15)",
+            borderRadius: "10px",
+            width: "40px",
+            height: "40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            transition: "all 0.2s",
           }}
+          title="Filters"
         >
-          <SlidersHorizontal size={15} />
-          Filter
-          {hasActiveFilters && (
-            <span style={{
-              position: 'absolute', top: -5, right: -5,
-              width: 16, height: 16, borderRadius: '50%',
-              background: RED, color: 'white',
-              fontSize: 9, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '2px solid white',
-            }}>
-              {[typeFilter !== 'all', !!subjectFilter, !!datePreset].filter(Boolean).length}
+          {/* Filter / X icon */}
+          {showFilters ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+          )}
+          {/* Active count badge */}
+          {!showFilters && activeFilterCount > 0 && (
+            <span
+              style={{
+                position: "absolute",
+                top: "-4px",
+                right: "-4px",
+                background: "#6366f1",
+                color: "#fff",
+                borderRadius: "50%",
+                width: "16px",
+                height: "16px",
+                fontSize: "10px",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {activeFilterCount}
             </span>
           )}
-          {showFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
 
-        {/* Close */}
+        {/* Close overlay */}
         <button
           onClick={onClose}
           style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: '#E4E6EB', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, transition: 'background 0.12s',
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: "10px",
+            width: "40px",
+            height: "40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            color: "#fff",
+            fontSize: "20px",
+            lineHeight: 1,
           }}
-          onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
-          onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}
+          title="Close"
         >
-          <X size={17} color="#050505" />
+          ←
         </button>
       </div>
 
-      {/* ── Filter panel ── */}
+      {/* ── FILTER PANEL (collapsible dropdowns) ── */}
       {showFilters && (
-        <div style={{
-          background: 'white',
-          borderBottom: '1px solid #E4E6EB',
-          padding: '14px 14px 16px',
-          flexShrink: 0,
-          animation: 'slideDown 0.18s ease',
-        }}>
-
-          {/* By type */}
-          <div style={{ marginBottom: 14 }}>
-            <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              By Type
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {TYPE_OPTIONS.map(t => (
+        <div
+          style={{
+            padding: "4px 16px 4px",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(0,0,0,0.2)",
+            flexShrink: 0,
+            overflowY: "auto",
+            maxHeight: "55vh",
+          }}
+        >
+          {/* By Type */}
+          <CollapsibleSection title="By Type">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {TYPES.map((t) => (
                 <button
-                  key={t.key}
-                  onClick={() => setTypeFilter(t.key)}
+                  key={t.value}
+                  onClick={() => setActiveType(t.value)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                    background: typeFilter === t.key ? RED : '#F0F2F5',
-                    color: typeFilter === t.key ? 'white' : '#65676B',
-                    transition: 'all 0.12s',
-                    boxShadow: typeFilter === t.key ? '0 2px 8px rgba(192,57,43,0.25)' : 'none',
+                    padding: "5px 12px",
+                    borderRadius: "20px",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background:
+                      activeType === t.value
+                        ? "rgba(99,102,241,0.5)"
+                        : "rgba(255,255,255,0.07)",
+                    color: "#fff",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    fontWeight: activeType === t.value ? 600 : 400,
                   }}
                 >
-                  <span style={{ fontSize: 13 }}>{t.emoji}</span> {t.label}
+                  {t.label}
                 </button>
               ))}
             </div>
-          </div>
+          </CollapsibleSection>
 
-          {/* By subject */}
-          {subjects.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                By Subject
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {/* By Subject */}
+          <CollapsibleSection title="By Subject">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {["all", ...subjects].map((s) => (
                 <button
-                  onClick={() => setSubjectFilter('')}
+                  key={s}
+                  onClick={() => setActiveSubject(s)}
                   style={{
-                    padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                    background: !subjectFilter ? BLUE : '#F0F2F5',
-                    color: !subjectFilter ? 'white' : '#65676B',
-                    transition: 'all 0.12s',
-                    boxShadow: !subjectFilter ? '0 2px 8px rgba(26,82,118,0.25)' : 'none',
+                    padding: "5px 12px",
+                    borderRadius: "20px",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background:
+                      activeSubject === s
+                        ? "rgba(99,102,241,0.5)"
+                        : "rgba(255,255,255,0.07)",
+                    color: "#fff",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    fontWeight: activeSubject === s ? 600 : 400,
+                    textTransform: s === "all" ? "none" : "capitalize",
                   }}
                 >
-                  All Subjects
-                </button>
-                {subjects.map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSubjectFilter(s.id)}
-                    style={{
-                      padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                      fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                      background: subjectFilter === s.id ? BLUE : '#F0F2F5',
-                      color: subjectFilter === s.id ? 'white' : '#65676B',
-                      transition: 'all 0.12s',
-                      boxShadow: subjectFilter === s.id ? '0 2px 8px rgba(26,82,118,0.25)' : 'none',
-                    }}
-                  >
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* By date */}
-          <div>
-            <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              By Date
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: datePreset === 'custom' ? 10 : 0 }}>
-              {DATE_PRESETS.map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => { setDatePreset(datePreset === p.key ? '' : p.key); setCustomStart(''); setCustomEnd('') }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                    background: datePreset === p.key ? '#0D7377' : '#F0F2F5',
-                    color: datePreset === p.key ? 'white' : '#65676B',
-                    transition: 'all 0.12s',
-                    boxShadow: datePreset === p.key ? '0 2px 8px rgba(13,115,119,0.25)' : 'none',
-                  }}
-                >
-                  {p.key === 'custom' && <Calendar size={12} />}
-                  {p.label}
+                  {s === "all" ? "All Subjects" : s}
                 </button>
               ))}
             </div>
-            {/* Custom range inputs */}
-            {datePreset === 'custom' && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+          </CollapsibleSection>
+
+          {/* By Date */}
+          <CollapsibleSection title="By Date">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {DATE_PRESETS.map((d) => (
+                <button
+                  key={d.value}
+                  onClick={() =>
+                    setActiveDatePreset((p) =>
+                      p === d.value ? null : d.value
+                    )
+                  }
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: "20px",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background:
+                      activeDatePreset === d.value
+                        ? "rgba(99,102,241,0.5)"
+                        : "rgba(255,255,255,0.07)",
+                    color: "#fff",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    fontWeight: activeDatePreset === d.value ? 600 : 400,
+                  }}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            {activeDatePreset === "custom" && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "center",
+                }}
+              >
                 <input
                   type="date"
                   value={customStart}
-                  onChange={e => setCustomStart(e.target.value)}
+                  onChange={(e) => setCustomStart(e.target.value)}
                   style={{
-                    flex: 1, padding: '8px 10px', borderRadius: 10,
-                    border: `1px solid ${customStart ? '#0D7377' : '#E4E6EB'}`,
-                    fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
-                    background: '#F7F8FA', outline: 'none',
+                    flex: 1,
+                    background: "rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    padding: "6px 8px",
+                    fontSize: "12px",
                   }}
                 />
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', flexShrink: 0 }}>to</span>
+                <span style={{ opacity: 0.5, fontSize: "12px" }}>to</span>
                 <input
                   type="date"
                   value={customEnd}
-                  min={customStart}
-                  onChange={e => setCustomEnd(e.target.value)}
-                  disabled={!customStart}
+                  onChange={(e) => setCustomEnd(e.target.value)}
                   style={{
-                    flex: 1, padding: '8px 10px', borderRadius: 10,
-                    border: `1px solid ${customEnd ? '#0D7377' : '#E4E6EB'}`,
-                    fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
-                    color: customStart ? '#050505' : '#BCC0C4',
-                    background: customStart ? '#F7F8FA' : '#F0F2F5',
-                    outline: 'none', opacity: customStart ? 1 : 0.5,
-                    cursor: customStart ? 'text' : 'not-allowed',
+                    flex: 1,
+                    background: "rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    padding: "6px 8px",
+                    fontSize: "12px",
                   }}
                 />
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
-          {/* Clear filters */}
-          {hasActiveFilters && (
+          {/* Reset filters */}
+          {activeFilterCount > 0 && (
             <button
-              onClick={clearFilters}
-              style={{
-                marginTop: 12, padding: '7px 16px', borderRadius: 20,
-                border: `1px solid ${RED}`, background: 'transparent',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12.5,
-                color: RED, cursor: 'pointer', transition: 'background 0.12s',
+              onClick={() => {
+                setActiveType("all");
+                setActiveSubject("all");
+                setActiveDatePreset(null);
+                setCustomStart("");
+                setCustomEnd("");
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#FFF5F5'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              style={{
+                marginTop: "10px",
+                marginBottom: "6px",
+                background: "none",
+                border: "1px solid rgba(255,100,100,0.4)",
+                borderRadius: "8px",
+                color: "rgba(255,150,150,1)",
+                padding: "6px 14px",
+                fontSize: "12px",
+                cursor: "pointer",
+                width: "100%",
+              }}
             >
-              ✕ Clear all filters
+              Clear all filters
             </button>
           )}
         </div>
       )}
 
-      {/* ── Results ── */}
-      <div style={{ flex: 1, overflowY: 'auto', background: '#E9EBEE' }}>
-        {!searched && !loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10, padding: 32 }}>
-            <div style={{ width: 64, height: 64, borderRadius: 18, background: '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Search size={28} color="#BCC0C4" />
-            </div>
-            <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505', margin: 0 }}>Search posts</p>
-            <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#65676B', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
-              Type something to search, or use filters to browse by type, subject, or date.
+      {/* ── RESULTS ── */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "12px 14px",
+          paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+        }}
+      >
+        {debouncedQuery || activeFilterCount > 0 ? (
+          <>
+            <p
+              style={{
+                fontSize: "12px",
+                opacity: 0.45,
+                marginBottom: "10px",
+                marginTop: 0,
+              }}
+            >
+              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
             </p>
-          </div>
-        ) : loading ? (
-          <div style={{ padding: '8px 0' }}>
-            {[0,1,2].map(i => <PostSkeleton key={i} />)}
-          </div>
-        ) : results.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 10, padding: 32 }}>
-            <div style={{ fontSize: 44 }}>🔍</div>
-            <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505', margin: 0 }}>No results found</p>
-            <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#65676B', margin: 0, textAlign: 'center' }}>
-              Try different keywords or adjust your filters.
-            </p>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} style={{ marginTop: 4, padding: '8px 18px', borderRadius: 20, border: `1px solid ${RED}`, background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: RED, cursor: 'pointer' }}>
-                Clear filters
-              </button>
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: "60px",
+                  opacity: 0.4,
+                  fontSize: "15px",
+                }}
+              >
+                <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔍</div>
+                No posts found
+              </div>
+            ) : (
+              filtered.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))
             )}
-          </div>
+          </>
         ) : (
-          <div>
-            {/* Result count */}
-            <div style={{ padding: '10px 14px 4px' }}>
-              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12.5, color: '#65676B', fontWeight: 600 }}>
-                {results.length} result{results.length !== 1 ? 's' : ''}
-                {query.trim() ? ` for "${query.trim()}"` : ''}
-              </span>
-            </div>
-            {results.map(post => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUserId={currentUserId}
-                subjects={subjects}
-              />
-            ))}
-            <div style={{ padding: '12px 0 8px', textAlign: 'center' }}>
-              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#BCC0C4' }}>· End of results ·</span>
-            </div>
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: "60px",
+              opacity: 0.3,
+              fontSize: "15px",
+            }}
+          >
+            <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔍</div>
+            Type to search posts
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes fullscreenIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
-      `}</style>
     </div>
-  )
+  );
 }
