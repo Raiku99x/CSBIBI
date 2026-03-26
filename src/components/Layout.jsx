@@ -70,7 +70,6 @@ export default function Layout({ children }) {
     navigate('/auth')
   }
 
-  // Chat replaced with Messages (unified inbox + group chat)
   const navItems = [
     { to: '/', icon: Home, label: 'Feed', exact: true },
     { to: '/messages', icon: MessageSquare, label: 'Messages', badge: dmUnread },
@@ -99,10 +98,7 @@ export default function Layout({ children }) {
             <div style={{ width: 34, height: 34, borderRadius: 8, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 6px rgba(192,57,43,0.2)' }}>
               <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-            <div>
-              <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 19, color: RED, letterSpacing: '-0.5px', lineHeight: 1 }}>CSB</div>
-              <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 8.5, color: BLUE, letterSpacing: '0.8px', textTransform: 'uppercase', lineHeight: 1, marginTop: 1 }}>Computer Science Board</div>
-            </div>
+            <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 19, color: RED, letterSpacing: '-0.5px', lineHeight: 1 }}>CSB</div>
           </div>
 
           {/* Right actions */}
@@ -177,7 +173,7 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* ── Main — no horizontal padding, cards go edge to edge on mobile ── */}
+      {/* ── Main ── */}
       <main style={{ flex: 1, maxWidth: 680, margin: '0 auto', width: '100%', paddingBottom: 64 }}>
         {children}
       </main>
@@ -206,7 +202,6 @@ export default function Layout({ children }) {
                   {isActive && (
                     <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 20, height: 2.5, borderRadius: 2, background: RED }} />
                   )}
-                  {/* Icon wrapper with optional badge */}
                   <div style={{ position: 'relative' }}>
                     <div style={{ width: 34, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, background: isActive ? '#FADBD8' : 'transparent', transition: 'background 0.15s' }}>
                       <Icon size={19} color={isActive ? RED : '#65676B'} strokeWidth={isActive ? 2.5 : 2} />
