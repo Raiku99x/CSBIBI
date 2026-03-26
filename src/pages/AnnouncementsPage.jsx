@@ -513,16 +513,19 @@ export default function AnnouncementsPage() {
         {/* Controls */}
         <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Filter tabs */}
-          <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 2, flex: 1 }}>
+          <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 1, flex: 1, minWidth: 0 }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
-                flex: 1, padding: '7px 4px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11.5,
+                flex: 1, padding: '7px 1px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10,
                 background: filter === f ? 'white' : 'transparent',
                 color: filter === f ? '#050505' : GREY,
                 boxShadow: filter === f ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
                 whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                minWidth: 0,
               }}>{f}</button>
             ))}
           </div>
@@ -536,7 +539,7 @@ export default function AnnouncementsPage() {
                 padding: '7px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 background: typeFilter !== 'All Types' ? RED_BG : GREY_BG,
                 color: typeFilter !== 'All Types' ? RED : GREY,
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12.5,
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
                 flexShrink: 0, transition: 'all 0.15s',
               }}
             >
