@@ -20,7 +20,6 @@ function formatTime12(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-// Returns the exact deadline Date, defaulting to 11:59 PM if no time set
 function getDeadlineDate(due_date, due_time) {
   const date = new Date(due_date)
   if (due_time) {
@@ -36,8 +35,8 @@ function getDueStatus(due_date, due_time) {
   const date = getDeadlineDate(due_date, due_time)
   if (isPast(date))                   return { label: 'Past due',     color: GREY,  bg: GREY_BG,  urgent: false, past: true  }
   const days = differenceInDays(date, new Date())
-  if (isToday(new Date(due_date)))    return { label: 'Due today!',   color: RED,   bg: RED_BG,   urgent: true,  past: false }
-  if (isTomorrow(new Date(due_date))) return { label: 'Due tomorrow', color: RED,   bg: RED_BG,   urgent: true,  past: false }
+  if (isToday(new Date(due_date)))    return { label: 'Today!',       color: RED,   bg: RED_BG,   urgent: true,  past: false }
+  if (isTomorrow(new Date(due_date))) return { label: 'Tomorrow',     color: RED,   bg: RED_BG,   urgent: true,  past: false }
   if (days <= 3)  return { label: `${days}d left`,  color: RED,   bg: RED_BG,   urgent: true,  past: false }
   if (days <= 7)  return { label: `${days}d left`,  color: BLUE,  bg: BLUE_BG,  urgent: false, past: false }
   return            { label: `${days}d left`,  color: BLUE,  bg: BLUE_BG,  urgent: false, past: false }
@@ -61,6 +60,8 @@ function parseFiles(file_url, file_name) {
 // ── Deadline Row ──────────────────────────────────────────────
 function DeadlineRow({ post, done, onToggleDone }) {
   const [expanded, setExpanded] = useState(false)
+  const [animating, setAnimating] = useState(false) // green-flash state
+  const [hiding, setHiding] = useState(false)       // fade-out state
   const status = getDueStatus(post.due_date, post.due_time)
   const photos = parsePhotos(post.photo_url)
   const files  = parseFiles(post.file_url, post.file_name)
@@ -68,57 +69,99 @@ function DeadlineRow({ post, done, onToggleDone }) {
 
   const leftAccent = done ? '#E5E7EB' : status.past ? '#DADDE1' : status.urgent ? RED : BLUE
 
+  function handleToggle() {
+    if (done) {
+      // Un-marking — instant
+      onToggleDone(post.id)
+      return
+    }
+    // Marking as done — green flash, then fade out, then remove
+    setAnimating(true)
+    setTimeout(() => {
+      setAnimating(false)
+      setHiding(true)
+      setTimeout(() => {
+        onToggleDone(post.id)
+      }, 380)
+    }, 500)
+  }
+
   return (
     <div style={{
-      background: done ? '#FAFAFA' : 'white',
+      background: animating ? '#DCFCE7' : done ? '#FAFAFA' : 'white',
       borderRadius: 12,
-      border: `1px solid ${done ? '#E5E7EB' : status.urgent && !status.past ? '#F5B7B1' : '#E4E6EB'}`,
+      border: `1px solid ${animating ? '#86EFAC' : done ? '#E5E7EB' : status.urgent && !status.past ? '#F5B7B1' : '#E4E6EB'}`,
       overflow: 'hidden',
-      transition: 'all 0.2s',
-      opacity: done ? 0.65 : 1,
+      transition: 'background 0.25s, border-color 0.25s, opacity 0.38s, transform 0.38s, max-height 0.38s',
+      opacity: hiding ? 0 : done ? 0.65 : 1,
+      transform: hiding ? 'translateX(40px)' : 'translateX(0)',
+      maxHeight: hiding ? 0 : 999,
+      pointerEvents: animating || hiding ? 'none' : 'auto',
     }}>
-      {/* Left accent bar */}
       <div style={{ display: 'flex' }}>
-        <div style={{ width: 4, flexShrink: 0, background: leftAccent, borderRadius: '0 0 0 0' }} />
+        <div style={{ width: 4, flexShrink: 0, background: animating ? '#22C55E' : leftAccent, transition: 'background 0.25s', borderRadius: '0 0 0 0' }} />
 
         <div style={{ flex: 1 }}>
           {/* ── Main row ── */}
           <div style={{ padding: '11px 14px 11px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
 
-            {/* Date block */}
+            {/* Date block — day / month / days-left stacked */}
             <div style={{
               flexShrink: 0,
               minWidth: 52,
               textAlign: 'center',
               padding: '5px 8px',
               borderRadius: 8,
-              background: done ? GREY_BG : status.bg,
-              border: `1px solid ${done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
+              background: animating ? '#DCFCE7' : done ? GREY_BG : status.bg,
+              border: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
+              transition: 'background 0.25s, border-color 0.25s',
             }}>
+              {/* Day number */}
               <div style={{
                 fontFamily: '"Bricolage Grotesque", system-ui',
-                fontWeight: 800, fontSize: 15,
-                color: done ? '#9CA3AF' : status.color,
+                fontWeight: 800, fontSize: 17,
+                color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color,
                 lineHeight: 1,
+                transition: 'color 0.25s',
               }}>
                 {format(new Date(post.due_date), 'd')}
               </div>
+              {/* Month */}
               <div style={{
                 fontFamily: '"Instrument Sans", system-ui',
                 fontWeight: 600, fontSize: 10,
-                color: done ? '#BCC0C4' : status.color,
+                color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
                 opacity: 0.85,
                 marginTop: 1,
+                transition: 'color 0.25s',
               }}>
                 {format(new Date(post.due_date), 'MMM')}
               </div>
-              {post.due_time && (
+              {/* Days left — shown below month */}
+              {!done && (
                 <div style={{
                   fontFamily: '"Instrument Sans", system-ui',
-                  fontWeight: 500, fontSize: 9,
+                  fontWeight: 700,
+                  fontSize: 9,
+                  color: animating ? '#16a34a' : status.color,
+                  marginTop: 3,
+                  padding: '1px 0',
+                  borderTop: `1px solid ${animating ? '#86EFAC' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
+                  letterSpacing: 0.1,
+                  transition: 'color 0.25s',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {animating ? '✓ Done' : status.label}
+                </div>
+              )}
+              {/* Time (only if set, shown below days-left) */}
+              {post.due_time && !done && (
+                <div style={{
+                  fontFamily: '"Instrument Sans", system-ui',
+                  fontWeight: 500, fontSize: 8.5,
                   color: done ? '#BCC0C4' : status.color,
-                  opacity: 0.7,
-                  marginTop: 1,
+                  opacity: 0.65,
+                  marginTop: 2,
                 }}>
                   {formatTime12(post.due_time)}
                 </div>
@@ -154,24 +197,15 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   </span>
                 )}
 
-                {/* Status */}
-                {done ? (
+                {/* Status pill — only show if done */}
+                {done && (
                   <span style={{
                     background: '#DCFCE7', color: '#16a34a',
                     border: '1px solid #BBF7D0',
                     fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
                     padding: '2px 8px', borderRadius: 20,
                   }}>
-                    Done
-                  </span>
-                ) : (
-                  <span style={{
-                    background: status.bg, color: status.color,
-                    border: `1px solid ${status.urgent ? '#F5B7B1' : status.past ? '#DADDE1' : '#AED6F1'}`,
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
-                    padding: '2px 8px', borderRadius: 20,
-                  }}>
-                    {status.label}
+                    Done ✓
                   </span>
                 )}
               </div>
@@ -210,35 +244,37 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 </button>
               )}
 
-              {/* Done toggle */}
+              {/* Done toggle — just says "Done" with checkmark */}
               <button
-                onClick={() => onToggleDone(post.id)}
+                onClick={handleToggle}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '6px 12px', borderRadius: 8, border: 'none',
                   cursor: 'pointer', flexShrink: 0,
                   fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12.5,
-                  background: done ? '#DCFCE7' : '#F0FDF4',
-                  color: done ? '#16a34a' : '#4ade80',
-                  outline: `2px solid ${done ? '#BBF7D0' : '#D1FAE5'}`,
-                  transition: 'all 0.15s',
+                  background: animating ? '#DCFCE7' : done ? '#DCFCE7' : '#F0FDF4',
+                  color: animating ? '#16a34a' : done ? '#16a34a' : '#4ade80',
+                  outline: `2px solid ${animating ? '#86EFAC' : done ? '#BBF7D0' : '#D1FAE5'}`,
+                  transition: 'all 0.2s',
+                  transform: animating ? 'scale(1.06)' : 'scale(1)',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = done ? '#BBF7D0' : '#DCFCE7'
-                  e.currentTarget.style.color = '#16a34a'
-                  e.currentTarget.style.outline = '2px solid #86EFAC'
+                  if (!animating) {
+                    e.currentTarget.style.background = done ? '#BBF7D0' : '#DCFCE7'
+                    e.currentTarget.style.color = '#16a34a'
+                    e.currentTarget.style.outline = '2px solid #86EFAC'
+                  }
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = done ? '#DCFCE7' : '#F0FDF4'
-                  e.currentTarget.style.color = done ? '#16a34a' : '#4ade80'
-                  e.currentTarget.style.outline = `2px solid ${done ? '#BBF7D0' : '#D1FAE5'}`
+                  if (!animating) {
+                    e.currentTarget.style.background = done ? '#DCFCE7' : '#F0FDF4'
+                    e.currentTarget.style.color = done ? '#16a34a' : '#4ade80'
+                    e.currentTarget.style.outline = `2px solid ${done ? '#BBF7D0' : '#D1FAE5'}`
+                  }
                 }}
               >
-                {done ? (
-                  <><Check size={13} strokeWidth={2.5} />Done</>
-                ) : (
-                  <><Check size={13} strokeWidth={2.5} />Mark done</>
-                )}
+                <Check size={13} strokeWidth={2.5} />
+                Done
               </button>
             </div>
           </div>
@@ -353,12 +389,12 @@ function LoadingSkeleton() {
         <div key={i} style={{ background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', display: 'flex', overflow: 'hidden' }}>
           <div style={{ width: 4, background: '#E4E6EB' }} />
           <div style={{ flex: 1, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {bar(52, 50, 8)}
+            {bar(52, 62, 8)}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
               <div style={{ display: 'flex', gap: 5 }}>{bar(80, 22, 20)}{bar(60, 22, 20)}{bar(55, 22, 20)}</div>
               {bar('60%', 13)}
             </div>
-            {bar(80, 30, 8)}
+            {bar(70, 30, 8)}
           </div>
         </div>
       ))}
@@ -367,9 +403,7 @@ function LoadingSkeleton() {
   )
 }
 
-// Filters: All, Due Soon (today+tomorrow only), Past Due, Done
 const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
-const TYPE_FILTERS = ['All Types', 'Quiz', 'Activity', 'Output', 'Exam', 'Fees', 'Info', 'Learning Task', 'Project', 'Reporting']
 
 export default function AnnouncementsPage() {
   const { user } = useAuth()
@@ -417,7 +451,6 @@ export default function AnnouncementsPage() {
     if (user) load()
   }, [user])
 
-  // Helpers
   const isDueSoon = (d) => {
     const deadline = getDeadlineDate(d.due_date, d.due_time)
     if (isPast(deadline)) return false
@@ -425,24 +458,15 @@ export default function AnnouncementsPage() {
   }
   const isPastDue = (d) => isPast(getDeadlineDate(d.due_date, d.due_time))
 
-  // Apply type filter to a list
   const applyTypeFilter = (list) =>
     typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
 
   const doneDeadlines   = deadlines.filter(d => doneIds.has(d.id))
   const activeDeadlines = deadlines.filter(d => !doneIds.has(d.id))
 
-  // Stats for header summary
-  const dueSoonCount = activeDeadlines.filter(isDueSoon).length
-  const doneCount    = doneDeadlines.length
-
-  // What to show based on active filter tab
   let displayItems = []
-  let showDoneSection = false
-
   if (filter === 'All') {
     displayItems = applyTypeFilter(activeDeadlines)
-    showDoneSection = false
   } else if (filter === 'Due Soon') {
     displayItems = applyTypeFilter(activeDeadlines.filter(isDueSoon))
   } else if (filter === 'Past Due') {
@@ -451,12 +475,10 @@ export default function AnnouncementsPage() {
     displayItems = applyTypeFilter(doneDeadlines)
   }
 
-  // Group active items into sections (for All, Due Soon, Past Due tabs)
   const urgent    = displayItems.filter(d => isDueSoon(d))
   const notUrgent = displayItems.filter(d => !isDueSoon(d) && !isPastDue(d))
   const past      = displayItems.filter(d => isPastDue(d))
 
-  // Build groups based on filter
   let groups = []
   if (filter === 'Due Soon') {
     groups = urgent.length ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }] : []
@@ -465,7 +487,6 @@ export default function AnnouncementsPage() {
   } else if (filter === 'Done') {
     groups = displayItems.length ? [{ emoji: '✅', label: 'Done', items: displayItems }] : []
   } else {
-    // All tab — show Due Soon, then Later, then Past Due
     if (urgent.length)    groups.push({ emoji: '🔥', label: 'Due Soon',  items: urgent })
     if (notUrgent.length) groups.push({ emoji: '🗓️', label: 'Later',     items: notUrgent })
     if (past.length)      groups.push({ emoji: '⚠️', label: 'Past Due',  items: past })
@@ -493,7 +514,6 @@ export default function AnnouncementsPage() {
           </div>
 
           {!loading && deadlines.length > 0 && (() => {
-            // Count active (non-done) tasks per type, skip blank types
             const typeCounts = {}
             activeDeadlines.forEach(d => {
               if (d.announcement_type) {
@@ -540,7 +560,6 @@ export default function AnnouncementsPage() {
 
         {/* Controls */}
         <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Filter tabs */}
           <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 1, flex: 1, minWidth: 0 }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
@@ -557,7 +576,6 @@ export default function AnnouncementsPage() {
               }}>{f}</button>
             ))}
           </div>
-
         </div>
       </div>
 
