@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { format, formatDistanceToNow, isPast, isToday, isTomorrow, differenceInDays } from 'date-fns'
 import {
   Clock, ChevronDown, ChevronUp,
-  BookOpen, FileText, Download, Check
+  BookOpen, FileText, Download, Check, X, RotateCcw
 } from 'lucide-react'
 
 const RED     = '#C0392B'
@@ -33,13 +33,13 @@ function getDeadlineDate(due_date, due_time) {
 
 function getDueStatus(due_date, due_time) {
   const date = getDeadlineDate(due_date, due_time)
-  if (isPast(date))                   return { label: 'Past due',     color: GREY,  bg: GREY_BG,  urgent: false, past: true  }
+  if (isPast(date))                   return { label: 'Past due',    color: GREY,  bg: GREY_BG,  urgent: false, past: true  }
   const days = differenceInDays(date, new Date())
-  if (isToday(new Date(due_date)))    return { label: 'Today!',       color: RED,   bg: RED_BG,   urgent: true,  past: false }
-  if (isTomorrow(new Date(due_date))) return { label: 'Tomorrow',     color: RED,   bg: RED_BG,   urgent: true,  past: false }
-  if (days <= 3)  return { label: `${days}d left`,  color: RED,   bg: RED_BG,   urgent: true,  past: false }
-  if (days <= 7)  return { label: `${days}d left`,  color: BLUE,  bg: BLUE_BG,  urgent: false, past: false }
-  return            { label: `${days}d left`,  color: BLUE,  bg: BLUE_BG,  urgent: false, past: false }
+  if (isToday(new Date(due_date)))    return { label: 'Today!',      color: RED,   bg: RED_BG,   urgent: true,  past: false }
+  if (isTomorrow(new Date(due_date))) return { label: 'Tomorrow',    color: RED,   bg: RED_BG,   urgent: true,  past: false }
+  if (days <= 3)  return { label: `${days}d left`, color: RED,  bg: RED_BG,   urgent: true,  past: false }
+  if (days <= 7)  return { label: `${days}d left`, color: BLUE, bg: BLUE_BG,  urgent: false, past: false }
+  return            { label: `${days}d left`, color: BLUE, bg: BLUE_BG,  urgent: false, past: false }
 }
 
 function parsePhotos(photo_url) {
@@ -60,29 +60,28 @@ function parseFiles(file_url, file_name) {
 // ── Deadline Row ──────────────────────────────────────────────
 function DeadlineRow({ post, done, onToggleDone }) {
   const [expanded, setExpanded] = useState(false)
-  const [animating, setAnimating] = useState(false) // green-flash state
-  const [hiding, setHiding] = useState(false)       // fade-out state
+  const [animating, setAnimating] = useState(false)
+  const [hiding, setHiding] = useState(false)
+
   const status = getDueStatus(post.due_date, post.due_time)
   const photos = parsePhotos(post.photo_url)
   const files  = parseFiles(post.file_url, post.file_name)
   const hasDetails = !!post.caption || photos.length > 0 || files.length > 0
-
   const leftAccent = done ? '#E5E7EB' : status.past ? '#DADDE1' : status.urgent ? RED : BLUE
 
   function handleToggle() {
     if (done) {
-      // Un-marking — instant
-      onToggleDone(post.id)
+      // Undone — quietly fade out of Done list, reappear in active
+      setHiding(true)
+      setTimeout(() => onToggleDone(post.id), 320)
       return
     }
-    // Marking as done — green flash, then fade out, then remove
+    // Mark done — green flash then slide out
     setAnimating(true)
     setTimeout(() => {
       setAnimating(false)
       setHiding(true)
-      setTimeout(() => {
-        onToggleDone(post.id)
-      }, 380)
+      setTimeout(() => onToggleDone(post.id), 380)
     }, 500)
   }
 
@@ -90,39 +89,48 @@ function DeadlineRow({ post, done, onToggleDone }) {
     <div style={{
       background: animating ? '#DCFCE7' : done ? '#FAFAFA' : 'white',
       borderRadius: 12,
-      border: `1px solid ${animating ? '#86EFAC' : done ? '#E5E7EB' : status.urgent && !status.past ? '#F5B7B1' : '#E4E6EB'}`,
+      border: `1px solid ${
+        animating ? '#86EFAC'
+        : done ? '#E5E7EB'
+        : status.urgent && !status.past ? '#F5B7B1'
+        : '#E4E6EB'
+      }`,
       overflow: 'hidden',
-      transition: 'background 0.25s, border-color 0.25s, opacity 0.38s, transform 0.38s, max-height 0.38s',
+      transition: 'background 0.25s, border-color 0.25s, opacity 0.32s, transform 0.32s',
       opacity: hiding ? 0 : done ? 0.65 : 1,
-      transform: hiding ? 'translateX(40px)' : 'translateX(0)',
-      maxHeight: hiding ? 0 : 999,
+      transform: hiding ? (done ? 'scale(0.97)' : 'translateX(40px)') : 'none',
       pointerEvents: animating || hiding ? 'none' : 'auto',
     }}>
       <div style={{ display: 'flex' }}>
-        <div style={{ width: 4, flexShrink: 0, background: animating ? '#22C55E' : leftAccent, transition: 'background 0.25s', borderRadius: '0 0 0 0' }} />
+        {/* Left accent bar */}
+        <div style={{
+          width: 4, flexShrink: 0,
+          background: animating ? '#22C55E' : leftAccent,
+          transition: 'background 0.25s',
+        }} />
 
-        <div style={{ flex: 1 }}>
-          {/* ── Main row ── */}
-          <div style={{ padding: '11px 14px 11px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
 
-            {/* Date block — day / month / days-left stacked */}
+          {/* ── Top content: date block + info + expand btn ── */}
+          <div style={{ padding: '11px 12px 6px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+
+            {/* Date block */}
             <div style={{
               flexShrink: 0,
-              minWidth: 52,
+              minWidth: 54,
               textAlign: 'center',
-              padding: '5px 8px',
+              padding: '5px 6px',
               borderRadius: 8,
               background: animating ? '#DCFCE7' : done ? GREY_BG : status.bg,
               border: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
               transition: 'background 0.25s, border-color 0.25s',
             }}>
-              {/* Day number */}
+              {/* Day */}
               <div style={{
                 fontFamily: '"Bricolage Grotesque", system-ui',
                 fontWeight: 800, fontSize: 17,
                 color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color,
-                lineHeight: 1,
-                transition: 'color 0.25s',
+                lineHeight: 1, transition: 'color 0.25s',
               }}>
                 {format(new Date(post.due_date), 'd')}
               </div>
@@ -131,48 +139,38 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 fontFamily: '"Instrument Sans", system-ui',
                 fontWeight: 600, fontSize: 10,
                 color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
-                opacity: 0.85,
-                marginTop: 1,
-                transition: 'color 0.25s',
+                opacity: 0.85, marginTop: 1, transition: 'color 0.25s',
               }}>
                 {format(new Date(post.due_date), 'MMM')}
               </div>
-              {/* Days left — shown below month */}
-              {!done && (
+              {/* Days left — below month, separated by thin line */}
+              <div style={{
+                fontFamily: '"Instrument Sans", system-ui',
+                fontWeight: 700, fontSize: 9,
+                color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
+                marginTop: 3, paddingTop: 2,
+                borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
+                letterSpacing: 0.1, whiteSpace: 'nowrap',
+                transition: 'color 0.25s',
+              }}>
+                {animating ? '✓ Done' : done ? 'Done ✓' : status.label}
+              </div>
+              {/* Time if set */}
+              {post.due_time && (
                 <div style={{
                   fontFamily: '"Instrument Sans", system-ui',
-                  fontWeight: 700,
-                  fontSize: 9,
-                  color: animating ? '#16a34a' : status.color,
-                  marginTop: 3,
-                  padding: '1px 0',
-                  borderTop: `1px solid ${animating ? '#86EFAC' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
-                  letterSpacing: 0.1,
-                  transition: 'color 0.25s',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {animating ? '✓ Done' : status.label}
-                </div>
-              )}
-              {/* Time (only if set, shown below days-left) */}
-              {post.due_time && !done && (
-                <div style={{
-                  fontFamily: '"Instrument Sans", system-ui',
-                  fontWeight: 500, fontSize: 8.5,
+                  fontWeight: 500, fontSize: 8,
                   color: done ? '#BCC0C4' : status.color,
-                  opacity: 0.65,
-                  marginTop: 2,
+                  opacity: 0.6, marginTop: 2,
                 }}>
                   {formatTime12(post.due_time)}
                 </div>
               )}
             </div>
 
-            {/* Info */}
+            {/* Info: pills + caption (2-line clamp) */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Pills row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
-                {/* Subject */}
                 <span style={{
                   background: post.subjects ? BLUE_BG : GREY_BG,
                   color: post.subjects ? BLUE : GREY,
@@ -184,8 +182,6 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   <BookOpen size={9} />
                   {post.subjects?.name || 'General'}
                 </span>
-
-                {/* Type */}
                 {post.announcement_type && (
                   <span style={{
                     background: GREY_BG, color: '#1c1e21',
@@ -196,87 +192,86 @@ function DeadlineRow({ post, done, onToggleDone }) {
                     {post.announcement_type}
                   </span>
                 )}
-
-                {/* Status pill — only show if done */}
-                {done && (
-                  <span style={{
-                    background: '#DCFCE7', color: '#16a34a',
-                    border: '1px solid #BBF7D0',
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
-                    padding: '2px 8px', borderRadius: 20,
-                  }}>
-                    Done ✓
-                  </span>
-                )}
               </div>
 
-              {/* Caption preview */}
               {post.caption && (
                 <p style={{
                   margin: 0,
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: done ? 400 : 500,
+                  fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
+                  fontWeight: done ? 400 : 500,
                   color: done ? '#9CA3AF' : '#1c1e21',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  // Clamp to 2 lines max — Done button is always below
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                   textDecoration: done ? 'line-through' : 'none',
+                  lineHeight: 1.45,
                 }}>
                   {post.caption}
                 </p>
               )}
             </div>
 
-            {/* Right actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              {/* Expand button */}
-              {hasDetails && (
-                <button
-                  onClick={() => setExpanded(e => !e)}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7,
-                    background: expanded ? GREY_BG : 'transparent',
-                    border: '1px solid #E4E6EB',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: GREY, transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = GREY_BG}
-                  onMouseLeave={e => e.currentTarget.style.background = expanded ? GREY_BG : 'transparent'}
-                >
-                  {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                </button>
-              )}
-
-              {/* Done toggle — just says "Done" with checkmark */}
+            {/* Expand toggle — top right */}
+            {hasDetails && (
               <button
-                onClick={handleToggle}
+                onClick={() => setExpanded(e => !e)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px 12px', borderRadius: 8, border: 'none',
-                  cursor: 'pointer', flexShrink: 0,
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12.5,
-                  background: animating ? '#DCFCE7' : done ? '#DCFCE7' : '#F0FDF4',
-                  color: animating ? '#16a34a' : done ? '#16a34a' : '#4ade80',
-                  outline: `2px solid ${animating ? '#86EFAC' : done ? '#BBF7D0' : '#D1FAE5'}`,
-                  transition: 'all 0.2s',
-                  transform: animating ? 'scale(1.06)' : 'scale(1)',
+                  flexShrink: 0, marginTop: 1,
+                  width: 28, height: 28, borderRadius: 7,
+                  background: expanded ? GREY_BG : 'transparent',
+                  border: '1px solid #E4E6EB',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: GREY, transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => {
-                  if (!animating) {
-                    e.currentTarget.style.background = done ? '#BBF7D0' : '#DCFCE7'
-                    e.currentTarget.style.color = '#16a34a'
-                    e.currentTarget.style.outline = '2px solid #86EFAC'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!animating) {
-                    e.currentTarget.style.background = done ? '#DCFCE7' : '#F0FDF4'
-                    e.currentTarget.style.color = done ? '#16a34a' : '#4ade80'
-                    e.currentTarget.style.outline = `2px solid ${done ? '#BBF7D0' : '#D1FAE5'}`
-                  }
-                }}
+                onMouseEnter={e => e.currentTarget.style.background = GREY_BG}
+                onMouseLeave={e => e.currentTarget.style.background = expanded ? GREY_BG : 'transparent'}
               >
-                <Check size={13} strokeWidth={2.5} />
-                Done
+                {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
-            </div>
+            )}
+          </div>
+
+          {/* ── Done button — always on its own row, never hidden ── */}
+          <div style={{
+            padding: '0 12px 10px',
+            // indent to align under the info column
+            paddingLeft: 80,
+          }}>
+            <button
+              onClick={handleToggle}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 14px', borderRadius: 8, border: 'none',
+                cursor: 'pointer',
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12,
+                background: animating ? '#DCFCE7' : done ? '#FFF1F2' : '#F0FDF4',
+                color: animating ? '#16a34a' : done ? '#e11d48' : '#4ade80',
+                outline: `2px solid ${animating ? '#86EFAC' : done ? '#FEE2E2' : '#D1FAE5'}`,
+                transition: 'all 0.2s',
+                transform: animating ? 'scale(1.05)' : 'scale(1)',
+              }}
+              onMouseEnter={e => {
+                if (!animating) {
+                  e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'
+                  e.currentTarget.style.color = done ? '#be123c' : '#16a34a'
+                  e.currentTarget.style.outline = `2px solid ${done ? '#FECDD3' : '#86EFAC'}`
+                }
+              }}
+              onMouseLeave={e => {
+                if (!animating) {
+                  e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'
+                  e.currentTarget.style.color = done ? '#e11d48' : '#4ade80'
+                  e.currentTarget.style.outline = `2px solid ${done ? '#FEE2E2' : '#D1FAE5'}`
+                }
+              }}
+            >
+              {done
+                ? <><RotateCcw size={11} strokeWidth={2.5} /> Undone</>
+                : <><Check size={12} strokeWidth={2.5} /> Done</>
+              }
+            </button>
           </div>
 
           {/* ── Expanded details ── */}
@@ -297,8 +292,6 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   {post.caption}
                 </p>
               )}
-
-              {/* Author */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <img
                   src={post.profiles?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(post.profiles?.display_name || 'U')}&backgroundColor=1A5276&textColor=ffffff`}
@@ -312,8 +305,6 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                 </span>
               </div>
-
-              {/* Photos */}
               {photos.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: photos.length === 1 ? '1fr' : 'repeat(3,1fr)', gap: 4, borderRadius: 8, overflow: 'hidden' }}>
                   {photos.slice(0, 6).map((url, i) => (
@@ -323,8 +314,6 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   ))}
                 </div>
               )}
-
-              {/* Files */}
               {files.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {files.map((file, i) => (
@@ -358,8 +347,7 @@ function SectionHeader({ emoji, label, count, muted }) {
         {label}
       </span>
       <span style={{
-        background: muted ? GREY_BG : '#E4E6EB',
-        color: muted ? '#BCC0C4' : GREY,
+        background: muted ? GREY_BG : '#E4E6EB', color: muted ? '#BCC0C4' : GREY,
         fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
         padding: '1px 7px', borderRadius: 10,
       }}>
@@ -386,15 +374,20 @@ function LoadingSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {[0, 1, 2, 3].map(i => (
-        <div key={i} style={{ background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', display: 'flex', overflow: 'hidden' }}>
-          <div style={{ width: 4, background: '#E4E6EB' }} />
-          <div style={{ flex: 1, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {bar(52, 62, 8)}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <div style={{ display: 'flex', gap: 5 }}>{bar(80, 22, 20)}{bar(60, 22, 20)}{bar(55, 22, 20)}</div>
-              {bar('60%', 13)}
+        <div key={i} style={{ background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', overflow: 'hidden' }}>
+          <div style={{ display: 'flex' }}>
+            <div style={{ width: 4, background: '#E4E6EB' }} />
+            <div style={{ flex: 1, padding: '11px 12px 10px' }}>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                {bar(54, 68, 8)}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  <div style={{ display: 'flex', gap: 5 }}>{bar(80, 22, 20)}{bar(60, 22, 20)}</div>
+                  {bar('90%', 13)}
+                  {bar('70%', 13)}
+                </div>
+              </div>
+              <div style={{ paddingLeft: 64 }}>{bar(70, 28, 8)}</div>
             </div>
-            {bar(70, 30, 8)}
           </div>
         </div>
       ))}
@@ -432,8 +425,7 @@ export default function AnnouncementsPage() {
       const subjectIds = enrolled?.map(e => e.subject_id) || []
 
       let query = supabase
-        .from('posts')
-        .select('*, profiles(*), subjects(*)')
+        .from('posts').select('*, profiles(*), subjects(*)')
         .eq('post_type', 'announcement')
         .not('due_date', 'is', null)
         .order('due_date', { ascending: true })
@@ -451,46 +443,39 @@ export default function AnnouncementsPage() {
     if (user) load()
   }, [user])
 
-  const isDueSoon = (d) => {
-    const deadline = getDeadlineDate(d.due_date, d.due_time)
-    if (isPast(deadline)) return false
-    return isToday(new Date(d.due_date)) || isTomorrow(new Date(d.due_date))
-  }
+  const isDueSoon = (d) => { const dl = getDeadlineDate(d.due_date, d.due_time); if (isPast(dl)) return false; return isToday(new Date(d.due_date)) || isTomorrow(new Date(d.due_date)) }
   const isPastDue = (d) => isPast(getDeadlineDate(d.due_date, d.due_time))
-
-  const applyTypeFilter = (list) =>
-    typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
+  const applyType = (list) => typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
 
   const doneDeadlines   = deadlines.filter(d => doneIds.has(d.id))
   const activeDeadlines = deadlines.filter(d => !doneIds.has(d.id))
 
   let displayItems = []
-  if (filter === 'All') {
-    displayItems = applyTypeFilter(activeDeadlines)
-  } else if (filter === 'Due Soon') {
-    displayItems = applyTypeFilter(activeDeadlines.filter(isDueSoon))
-  } else if (filter === 'Past Due') {
-    displayItems = applyTypeFilter(activeDeadlines.filter(isPastDue))
-  } else if (filter === 'Done') {
-    displayItems = applyTypeFilter(doneDeadlines)
-  }
+  if (filter === 'All')          displayItems = applyType(activeDeadlines)
+  else if (filter === 'Due Soon')  displayItems = applyType(activeDeadlines.filter(isDueSoon))
+  else if (filter === 'Past Due')  displayItems = applyType(activeDeadlines.filter(isPastDue))
+  else if (filter === 'Done')      displayItems = applyType(doneDeadlines)
 
   const urgent    = displayItems.filter(d => isDueSoon(d))
   const notUrgent = displayItems.filter(d => !isDueSoon(d) && !isPastDue(d))
   const past      = displayItems.filter(d => isPastDue(d))
 
   let groups = []
-  if (filter === 'Due Soon') {
-    groups = urgent.length ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }] : []
-  } else if (filter === 'Past Due') {
-    groups = past.length ? [{ emoji: '⚠️', label: 'Past Due', items: past }] : []
-  } else if (filter === 'Done') {
-    groups = displayItems.length ? [{ emoji: '✅', label: 'Done', items: displayItems }] : []
-  } else {
-    if (urgent.length)    groups.push({ emoji: '🔥', label: 'Due Soon',  items: urgent })
-    if (notUrgent.length) groups.push({ emoji: '🗓️', label: 'Later',     items: notUrgent })
-    if (past.length)      groups.push({ emoji: '⚠️', label: 'Past Due',  items: past })
+  if (filter === 'Due Soon')     groups = urgent.length    ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }]        : []
+  else if (filter === 'Past Due')  groups = past.length    ? [{ emoji: '⚠️', label: 'Past Due', items: past }]          : []
+  else if (filter === 'Done')      groups = displayItems.length ? [{ emoji: '✅', label: 'Done', items: displayItems }] : []
+  else {
+    if (urgent.length)    groups.push({ emoji: '🔥', label: 'Due Soon', items: urgent })
+    if (notUrgent.length) groups.push({ emoji: '🗓️', label: 'Later',    items: notUrgent })
+    if (past.length)      groups.push({ emoji: '⚠️', label: 'Past Due', items: past })
   }
+
+  // Type filter pills data
+  const typeCounts = {}
+  activeDeadlines.forEach(d => {
+    if (d.announcement_type) typeCounts[d.announcement_type] = (typeCounts[d.announcement_type] || 0) + 1
+  })
+  const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
 
   return (
     <div style={{ paddingTop: 14 }}>
@@ -498,7 +483,9 @@ export default function AnnouncementsPage() {
       {/* ── Header card ── */}
       <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 10, boxShadow: '0 2px 12px rgba(192,57,43,0.15)' }}>
         <div style={{ background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`, padding: '18px 20px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: loading ? 0 : 14 }}>
+
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: loading || typeEntries.length === 0 ? 0 : 14 }}>
             <div style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Clock size={22} color="white" />
             </div>
@@ -513,54 +500,60 @@ export default function AnnouncementsPage() {
             )}
           </div>
 
-          {!loading && deadlines.length > 0 && (() => {
-            const typeCounts = {}
-            activeDeadlines.forEach(d => {
-              if (d.announcement_type) {
-                typeCounts[d.announcement_type] = (typeCounts[d.announcement_type] || 0) + 1
-              }
-            })
-            const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
-            if (typeEntries.length === 0) return null
-            return (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {typeEntries.map(([type, count]) => (
+          {/* Type filter pills — active pill gets a red × circle on the left */}
+          {!loading && typeEntries.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {typeEntries.map(([type, count]) => {
+                const isActive = typeFilter === type
+                return (
                   <button
                     key={type}
                     onClick={() => setTypeFilter(t => t === type ? 'All Types' : type)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '4px 10px', borderRadius: 20,
-                      border: `1.5px solid ${typeFilter === type ? 'white' : 'rgba(255,255,255,0.35)'}`,
-                      background: typeFilter === type ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)',
+                      display: 'inline-flex', alignItems: 'center',
+                      gap: 5,
+                      padding: isActive ? '4px 10px 4px 6px' : '4px 10px',
+                      borderRadius: 20,
+                      border: `1.5px solid ${isActive ? 'white' : 'rgba(255,255,255,0.35)'}`,
+                      background: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)',
                       cursor: 'pointer', transition: 'all 0.15s',
                     }}
                   >
+                    {/* × indicator — only on active pill */}
+                    {isActive && (
+                      <span style={{
+                        width: 15, height: 15, borderRadius: '50%',
+                        background: RED,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <X size={8} color="white" strokeWidth={3} />
+                      </span>
+                    )}
                     <span style={{
                       fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12,
-                      color: typeFilter === type ? RED : 'white',
+                      color: isActive ? RED : 'white',
                     }}>
                       {type}
                     </span>
                     <span style={{
                       fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 11,
-                      background: typeFilter === type ? RED : 'rgba(255,255,255,0.25)',
-                      color: 'white',
-                      borderRadius: 10, padding: '1px 6px', lineHeight: 1.6,
+                      background: isActive ? RED : 'rgba(255,255,255,0.25)',
+                      color: 'white', borderRadius: 10, padding: '1px 6px', lineHeight: 1.6,
                       minWidth: 18, textAlign: 'center',
                     }}>
                       {count}
                     </span>
                   </button>
-                ))}
-              </div>
-            )
-          })()}
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Controls */}
-        <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 1, flex: 1, minWidth: 0 }}>
+        {/* Tab bar */}
+        <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5' }}>
+          <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 1 }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
                 flex: 1, padding: '7px 1px', borderRadius: 6, border: 'none', cursor: 'pointer',
@@ -568,11 +561,7 @@ export default function AnnouncementsPage() {
                 background: filter === f ? 'white' : 'transparent',
                 color: filter === f ? '#050505' : GREY,
                 boxShadow: filter === f ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                minWidth: 0,
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
               }}>{f}</button>
             ))}
           </div>
@@ -606,16 +595,16 @@ export default function AnnouncementsPage() {
             <EmptyState
               emoji={filter === 'Due Soon' ? '🎉' : filter === 'Done' ? '📋' : '🗓️'}
               title={
-                filter === 'Due Soon' ? 'Nothing due soon!' :
-                filter === 'Past Due' ? 'No past due tasks' :
-                filter === 'Done' ? 'No completed tasks yet' :
-                'All clear!'
+                filter === 'Due Soon' ? 'Nothing due soon!'
+                : filter === 'Past Due' ? 'No past due tasks'
+                : filter === 'Done' ? 'No completed tasks yet'
+                : 'All clear!'
               }
               subtitle={
-                filter === 'Due Soon' ? 'No tasks due today or tomorrow' :
-                filter === 'Past Due' ? "You're all caught up" :
-                filter === 'Done' ? 'Mark tasks as done to see them here' :
-                'Nothing matches this filter'
+                filter === 'Due Soon' ? 'No tasks due today or tomorrow'
+                : filter === 'Past Due' ? "You're all caught up"
+                : filter === 'Done' ? 'Mark tasks as done to see them here'
+                : 'Nothing matches this filter'
               }
             />
           )}
