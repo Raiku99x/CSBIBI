@@ -5,7 +5,7 @@ import { useNotifications } from '../hooks/useNotifications'
 import { supabase } from '../lib/supabase'
 import {
   Home, MessageSquare, Bell, BookMarked, Grid3X3,
-  LogOut, Settings, Check, ChevronDown, X
+  LogOut, Settings, Check, ChevronDown, X, Menu
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -22,6 +22,7 @@ const BLUE = '#1A5276'
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const [showDrawer, setShowDrawer]     = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifs, setShowNotifs]     = useState(false)
   const [dmUnread, setDmUnread]         = useState(0)
@@ -38,6 +39,12 @@ export default function Layout({ children }) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  // Lock body scroll when drawer open
+  useEffect(() => {
+    document.body.style.overflow = showDrawer ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [showDrawer])
 
   // DM unread badge
   useEffect(() => {
@@ -66,6 +73,7 @@ export default function Layout({ children }) {
   }, [profile])
 
   async function handleSignOut() {
+    setShowDrawer(false)
     await signOut()
     navigate('/auth')
   }
@@ -81,6 +89,113 @@ export default function Layout({ children }) {
   return (
     <div style={{ minHeight: '100vh', background: '#E9EBEE', display: 'flex', flexDirection: 'column' }}>
 
+      {/* ── Drawer Backdrop ── */}
+      {showDrawer && (
+        <div
+          onClick={() => setShowDrawer(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 80,
+            background: 'rgba(0,0,0,0.45)',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        />
+      )}
+
+      {/* ── Slide-out Drawer ── */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        width: 280, zIndex: 90,
+        background: 'white',
+        boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
+        display: 'flex', flexDirection: 'column',
+        transform: showDrawer ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+
+        {/* Drawer header */}
+        <div style={{
+          background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`,
+          padding: '48px 20px 24px',
+          position: 'relative',
+        }}>
+          {/* Close button */}
+          <button
+            onClick={() => setShowDrawer(false)}
+            style={{
+              position: 'absolute', top: 14, right: 14,
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.2)', border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <X size={16} color="white" />
+          </button>
+
+          {/* Avatar */}
+          <img
+            src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
+            alt="avatar"
+            style={{
+              width: 64, height: 64, borderRadius: '50%',
+              objectFit: 'cover',
+              border: '3px solid rgba(255,255,255,0.6)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+              marginBottom: 12, display: 'block',
+            }}
+          />
+
+          {/* Name */}
+          <p style={{
+            margin: '0 0 2px',
+            fontFamily: '"Bricolage Grotesque", system-ui',
+            fontWeight: 800, fontSize: 18, color: 'white',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {profile?.display_name}
+          </p>
+
+          {/* Email */}
+          <p style={{
+            margin: 0,
+            fontFamily: '"Instrument Sans", system-ui',
+            fontSize: 12.5, color: 'rgba(255,255,255,0.72)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {profile?.email}
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: '#F0F2F5' }} />
+
+        {/* Drawer items */}
+        <div style={{ flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <DrawerItem
+            icon={<Settings size={18} color="#65676B" />}
+            label="Profile Settings"
+            onClick={() => { setShowDrawer(false); navigate('/profile') }}
+          />
+          <div style={{ height: 1, background: '#F0F2F5', margin: '6px 4px' }} />
+          <DrawerItem
+            icon={<LogOut size={18} color={RED} />}
+            label="Log Out"
+            onClick={handleSignOut}
+            danger
+          />
+        </div>
+
+        {/* Drawer footer */}
+        <div style={{ padding: '12px 20px 24px', borderTop: '1px solid #F0F2F5' }}>
+          <p style={{
+            margin: 0,
+            fontFamily: '"Instrument Sans", system-ui',
+            fontSize: 11, color: '#BCC0C4', textAlign: 'center',
+          }}>
+            CSB · Computer Science Board
+          </p>
+        </div>
+      </div>
+
       {/* ── Header ── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 40,
@@ -92,13 +207,38 @@ export default function Layout({ children }) {
           maxWidth: 680, margin: '0 auto',
           height: 52, padding: '0 12px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 8,
         }}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 6px rgba(192,57,43,0.2)' }}>
-              <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+          {/* Left: Hamburger + Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Hamburger button */}
+            <button
+              onClick={() => setShowDrawer(true)}
+              style={{
+                width: 36, height: 36, borderRadius: 9,
+                background: '#F4F6F8', border: '1.5px solid #E4E6EB',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#EAECEF'}
+              onMouseLeave={e => e.currentTarget.style.background = '#F4F6F8'}
+            >
+              <Menu size={17} color="#65676B" />
+            </button>
+
+            {/* Logo */}
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+              onClick={() => navigate('/')}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: 8, overflow: 'hidden', flexShrink: 0, boxShadow: '0 2px 6px rgba(192,57,43,0.2)' }}>
+                <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+              <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 19, color: RED, letterSpacing: '-0.5px', lineHeight: 1 }}>
+                CSB
+              </div>
             </div>
-            <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 19, color: RED, letterSpacing: '-0.5px', lineHeight: 1 }}>CSB</div>
           </div>
 
           {/* Right actions */}
@@ -229,8 +369,40 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+      `}</style>
     </div>
+  )
+}
+
+function DrawerItem({ icon, label, onClick, danger }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+        padding: '12px 14px', border: 'none', cursor: 'pointer', textAlign: 'left',
+        background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent',
+        color: danger ? RED : '#1c1e21',
+        fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 15,
+        borderRadius: 10, transition: 'background 0.12s',
+      }}
+    >
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+        background: hovered ? (danger ? '#FADBD8' : '#EAECEF') : '#F0F2F5',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 0.12s',
+      }}>
+        {icon}
+      </div>
+      {label}
+    </button>
   )
 }
 
