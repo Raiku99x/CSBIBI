@@ -33,6 +33,8 @@ export default function Layout({ children, onOpenSearch }) {
   useEffect(() => {
     function handleClick(e) {
       if (menuRef.current  && !menuRef.current.contains(e.target))  setShowUserMenu(false)
+      // For notifs on desktop, close on outside click
+      // On mobile it renders as a backdrop sheet so this doesn't matter
       if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
     }
     document.addEventListener('mousedown', handleClick)
@@ -81,6 +83,21 @@ export default function Layout({ children, onOpenSearch }) {
       {/* Drawer Backdrop */}
       {showDrawer && (
         <div onClick={() => setShowDrawer(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.45)', animation: 'fadeIn 0.2s ease' }} />
+      )}
+
+      {/* Notification backdrop (mobile) — sits below the panel */}
+      {showNotifs && (
+        <div
+          onClick={() => setShowNotifs(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 95,
+            background: 'rgba(0,0,0,0.4)',
+            animation: 'fadeIn 0.2s ease',
+            // only visible on mobile; hidden on desktop via the panel's own outside-click
+            display: 'block',
+          }}
+          className="notif-mobile-backdrop"
+        />
       )}
 
       {/* Slide-out Drawer */}
@@ -139,9 +156,11 @@ export default function Layout({ children, onOpenSearch }) {
               <Search size={17} color="#65676B" />
             </button>
 
-            {/* Bell */}
+            {/* Bell — ref used for desktop dropdown outside-click only */}
             <div ref={notifRef} style={{ position: 'relative' }}>
-              <button onClick={() => { setShowNotifs(v => !v); setShowUserMenu(false) }} style={{ width: 36, height: 36, borderRadius: 9, background: showNotifs ? '#FADBD8' : '#F4F6F8', border: `1.5px solid ${showNotifs ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'all 0.15s' }}>
+              <button
+                onClick={() => { setShowNotifs(v => !v); setShowUserMenu(false) }}
+                style={{ width: 36, height: 36, borderRadius: 9, background: showNotifs ? '#FADBD8' : '#F4F6F8', border: `1.5px solid ${showNotifs ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'all 0.15s' }}>
                 <Bell size={17} color={showNotifs ? RED : '#65676B'} strokeWidth={showNotifs ? 2.5 : 2} />
                 {unreadCount > 0 && (
                   <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 9, background: RED, color: 'white', fontSize: 9.5, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid white' }}>
@@ -149,7 +168,20 @@ export default function Layout({ children, onOpenSearch }) {
                   </span>
                 )}
               </button>
-              {showNotifs && <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={() => setShowNotifs(false)} navigate={navigate} />}
+
+              {/* Desktop dropdown — only rendered above 600px via CSS */}
+              {showNotifs && (
+                <div className="notif-desktop-panel">
+                  <NotifPanel
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    markAllRead={markAllRead}
+                    markRead={markRead}
+                    onClose={() => setShowNotifs(false)}
+                    navigate={navigate}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Avatar only */}
@@ -177,6 +209,21 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         </div>
       </header>
+
+      {/* Mobile notification sheet — bottom sheet on small screens */}
+      {showNotifs && (
+        <div className="notif-mobile-sheet" style={{ zIndex: 96 }}>
+          <NotifPanel
+            notifications={notifications}
+            unreadCount={unreadCount}
+            markAllRead={markAllRead}
+            markRead={markRead}
+            onClose={() => setShowNotifs(false)}
+            navigate={navigate}
+            mobile
+          />
+        </div>
+      )}
 
       {/* Main */}
       <main style={{ flex: 1, maxWidth: 680, margin: '0 auto', width: '100%', paddingBottom: 64 }}>
@@ -212,6 +259,40 @@ export default function Layout({ children, onOpenSearch }) {
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(100%) } to { opacity: 1; transform: translateY(0) } }
+
+        /* Desktop: show as dropdown, hide mobile sheet */
+        .notif-desktop-panel {
+          display: block;
+          position: absolute;
+          right: 0;
+          top: calc(100% + 8px);
+          z-index: 100;
+        }
+        .notif-mobile-sheet {
+          display: none;
+        }
+        .notif-mobile-backdrop {
+          display: none;
+        }
+
+        /* Mobile: hide dropdown, show bottom sheet + backdrop */
+        @media (max-width: 600px) {
+          .notif-desktop-panel {
+            display: none !important;
+          }
+          .notif-mobile-sheet {
+            display: block;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            animation: slideUp 0.28s cubic-bezier(0.16,1,0.3,1);
+          }
+          .notif-mobile-backdrop {
+            display: block;
+          }
+        }
       `}</style>
     </div>
   )
@@ -238,10 +319,28 @@ function MenuAction({ icon, label, onClick, danger }) {
   )
 }
 
-function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose, navigate }) {
+function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose, navigate, mobile }) {
   return (
-    <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 310, background: 'white', borderRadius: 13, border: '1px solid #E4E6EB', boxShadow: '0 8px 28px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 100, animation: 'slideDown 0.18s ease' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px 10px', borderBottom: '1px solid #F0F2F5' }}>
+    <div style={{
+      background: 'white',
+      borderRadius: mobile ? '16px 16px 0 0' : 13,
+      border: mobile ? 'none' : '1px solid #E4E6EB',
+      boxShadow: mobile ? '0 -4px 32px rgba(0,0,0,0.18)' : '0 8px 28px rgba(0,0,0,0.12)',
+      overflow: 'hidden',
+      width: mobile ? '100%' : 310,
+      maxHeight: mobile ? '75vh' : undefined,
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Drag handle (mobile only) */}
+      {mobile && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E4E6EB' }} />
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: mobile ? '4px 16px 12px' : '11px 14px 10px', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Bell size={15} color={RED} strokeWidth={2.5} />
           <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>Notifications</span>
@@ -258,12 +357,17 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
           </button>
         </div>
       </div>
-      <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+
+      {/* List */}
+      <div style={{ overflowY: 'auto', flex: 1 }}>
         {notifications.length === 0
           ? <div style={{ padding: '32px 16px', textAlign: 'center', color: '#65676B', fontSize: 13, fontFamily: '"Instrument Sans", system-ui' }}><div style={{ fontSize: 28, marginBottom: 6 }}>🔔</div>You're all caught up!</div>
           : notifications.map(n => <NotifItem key={n.id} notif={n} onRead={markRead} onClose={onClose} navigate={navigate} />)
         }
       </div>
+
+      {/* Safe area padding on mobile */}
+      {mobile && <div style={{ height: 'env(safe-area-inset-bottom)', flexShrink: 0 }} />}
     </div>
   )
 }
