@@ -2,14 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import PostCard from "./PostCard";
 import { useAuth } from "../contexts/AuthContext";
+import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+
+const RED = '#C0392B';
 
 const TYPES = [
   { label: "All", value: "all" },
-  { label: "Status", value: "status" },
-  { label: "Announcement", value: "announcement" },
-  { label: "Deadline", value: "deadline" },
-  { label: "Reminder", value: "reminder" },
-  { label: "Material", value: "material" },
+  { label: "💬 Status", value: "status" },
+  { label: "📢 Announcement", value: "announcement" },
+  { label: "📅 Deadline", value: "deadline" },
+  { label: "🔔 Reminder", value: "reminder" },
+  { label: "📁 Material", value: "material" },
 ];
 
 const DATE_PRESETS = [
@@ -22,7 +25,7 @@ const DATE_PRESETS = [
 function CollapsibleSection({ title, children, activeCount = 0 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+    <div style={{ borderBottom: "1px solid #F0F2F5" }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -32,25 +35,25 @@ function CollapsibleSection({ title, children, activeCount = 0 }) {
           justifyContent: "space-between",
           background: "none",
           border: "none",
-          padding: "9px 0",
+          padding: "11px 0",
           cursor: "pointer",
-          color: "#fff",
+          color: "#65676B",
           fontSize: "12px",
-          fontWeight: 600,
+          fontWeight: 700,
           letterSpacing: "0.05em",
           textTransform: "uppercase",
-          opacity: 0.65,
+          fontFamily: '"Instrument Sans", system-ui',
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span>{title}</span>
           {activeCount > 0 && (
             <span style={{
-              background: "#6366f1",
+              background: RED,
               color: "#fff",
               borderRadius: "50%",
-              width: 14,
-              height: 14,
+              width: 16,
+              height: 16,
               fontSize: 9,
               fontWeight: 700,
               display: "flex",
@@ -61,17 +64,12 @@ function CollapsibleSection({ title, children, activeCount = 0 }) {
             </span>
           )}
         </div>
-        <span style={{
-          fontSize: "16px",
-          lineHeight: 1,
-          transition: "transform 0.2s",
-          transform: open ? "rotate(90deg)" : "rotate(0deg)",
-          opacity: 0.5,
-        }}>
-          ›
-        </span>
+        {open
+          ? <ChevronUp size={14} color="#BCC0C4" />
+          : <ChevronDown size={14} color="#BCC0C4" />
+        }
       </button>
-      {open && <div style={{ paddingBottom: "10px" }}>{children}</div>}
+      {open && <div style={{ paddingBottom: "12px" }}>{children}</div>}
     </div>
   );
 }
@@ -80,15 +78,16 @@ const PillBtn = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
     style={{
-      padding: "4px 11px",
+      padding: "5px 12px",
       borderRadius: "20px",
-      border: "1px solid rgba(255,255,255,0.18)",
-      background: active ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.07)",
-      color: "#fff",
-      fontSize: "12px",
+      border: `1.5px solid ${active ? RED : '#E4E6EB'}`,
+      background: active ? '#FADBD8' : 'white',
+      color: active ? RED : '#65676B',
+      fontSize: "13px",
       cursor: "pointer",
-      fontWeight: active ? 700 : 400,
-      transition: "background 0.15s",
+      fontWeight: active ? 700 : 500,
+      fontFamily: '"Instrument Sans", system-ui',
+      transition: "all 0.15s",
     }}
   >
     {label}
@@ -109,7 +108,6 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const [customEnd, setCustomEnd] = useState("");
   const inputRef = useRef(null);
 
-  // Fetch all posts once on mount
   useEffect(() => {
     supabase
       .from("posts")
@@ -186,253 +184,308 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const showResults = debouncedQuery || activeFilterCount > 0;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        background:
-          "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-        color: "#fff",
-        overflow: "hidden",
-      }}
-    >
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      display: "flex",
+      flexDirection: "column",
+      background: "#E9EBEE",
+    }}>
       {/* TOP BAR */}
-      <div
-        style={{
+      <div style={{
+        background: 'white',
+        borderBottom: "1px solid #E4E6EB",
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        flexShrink: 0,
+      }}>
+        <div style={{
           display: "flex",
           alignItems: "center",
           gap: "8px",
           padding: "10px 12px",
           paddingTop: "calc(10px + env(safe-area-inset-top))",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          flexShrink: 0,
-        }}
-      >
-        {/* Search input */}
-        <div
-          style={{
+          maxWidth: 680,
+          margin: '0 auto',
+          width: '100%',
+        }}>
+          {/* Back button */}
+          <button
+            onClick={onClose}
+            style={{
+              background: "#F4F6F8",
+              border: "1.5px solid #E4E6EB",
+              borderRadius: "9px",
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#EAECEF'}
+            onMouseLeave={e => e.currentTarget.style.background = '#F4F6F8'}
+            title="Back"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#65676B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+
+          {/* Search input */}
+          <div style={{
             flex: 1,
             display: "flex",
             alignItems: "center",
-            background: "rgba(255,255,255,0.1)",
-            borderRadius: "10px",
-            padding: "0 10px",
-            gap: "7px",
+            background: "#F0F2F5",
+            borderRadius: "20px",
+            padding: "0 12px",
+            gap: "8px",
+            height: 38,
             minWidth: 0,
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search posts…"
-            style={{
-              flex: 1,
-              background: "none",
-              border: "none",
-              outline: "none",
-              color: "#fff",
-              fontSize: "15px",
-              padding: "9px 0",
-              minWidth: 0,
-            }}
-          />
-          {query.length > 0 && (
-            <button
-              onClick={() => setQuery("")}
+          }}>
+            <Search size={15} color="#8A8D91" style={{ flexShrink: 0 }} />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search posts…"
               style={{
+                flex: 1,
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.4)",
-                fontSize: "18px",
-                cursor: "pointer",
-                padding: 0,
-                lineHeight: 1,
-                flexShrink: 0,
+                outline: "none",
+                color: "#050505",
+                fontSize: "14px",
+                fontFamily: '"Instrument Sans", system-ui',
+                minWidth: 0,
               }}
-            >
-              ×
-            </button>
-          )}
-        </div>
+            />
+            {query.length > 0 && (
+              <button
+                onClick={() => setQuery("")}
+                style={{
+                  background: "#CED0D4",
+                  border: "none",
+                  color: "#65676B",
+                  width: 18, height: 18, borderRadius: '50%',
+                  cursor: "pointer",
+                  padding: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
 
-        {/* Filter button — icon only, no text */}
-        <button
-          onClick={() => setShowFilters((s) => !s)}
-          style={{
-            position: "relative",
-            background: showFilters
-              ? "rgba(99,102,241,0.4)"
-              : "rgba(255,255,255,0.1)",
-            border: `1px solid ${showFilters ? "rgba(99,102,241,0.7)" : "rgba(255,255,255,0.15)"}`,
-            borderRadius: "10px",
-            width: "38px",
-            height: "38px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            flexShrink: 0,
-            transition: "all 0.18s",
-          }}
-          title="Filters"
-        >
-          {showFilters ? (
-            /* X to close filter panel */
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.8" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          ) : (
-            /* Funnel */
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-            </svg>
-          )}
-          {!showFilters && activeFilterCount > 0 && (
-            <span
-              style={{
+          {/* Filter button */}
+          <button
+            onClick={() => setShowFilters((s) => !s)}
+            style={{
+              position: "relative",
+              background: showFilters ? '#FADBD8' : "#F4F6F8",
+              border: `1.5px solid ${showFilters ? '#F5B7B1' : "#E4E6EB"}`,
+              borderRadius: "9px",
+              width: "36px",
+              height: "36px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: "all 0.15s",
+            }}
+            title="Filters"
+          >
+            <SlidersHorizontal size={16} color={showFilters ? RED : "#65676B"} />
+            {!showFilters && activeFilterCount > 0 && (
+              <span style={{
                 position: "absolute",
                 top: "-4px",
                 right: "-4px",
-                background: "#6366f1",
+                background: RED,
                 color: "#fff",
                 borderRadius: "50%",
                 width: "15px",
                 height: "15px",
                 fontSize: "9px",
                 fontWeight: 700,
+                fontFamily: '"Instrument Sans", system-ui',
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-              }}
-            >
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+                border: '2px solid white',
+              }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
 
-        {/* Back / close */}
-        <button
-          onClick={onClose}
-          style={{
-            background: "rgba(255,255,255,0.1)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: "10px",
-            width: "38px",
-            height: "38px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
+        {/* FILTER PANEL */}
+        {showFilters && (
+          <div style={{
+            borderTop: "1px solid #F0F2F5",
+            background: "white",
             flexShrink: 0,
-          }}
-          title="Close"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-        </button>
+          }}>
+            <div style={{
+              padding: "0 16px",
+              maxWidth: 680,
+              margin: '0 auto',
+              width: '100%',
+              maxHeight: '40vh',
+              overflowY: 'auto',
+            }}>
+              <CollapsibleSection title="By Type" activeCount={activeType !== "all" ? 1 : 0}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {TYPES.map((t) => (
+                    <PillBtn key={t.value} label={t.label} active={activeType === t.value} onClick={() => setActiveType(t.value)} />
+                  ))}
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection title="By Subject" activeCount={activeSubjectId !== "all" ? 1 : 0}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  <PillBtn label="All Subjects" active={activeSubjectId === "all"} onClick={() => setActiveSubjectId("all")} />
+                  {subjects.map((s) => (
+                    <PillBtn key={s.id} label={s.name} active={activeSubjectId === s.id} onClick={() => setActiveSubjectId(s.id)} />
+                  ))}
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection title="By Date" activeCount={activeDatePreset ? 1 : 0}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {DATE_PRESETS.map((d) => (
+                    <PillBtn
+                      key={d.value}
+                      label={d.label}
+                      active={activeDatePreset === d.value}
+                      onClick={() => setActiveDatePreset((p) => p === d.value ? null : d.value)}
+                    />
+                  ))}
+                </div>
+                {activeDatePreset === "custom" && (
+                  <div style={{ marginTop: "10px", display: "flex", gap: "8px", alignItems: "center" }}>
+                    <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+                      style={{
+                        flex: 1, background: "#F7F8FA",
+                        border: "1.5px solid #E4E6EB", borderRadius: "8px",
+                        color: "#050505", padding: "7px 10px", fontSize: "13px",
+                        outline: "none", fontFamily: '"Instrument Sans", system-ui',
+                      }} />
+                    <span style={{ color: '#BCC0C4', fontSize: "12px" }}>–</span>
+                    <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+                      style={{
+                        flex: 1, background: "#F7F8FA",
+                        border: "1.5px solid #E4E6EB", borderRadius: "8px",
+                        color: "#050505", padding: "7px 10px", fontSize: "13px",
+                        outline: "none", fontFamily: '"Instrument Sans", system-ui',
+                      }} />
+                  </div>
+                )}
+              </CollapsibleSection>
+
+              {activeFilterCount > 0 && (
+                <div style={{ padding: '10px 0' }}>
+                  <button
+                    onClick={() => { setActiveType("all"); setActiveSubjectId("all"); setActiveDatePreset(null); setCustomStart(""); setCustomEnd(""); }}
+                    style={{
+                      background: '#FADBD8', border: '1.5px solid #F5B7B1',
+                      borderRadius: "8px", color: RED, padding: "7px 16px",
+                      fontSize: "13px", cursor: "pointer", width: "100%",
+                      fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
+                      transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F5B7B1'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#FADBD8'}
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* FILTER PANEL */}
-      {showFilters && (
-        <div
-          style={{
-            padding: "2px 14px 4px",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(0,0,0,0.25)",
-            flexShrink: 0,
-            overflowY: "auto",
-            maxHeight: "48vh",
-          }}
-        >
-          <CollapsibleSection title="By Type" activeCount={activeType !== "all" ? 1 : 0}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-              {TYPES.map((t) => (
-                <PillBtn key={t.value} label={t.label} active={activeType === t.value} onClick={() => setActiveType(t.value)} />
-              ))}
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="By Subject" activeCount={activeSubjectId !== "all" ? 1 : 0}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-              <PillBtn label="All" active={activeSubjectId === "all"} onClick={() => setActiveSubjectId("all")} />
-              {subjects.map((s) => (
-                <PillBtn key={s.id} label={s.name} active={activeSubjectId === s.id} onClick={() => setActiveSubjectId(s.id)} />
-              ))}
-            </div>
-          </CollapsibleSection>
-
-          <CollapsibleSection title="By Date" activeCount={activeDatePreset ? 1 : 0}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-              {DATE_PRESETS.map((d) => (
-                <PillBtn
-                  key={d.value}
-                  label={d.label}
-                  active={activeDatePreset === d.value}
-                  onClick={() => setActiveDatePreset((p) => p === d.value ? null : d.value)}
-                />
-              ))}
-            </div>
-            {activeDatePreset === "custom" && (
-              <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
-                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-                  style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", color: "#fff", padding: "5px 7px", fontSize: "12px", outline: "none" }} />
-                <span style={{ opacity: 0.4, fontSize: "11px" }}>–</span>
-                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-                  style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "8px", color: "#fff", padding: "5px 7px", fontSize: "12px", outline: "none" }} />
-              </div>
-            )}
-          </CollapsibleSection>
-
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => { setActiveType("all"); setActiveSubjectId("all"); setActiveDatePreset(null); setCustomStart(""); setCustomEnd(""); }}
-              style={{ marginTop: "8px", marginBottom: "4px", background: "none", border: "1px solid rgba(255,100,100,0.35)", borderRadius: "8px", color: "rgba(255,160,160,1)", padding: "5px 12px", fontSize: "11px", cursor: "pointer", width: "100%", fontWeight: 600 }}
-            >
-              Clear all filters
-            </button>
-          )}
-        </div>
-      )}
-
       {/* RESULTS */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "10px 0",
-          paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
-        }}
-      >
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        paddingBottom: "calc(64px + env(safe-area-inset-bottom))",
+      }}>
         {!showResults ? (
-          <div style={{ textAlign: "center", marginTop: "70px", opacity: 0.3, fontSize: "15px" }}>
-            <div style={{ fontSize: "38px", marginBottom: "8px" }}>🔍</div>
-            Type to search posts
+          <div style={{
+            textAlign: "center", marginTop: "80px", padding: '0 24px',
+          }}>
+            <div style={{
+              width: 68, height: 68, borderRadius: 18,
+              background: 'white',
+              border: '1px solid #E4E6EB',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 14px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            }}>
+              <Search size={28} color="#BCC0C4" />
+            </div>
+            <p style={{
+              fontFamily: '"Bricolage Grotesque", system-ui',
+              fontWeight: 800, fontSize: 17, color: '#050505', margin: '0 0 6px',
+            }}>Search posts</p>
+            <p style={{
+              fontFamily: '"Instrument Sans", system-ui',
+              fontSize: 13.5, color: '#65676B', margin: 0,
+            }}>Type to find announcements, deadlines, materials, and more</p>
           </div>
         ) : postsLoading ? (
-          <div style={{ textAlign: "center", marginTop: "60px", opacity: 0.4, fontSize: "14px" }}>Loading…</div>
+          <div style={{ textAlign: "center", marginTop: "60px" }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              border: `3px solid #F0F2F5`, borderTopColor: RED,
+              animation: 'spin 0.7s linear infinite',
+              margin: '0 auto',
+            }} />
+            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+          </div>
         ) : (
           <>
-            <p style={{ fontSize: "11px", opacity: 0.4, margin: "0 14px 6px" }}>
-              {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-            </p>
+            {/* Result count bar */}
+            <div style={{
+              padding: '8px 16px',
+              maxWidth: 680, margin: '0 auto', width: '100%',
+            }}>
+              <span style={{
+                fontFamily: '"Instrument Sans", system-ui',
+                fontSize: 12, fontWeight: 600, color: '#8A8D91',
+              }}>
+                {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+                {debouncedQuery ? ` for "${debouncedQuery}"` : ''}
+              </span>
+            </div>
+
             {filtered.length === 0 ? (
-              <div style={{ textAlign: "center", marginTop: "50px", opacity: 0.35, fontSize: "14px" }}>
+              <div style={{ textAlign: "center", padding: '48px 24px' }}>
                 <div style={{ fontSize: "36px", marginBottom: "8px" }}>🫙</div>
-                No posts found
+                <p style={{
+                  fontFamily: '"Bricolage Grotesque", system-ui',
+                  fontWeight: 800, fontSize: 16, color: '#050505', margin: '0 0 6px',
+                }}>No posts found</p>
+                <p style={{
+                  fontFamily: '"Instrument Sans", system-ui',
+                  fontSize: 13.5, color: '#65676B', margin: 0,
+                }}>Try different keywords or filters</p>
               </div>
             ) : (
-              filtered.map((post) => (
-                <PostCard key={post.id} post={post} currentUserId={user?.id} />
-              ))
+              <div style={{ maxWidth: 680, margin: '0 auto', width: '100%' }}>
+                {filtered.map((post) => (
+                  <PostCard key={post.id} post={post} currentUserId={user?.id} />
+                ))}
+              </div>
             )}
           </>
         )}
