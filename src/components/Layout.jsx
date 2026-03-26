@@ -19,9 +19,20 @@ function dicebearUrl(name = '') {
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 600)
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth <= 600)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return isMobile
+}
+
 export default function Layout({ children, onOpenSearch }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [showDrawer, setShowDrawer]     = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifs, setShowNotifs]     = useState(false)
@@ -32,19 +43,19 @@ export default function Layout({ children, onOpenSearch }) {
 
   useEffect(() => {
     function handleClick(e) {
-      if (menuRef.current  && !menuRef.current.contains(e.target))  setShowUserMenu(false)
-      // For notifs on desktop, close on outside click
-      // On mobile it renders as a backdrop sheet so this doesn't matter
-      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowUserMenu(false)
+      // Only use outside-click to close on desktop; mobile uses backdrop tap
+      if (!isMobile && notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  }, [isMobile])
 
+  // Lock scroll only for drawer or mobile notif sheet
   useEffect(() => {
-    document.body.style.overflow = showDrawer ? 'hidden' : ''
+    document.body.style.overflow = (showDrawer || (showNotifs && isMobile)) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [showDrawer])
+  }, [showDrawer, showNotifs, isMobile])
 
   useEffect(() => {
     if (!profile) return
@@ -80,27 +91,20 @@ export default function Layout({ children, onOpenSearch }) {
   return (
     <div style={{ minHeight: '100vh', background: '#E9EBEE', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Drawer Backdrop */}
+      {/* Drawer backdrop */}
       {showDrawer && (
         <div onClick={() => setShowDrawer(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.45)', animation: 'fadeIn 0.2s ease' }} />
       )}
 
-      {/* Notification backdrop (mobile) — sits below the panel */}
-      {showNotifs && (
+      {/* Mobile notif backdrop — only on mobile, never on desktop */}
+      {showNotifs && isMobile && (
         <div
           onClick={() => setShowNotifs(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 95,
-            background: 'rgba(0,0,0,0.4)',
-            animation: 'fadeIn 0.2s ease',
-            // only visible on mobile; hidden on desktop via the panel's own outside-click
-            display: 'block',
-          }}
-          className="notif-mobile-backdrop"
+          style={{ position: 'fixed', inset: 0, zIndex: 98, background: 'rgba(0,0,0,0.45)', animation: 'fadeIn 0.2s ease' }}
         />
       )}
 
-      {/* Slide-out Drawer */}
+      {/* Drawer */}
       <div style={{
         position: 'fixed', top: 0, left: 0, bottom: 0, width: 280, zIndex: 90,
         background: 'white', boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
@@ -131,7 +135,7 @@ export default function Layout({ children, onOpenSearch }) {
       <header style={{ position: 'sticky', top: 0, zIndex: 40, background: 'white', borderBottom: '1px solid #E4E6EB', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <div style={{ maxWidth: 680, margin: '0 auto', height: 52, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
 
-          {/* Left: Hamburger + Logo */}
+          {/* Left */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={() => setShowDrawer(true)} style={{ width: 36, height: 36, borderRadius: 9, background: '#F4F6F8', border: '1.5px solid #E4E6EB', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.background = '#EAECEF'}
@@ -146,17 +150,15 @@ export default function Layout({ children, onOpenSearch }) {
             </div>
           </div>
 
-          {/* Right actions */}
+          {/* Right */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-
-            {/* Search */}
             <button onClick={onOpenSearch} style={{ width: 36, height: 36, borderRadius: 9, background: '#F4F6F8', border: '1.5px solid #E4E6EB', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.background = '#EAECEF'}
               onMouseLeave={e => e.currentTarget.style.background = '#F4F6F8'}>
               <Search size={17} color="#65676B" />
             </button>
 
-            {/* Bell — ref used for desktop dropdown outside-click only */}
+            {/* Bell + desktop dropdown */}
             <div ref={notifRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => { setShowNotifs(v => !v); setShowUserMenu(false) }}
@@ -169,9 +171,15 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </button>
 
-              {/* Desktop dropdown — only rendered above 600px via CSS */}
-              {showNotifs && (
-                <div className="notif-desktop-panel">
+              {/* Desktop only: dropdown ABOVE the bell */}
+              {showNotifs && !isMobile && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  bottom: 'calc(100% + 8px)',
+                  zIndex: 100,
+                  animation: 'slideUp 0.18s ease',
+                }}>
                   <NotifPanel
                     notifications={notifications}
                     unreadCount={unreadCount}
@@ -184,7 +192,7 @@ export default function Layout({ children, onOpenSearch }) {
               )}
             </div>
 
-            {/* Avatar only */}
+            {/* Avatar menu */}
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button onClick={() => { setShowUserMenu(v => !v); setShowNotifs(false) }} style={{ width: 36, height: 36, borderRadius: 9, border: `1.5px solid ${showUserMenu ? '#F5B7B1' : '#E4E6EB'}`, background: 'transparent', cursor: 'pointer', padding: 0, overflow: 'hidden', transition: 'border-color 0.15s', flexShrink: 0 }}>
                 <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -210,9 +218,14 @@ export default function Layout({ children, onOpenSearch }) {
         </div>
       </header>
 
-      {/* Mobile notification sheet — bottom sheet on small screens */}
-      {showNotifs && (
-        <div className="notif-mobile-sheet" style={{ zIndex: 96 }}>
+      {/* Mobile notif bottom sheet — only on mobile, above backdrop */}
+      {showNotifs && isMobile && (
+        <div style={{
+          position: 'fixed',
+          left: 0, right: 0, bottom: 0,
+          zIndex: 99,
+          animation: 'slideUpSheet 0.28s cubic-bezier(0.16,1,0.3,1)',
+        }}>
           <NotifPanel
             notifications={notifications}
             unreadCount={unreadCount}
@@ -257,42 +270,10 @@ export default function Layout({ children, onOpenSearch }) {
       </nav>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(100%) } to { opacity: 1; transform: translateY(0) } }
-
-        /* Desktop: show as dropdown, hide mobile sheet */
-        .notif-desktop-panel {
-          display: block;
-          position: absolute;
-          right: 0;
-          top: calc(100% + 8px);
-          z-index: 100;
-        }
-        .notif-mobile-sheet {
-          display: none;
-        }
-        .notif-mobile-backdrop {
-          display: none;
-        }
-
-        /* Mobile: hide dropdown, show bottom sheet + backdrop */
-        @media (max-width: 600px) {
-          .notif-desktop-panel {
-            display: none !important;
-          }
-          .notif-mobile-sheet {
-            display: block;
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            animation: slideUp 0.28s cubic-bezier(0.16,1,0.3,1);
-          }
-          .notif-mobile-backdrop {
-            display: block;
-          }
-        }
+        @keyframes fadeIn     { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideDown  { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideUp    { from { opacity: 0; transform: translateY(6px)  } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideUpSheet { from { opacity: 0; transform: translateY(100%) } to { opacity: 1; transform: translateY(0) } }
       `}</style>
     </div>
   )
@@ -301,7 +282,8 @@ export default function Layout({ children, onOpenSearch }) {
 function DrawerItem({ icon, label, onClick, danger }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent', color: danger ? RED : '#1c1e21', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 15, borderRadius: 10, transition: 'background 0.12s' }}>
+    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent', color: danger ? RED : '#1c1e21', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 15, borderRadius: 10, transition: 'background 0.12s' }}>
       <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: hovered ? (danger ? '#FADBD8' : '#EAECEF') : '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}>
         {icon}
       </div>
@@ -313,7 +295,8 @@ function DrawerItem({ icon, label, onClick, danger }) {
 function MenuAction({ icon, label, onClick, danger }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent', color: danger ? RED : '#1c1e21', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, borderRadius: 7, transition: 'background 0.12s' }}>
+    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? '#FFF5F5' : '#F7F8FA') : 'transparent', color: danger ? RED : '#1c1e21', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, borderRadius: 7, transition: 'background 0.12s' }}>
       {icon} {label}
     </button>
   )
@@ -325,21 +308,21 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
       background: 'white',
       borderRadius: mobile ? '16px 16px 0 0' : 13,
       border: mobile ? 'none' : '1px solid #E4E6EB',
-      boxShadow: mobile ? '0 -4px 32px rgba(0,0,0,0.18)' : '0 8px 28px rgba(0,0,0,0.12)',
+      boxShadow: mobile
+        ? '0 -4px 32px rgba(0,0,0,0.18)'
+        : '0 -8px 24px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
       overflow: 'hidden',
       width: mobile ? '100%' : 310,
-      maxHeight: mobile ? '75vh' : undefined,
+      maxHeight: mobile ? '75vh' : 380,
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Drag handle (mobile only) */}
       {mobile && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E4E6EB' }} />
         </div>
       )}
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: mobile ? '4px 16px 12px' : '11px 14px 10px', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Bell size={15} color={RED} strokeWidth={2.5} />
@@ -358,7 +341,6 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
         </div>
       </div>
 
-      {/* List */}
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {notifications.length === 0
           ? <div style={{ padding: '32px 16px', textAlign: 'center', color: '#65676B', fontSize: 13, fontFamily: '"Instrument Sans", system-ui' }}><div style={{ fontSize: 28, marginBottom: 6 }}>🔔</div>You're all caught up!</div>
@@ -366,7 +348,6 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
         }
       </div>
 
-      {/* Safe area padding on mobile */}
       {mobile && <div style={{ height: 'env(safe-area-inset-bottom)', flexShrink: 0 }} />}
     </div>
   )
@@ -377,7 +358,8 @@ function NotifItem({ notif, onRead, onClose, navigate }) {
   const icons = { announcement: '📢', tag: '🏷️', whisper: '💬' }
   function handleClick() { onRead(notif.id); onClose(); if (notif.post_id) navigate(`/?post=${notif.post_id}`) }
   return (
-    <button onClick={handleClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? '#F7F8FA' : notif.is_read ? 'white' : '#FFF8F8', borderLeft: notif.is_read ? '3px solid transparent' : `3px solid ${RED}`, transition: 'background 0.12s' }}>
+    <button onClick={handleClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? '#F7F8FA' : notif.is_read ? 'white' : '#FFF8F8', borderLeft: notif.is_read ? '3px solid transparent' : `3px solid ${RED}`, transition: 'background 0.12s' }}>
       <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: notif.is_read ? '#F0F2F5' : '#FADBD8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{icons[notif.type] || '🔔'}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 12.5, color: '#1c1e21', fontFamily: '"Instrument Sans", system-ui', lineHeight: 1.4, fontWeight: notif.is_read ? 400 : 600 }}>{notif.message}</p>
