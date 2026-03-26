@@ -20,14 +20,20 @@ function formatTime12(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-function getDueStatus(due_date, due_time) {
+// Returns the exact deadline Date, defaulting to 11:59 PM if no time set
+function getDeadlineDate(due_date, due_time) {
   const date = new Date(due_date)
   if (due_time) {
     const [h, m] = due_time.split(':').map(Number)
     date.setHours(h, m, 0, 0)
   } else {
-    date.setHours(23, 59, 59, 999)
+    date.setHours(23, 59, 0, 0)
   }
+  return date
+}
+
+function getDueStatus(due_date, due_time) {
+  const date = getDeadlineDate(due_date, due_time)
   if (isPast(date))                   return { label: 'Past due',     color: GREY,  bg: GREY_BG,  urgent: false, past: true  }
   const days = differenceInDays(date, new Date())
   if (isToday(new Date(due_date)))    return { label: 'Due today!',   color: RED,   bg: RED_BG,   urgent: true,  past: false }
@@ -204,7 +210,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 </button>
               )}
 
-              {/* Done toggle — prominent button */}
+              {/* Done toggle */}
               <button
                 onClick={() => onToggleDone(post.id)}
                 style={{
@@ -229,15 +235,9 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 }}
               >
                 {done ? (
-                  <>
-                    <Check size={13} strokeWidth={2.5} />
-                    Done
-                  </>
+                  <><Check size={13} strokeWidth={2.5} />Done</>
                 ) : (
-                  <>
-                    <Check size={13} strokeWidth={2.5} />
-                    Mark done
-                  </>
+                  <><Check size={13} strokeWidth={2.5} />Mark done</>
                 )}
               </button>
             </div>
@@ -367,7 +367,8 @@ function LoadingSkeleton() {
   )
 }
 
-const FILTERS = ['All', 'Upcoming', 'Past Due']
+// Filters: All, Due Soon (today+tomorrow only), Past Due, Done
+const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
 const TYPE_FILTERS = ['All Types', 'Quiz', 'Activity', 'Output', 'Exam', 'Fees', 'Info', 'Learning Task', 'Project', 'Reporting']
 
 export default function AnnouncementsPage() {
@@ -417,40 +418,59 @@ export default function AnnouncementsPage() {
     if (user) load()
   }, [user])
 
-  const now = new Date()
-  const active = deadlines.filter(d => !doneIds.has(d.id))
-  const done   = deadlines.filter(d =>  doneIds.has(d.id))
+  // Helpers
+  const isDueSoon = (d) => {
+    const deadline = getDeadlineDate(d.due_date, d.due_time)
+    if (isPast(deadline)) return false
+    return isToday(new Date(d.due_date)) || isTomorrow(new Date(d.due_date))
+  }
+  const isPastDue = (d) => isPast(getDeadlineDate(d.due_date, d.due_time))
 
-  const filtered = active.filter(d => {
-    const dueDate = new Date(d.due_date)
-    if (filter === 'Upcoming' && isPast(dueDate)) return false
-    if (filter === 'Past Due' && !isPast(dueDate)) return false
-    if (typeFilter !== 'All Types' && d.announcement_type !== typeFilter) return false
-    return true
-  })
+  // Apply type filter to a list
+  const applyTypeFilter = (list) =>
+    typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
 
-  const upcomingCount = active.filter(d => !isPast(new Date(d.due_date))).length
-  const urgentCount   = active.filter(d => { const days = differenceInDays(new Date(d.due_date), now); return days >= 0 && days <= 3 }).length
+  const doneDeadlines   = deadlines.filter(d => doneIds.has(d.id))
+  const activeDeadlines = deadlines.filter(d => !doneIds.has(d.id))
 
-  const urgent   = filtered.filter(d => { const days = differenceInDays(new Date(d.due_date), now); return days >= 0 && days <= 3 })
-  const thisWeek = filtered.filter(d => { const days = differenceInDays(new Date(d.due_date), now); return days > 3 && days <= 7 })
-  const later    = filtered.filter(d => differenceInDays(new Date(d.due_date), now) > 7)
-  const past     = filtered.filter(d => isPast(new Date(d.due_date)))
+  // Stats for header summary
+  const dueSoonCount = activeDeadlines.filter(isDueSoon).length
+  const doneCount    = doneDeadlines.length
 
-  const groups = filter === 'Past Due'
-    ? [{ emoji: '⚠️', label: 'Past Due', items: past }]
-    : filter === 'Upcoming'
-      ? [
-          ...(urgent.length   ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }]   : []),
-          ...(thisWeek.length ? [{ emoji: '📅', label: 'This Week', items: thisWeek }] : []),
-          ...(later.length    ? [{ emoji: '🗓️', label: 'Later', items: later }]        : []),
-        ]
-      : [
-          ...(urgent.length   ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }]   : []),
-          ...(thisWeek.length ? [{ emoji: '📅', label: 'This Week', items: thisWeek }] : []),
-          ...(later.length    ? [{ emoji: '🗓️', label: 'Later', items: later }]        : []),
-          ...(past.length     ? [{ emoji: '⚠️', label: 'Past Due', items: past }]      : []),
-        ]
+  // What to show based on active filter tab
+  let displayItems = []
+  let showDoneSection = false
+
+  if (filter === 'All') {
+    displayItems = applyTypeFilter(activeDeadlines)
+    showDoneSection = false
+  } else if (filter === 'Due Soon') {
+    displayItems = applyTypeFilter(activeDeadlines.filter(isDueSoon))
+  } else if (filter === 'Past Due') {
+    displayItems = applyTypeFilter(activeDeadlines.filter(isPastDue))
+  } else if (filter === 'Done') {
+    displayItems = applyTypeFilter(doneDeadlines)
+  }
+
+  // Group active items into sections (for All, Due Soon, Past Due tabs)
+  const urgent    = displayItems.filter(d => isDueSoon(d))
+  const notUrgent = displayItems.filter(d => !isDueSoon(d) && !isPastDue(d))
+  const past      = displayItems.filter(d => isPastDue(d))
+
+  // Build groups based on filter
+  let groups = []
+  if (filter === 'Due Soon') {
+    groups = urgent.length ? [{ emoji: '🔥', label: 'Due Soon', items: urgent }] : []
+  } else if (filter === 'Past Due') {
+    groups = past.length ? [{ emoji: '⚠️', label: 'Past Due', items: past }] : []
+  } else if (filter === 'Done') {
+    groups = displayItems.length ? [{ emoji: '✅', label: 'Done', items: displayItems }] : []
+  } else {
+    // All tab — show Due Soon, then Later, then Past Due
+    if (urgent.length)    groups.push({ emoji: '🔥', label: 'Due Soon',  items: urgent })
+    if (notUrgent.length) groups.push({ emoji: '🗓️', label: 'Later',     items: notUrgent })
+    if (past.length)      groups.push({ emoji: '⚠️', label: 'Past Due',  items: past })
+  }
 
   return (
     <div style={{ paddingTop: 14 }}>
@@ -468,7 +488,7 @@ export default function AnnouncementsPage() {
             </div>
             {!loading && (
               <div style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', padding: '4px 12px', borderRadius: 20, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13 }}>
-                {filtered.length}
+                {deadlines.length}
               </div>
             )}
           </div>
@@ -476,9 +496,9 @@ export default function AnnouncementsPage() {
           {!loading && deadlines.length > 0 && (
             <div style={{ display: 'flex', gap: 8 }}>
               {[
-                { label: 'Upcoming', count: upcomingCount, emoji: '⏰' },
-                { label: 'Due Soon', count: urgentCount,   emoji: '🔥' },
-                { label: 'Done',     count: done.length,   emoji: '✅' },
+                { label: 'Upcoming', count: activeDeadlines.filter(d => !isPastDue(d)).length, emoji: '⏰' },
+                { label: 'Due Soon', count: dueSoonCount,  emoji: '🔥' },
+                { label: 'Done',     count: doneCount,     emoji: '✅' },
               ].map(s => (
                 <div key={s.label} style={{ flex: 1, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
                   <div style={{ fontSize: 15, marginBottom: 2 }}>{s.emoji}</div>
@@ -492,19 +512,22 @@ export default function AnnouncementsPage() {
 
         {/* Controls */}
         <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Filter tabs */}
           <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 2, flex: 1 }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{
-                flex: 1, padding: '7px 6px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12.5,
+                flex: 1, padding: '7px 4px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11.5,
                 background: filter === f ? 'white' : 'transparent',
                 color: filter === f ? '#050505' : GREY,
                 boxShadow: filter === f ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
               }}>{f}</button>
             ))}
           </div>
 
+          {/* Type filter */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowTypeFilter(v => !v)}
@@ -558,28 +581,36 @@ export default function AnnouncementsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {groups.map(({ emoji, label, items }) => items.length > 0 && (
             <div key={label}>
-              <SectionHeader emoji={emoji} label={label} count={items.length} />
+              <SectionHeader emoji={emoji} label={label} count={items.length} muted={label === 'Done'} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {items.map(post => (
-                  <DeadlineRow key={post.id} post={post} done={false} onToggleDone={toggleDone} />
+                  <DeadlineRow
+                    key={post.id}
+                    post={post}
+                    done={filter === 'Done' || doneIds.has(post.id)}
+                    onToggleDone={toggleDone}
+                  />
                 ))}
               </div>
             </div>
           ))}
 
-          {filtered.length === 0 && done.length === 0 && (
-            <EmptyState emoji="🎉" title="All clear!" subtitle="Nothing matches this filter" />
-          )}
-
-          {done.length > 0 && (
-            <div>
-              <SectionHeader emoji="✅" label="Done" count={done.length} muted />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {done.map(post => (
-                  <DeadlineRow key={post.id} post={post} done={true} onToggleDone={toggleDone} />
-                ))}
-              </div>
-            </div>
+          {groups.length === 0 && (
+            <EmptyState
+              emoji={filter === 'Due Soon' ? '🎉' : filter === 'Done' ? '📋' : '🗓️'}
+              title={
+                filter === 'Due Soon' ? 'Nothing due soon!' :
+                filter === 'Past Due' ? 'No past due tasks' :
+                filter === 'Done' ? 'No completed tasks yet' :
+                'All clear!'
+              }
+              subtitle={
+                filter === 'Due Soon' ? 'No tasks due today or tomorrow' :
+                filter === 'Past Due' ? "You're all caught up" :
+                filter === 'Done' ? 'Mark tasks as done to see them here' :
+                'Nothing matches this filter'
+              }
+            />
           )}
         </div>
       )}
