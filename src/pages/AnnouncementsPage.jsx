@@ -68,7 +68,7 @@ function DeadlineCard({ post, done, onToggleDone }) {
   const typeStyle = TYPE_COLORS[post.announcement_type] || null
   const photos = parsePhotos(post.photo_url)
   const files  = parseFiles(post.file_url, post.file_name)
-  const hasDetails = photos.length > 0 || files.length > 0
+  const hasDetails = !!post.caption || photos.length > 0 || files.length > 0
   const subjectName = post.subjects?.name || 'General'
   const subjectColor = post.subjects
     ? { bg: '#EBF5FB', color: BLUE, border: '#AED6F1' }
@@ -141,7 +141,7 @@ function DeadlineCard({ post, done, onToggleDone }) {
         <div style={{ flex: 1, minWidth: 0 }}>
 
           {/* Badges: subject (prominent) + type + status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
 
             {/* Subject — big & noticeable */}
             <span style={{
@@ -180,22 +180,9 @@ function DeadlineCard({ post, done, onToggleDone }) {
               </span>
             )}
           </div>
-
-          {/* Full caption — no truncation */}
-          {post.caption && (
-            <p style={{
-              margin: 0,
-              fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 13.5,
-              color: done ? '#9CA3AF' : '#1c1e21',
-              lineHeight: 1.55,
-              textDecoration: done ? 'line-through' : 'none',
-            }}>
-              {post.caption}
-            </p>
-          )}
         </div>
 
-        {/* Expand chevron — only if files or photos */}
+        {/* Expand chevron — only if caption, files or photos */}
         {hasDetails && (
           <button
             onClick={() => setExpanded(e => !e)}
@@ -215,7 +202,7 @@ function DeadlineCard({ post, done, onToggleDone }) {
         )}
       </div>
 
-      {/* ── Expanded: who posted + photos + files ── */}
+      {/* ── Expanded: caption + who posted + photos + files ── */}
       {expanded && (
         <div style={{
           borderTop: '1px solid #F0F2F5',
@@ -223,6 +210,19 @@ function DeadlineCard({ post, done, onToggleDone }) {
           display: 'flex', flexDirection: 'column', gap: 12,
           animation: 'expandIn 0.18s ease',
         }}>
+          {/* Caption */}
+          {post.caption && (
+            <p style={{
+              margin: 0,
+              fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 13.5,
+              color: done ? '#9CA3AF' : '#1c1e21',
+              lineHeight: 1.55,
+              textDecoration: done ? 'line-through' : 'none',
+            }}>
+              {post.caption}
+            </p>
+          )}
+
           {/* Author + timestamp */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <img
@@ -313,8 +313,6 @@ function LoadingSkeleton() {
           {bar(60, 46, 8)}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
             <div style={{ display: 'flex', gap: 5 }}>{bar(80, 22, 20)}{bar(55, 22, 20)}{bar(50, 22, 20)}</div>
-            {bar('95%', 13)}
-            {bar('75%', 13)}
           </div>
         </div>
       ))}
