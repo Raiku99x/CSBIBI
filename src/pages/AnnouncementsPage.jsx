@@ -109,64 +109,98 @@ function DeadlineRow({ post, done, onToggleDone }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* ── Top content: date block + info + expand btn ── */}
-          <div style={{ padding: '11px 12px 6px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          {/* ── Single row: [left col: date+done] · [right col: pills+caption] · [expand btn] ── */}
+          <div style={{ padding: '11px 12px 11px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
 
-            {/* Date block */}
-            <div style={{
-              flexShrink: 0,
-              width: 62,
-              textAlign: 'center',
-              padding: '5px 6px',
-              borderRadius: 8,
-              background: animating ? '#DCFCE7' : done ? GREY_BG : status.bg,
-              border: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
-              transition: 'background 0.25s, border-color 0.25s',
-            }}>
-              {/* Day */}
+            {/* ── LEFT COLUMN: date card + done button stacked, always together ── */}
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+
+              {/* Date block */}
               <div style={{
-                fontFamily: '"Bricolage Grotesque", system-ui',
-                fontWeight: 800, fontSize: 17,
-                color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color,
-                lineHeight: 1, transition: 'color 0.25s',
+                width: 62,
+                textAlign: 'center',
+                padding: '5px 6px',
+                borderRadius: 8,
+                background: animating ? '#DCFCE7' : done ? GREY_BG : status.bg,
+                border: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
+                transition: 'background 0.25s, border-color 0.25s',
               }}>
-                {format(new Date(post.due_date), 'd')}
-              </div>
-              {/* Month */}
-              <div style={{
-                fontFamily: '"Instrument Sans", system-ui',
-                fontWeight: 600, fontSize: 10,
-                color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
-                opacity: 0.85, marginTop: 1, transition: 'color 0.25s',
-              }}>
-                {format(new Date(post.due_date), 'MMM')}
-              </div>
-              {/* Days left */}
-              <div style={{
-                fontFamily: '"Instrument Sans", system-ui',
-                fontWeight: 700, fontSize: 9,
-                color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
-                marginTop: 3, paddingTop: 2,
-                borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
-                letterSpacing: 0.1, whiteSpace: 'nowrap',
-                transition: 'color 0.25s',
-              }}>
-                {animating ? '✓ Done' : done ? 'Done ✓' : status.label}
-              </div>
-              {/* Time if set */}
-              {post.due_time && (
+                <div style={{
+                  fontFamily: '"Bricolage Grotesque", system-ui',
+                  fontWeight: 800, fontSize: 17,
+                  color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color,
+                  lineHeight: 1, transition: 'color 0.25s',
+                }}>
+                  {format(new Date(post.due_date), 'd')}
+                </div>
                 <div style={{
                   fontFamily: '"Instrument Sans", system-ui',
-                  fontWeight: 500, fontSize: 8,
-                  color: done ? '#BCC0C4' : status.color,
-                  opacity: 0.6, marginTop: 2,
+                  fontWeight: 600, fontSize: 10,
+                  color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
+                  opacity: 0.85, marginTop: 1, transition: 'color 0.25s',
                 }}>
-                  {formatTime12(post.due_time)}
+                  {format(new Date(post.due_date), 'MMM')}
                 </div>
-              )}
+                <div style={{
+                  fontFamily: '"Instrument Sans", system-ui',
+                  fontWeight: 700, fontSize: 9,
+                  color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
+                  marginTop: 3, paddingTop: 2,
+                  borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
+                  letterSpacing: 0.1, whiteSpace: 'nowrap',
+                  transition: 'color 0.25s',
+                }}>
+                  {animating ? '✓ Done' : done ? 'Done ✓' : status.label}
+                </div>
+                {post.due_time && (
+                  <div style={{
+                    fontFamily: '"Instrument Sans", system-ui',
+                    fontWeight: 500, fontSize: 8,
+                    color: done ? '#BCC0C4' : status.color,
+                    opacity: 0.6, marginTop: 2,
+                  }}>
+                    {formatTime12(post.due_time)}
+                  </div>
+                )}
+              </div>
+
+              {/* Done button — same width (62px), flush below date card */}
+              <button
+                onClick={handleToggle}
+                style={{
+                  width: 62, padding: '5px 0', borderRadius: 8, border: 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  cursor: 'pointer',
+                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
+                  background: animating ? '#DCFCE7' : done ? '#FFF1F2' : '#F0FDF4',
+                  color: animating ? '#16a34a' : done ? '#e11d48' : '#4ade80',
+                  outline: `2px solid ${animating ? '#86EFAC' : done ? '#FEE2E2' : '#D1FAE5'}`,
+                  transition: 'all 0.2s',
+                  transform: animating ? 'scale(1.05)' : 'scale(1)',
+                }}
+                onMouseEnter={e => {
+                  if (!animating) {
+                    e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'
+                    e.currentTarget.style.color = done ? '#be123c' : '#16a34a'
+                    e.currentTarget.style.outline = `2px solid ${done ? '#FECDD3' : '#86EFAC'}`
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!animating) {
+                    e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'
+                    e.currentTarget.style.color = done ? '#e11d48' : '#4ade80'
+                    e.currentTarget.style.outline = `2px solid ${done ? '#FEE2E2' : '#D1FAE5'}`
+                  }
+                }}
+              >
+                {done
+                  ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
+                  : <><Check size={11} strokeWidth={2.5} /> Done</>
+                }
+              </button>
             </div>
 
-            {/* Info: pills + caption (3-line clamp) */}
+            {/* ── RIGHT COLUMN: pills + caption ── */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
                 <span style={{
@@ -198,7 +232,6 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
                   fontWeight: done ? 400 : 500,
                   color: done ? '#9CA3AF' : '#1c1e21',
-                  // Clamp to 3 lines max
                   display: '-webkit-box',
                   WebkitLineClamp: 3,
                   WebkitBoxOrient: 'vertical',
@@ -211,16 +244,16 @@ function DeadlineRow({ post, done, onToggleDone }) {
               )}
             </div>
 
-            {/* Expand toggle — top right, text label */}
+            {/* ── Expand toggle: icon-only on mobile, text+icon on desktop ── */}
             {hasDetails && (
               <button
                 onClick={() => setExpanded(e => !e)}
                 style={{
                   flexShrink: 0, marginTop: 1,
-                  padding: '4px 9px', borderRadius: 7,
+                  padding: '4px 7px', borderRadius: 7,
                   background: expanded ? GREY_BG : 'transparent',
                   border: '1px solid #E4E6EB',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
                   color: GREY, transition: 'all 0.15s',
                   fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
                   whiteSpace: 'nowrap',
@@ -228,50 +261,12 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 onMouseEnter={e => e.currentTarget.style.background = GREY_BG}
                 onMouseLeave={e => e.currentTarget.style.background = expanded ? GREY_BG : 'transparent'}
               >
-                {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                {expanded ? 'Close details' : 'See details'}
+                {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                <span className="dl-detail-label">
+                  {expanded ? 'Close' : 'Details'}
+                </span>
               </button>
             )}
-          </div>
-
-          {/* ── Done button — fixed width matching date card ── */}
-          <div style={{
-            padding: '0 12px 10px 12px',
-            display: 'flex',
-          }}>
-            <button
-              onClick={handleToggle}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                width: 66, padding: '5px 0', borderRadius: 8, border: 'none',
-                cursor: 'pointer',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
-                background: animating ? '#DCFCE7' : done ? '#FFF1F2' : '#F0FDF4',
-                color: animating ? '#16a34a' : done ? '#e11d48' : '#4ade80',
-                outline: `2px solid ${animating ? '#86EFAC' : done ? '#FEE2E2' : '#D1FAE5'}`,
-                transition: 'all 0.2s',
-                transform: animating ? 'scale(1.05)' : 'scale(1)',
-              }}
-              onMouseEnter={e => {
-                if (!animating) {
-                  e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'
-                  e.currentTarget.style.color = done ? '#be123c' : '#16a34a'
-                  e.currentTarget.style.outline = `2px solid ${done ? '#FECDD3' : '#86EFAC'}`
-                }
-              }}
-              onMouseLeave={e => {
-                if (!animating) {
-                  e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'
-                  e.currentTarget.style.color = done ? '#e11d48' : '#4ade80'
-                  e.currentTarget.style.outline = `2px solid ${done ? '#FEE2E2' : '#D1FAE5'}`
-                }
-              }}
-            >
-              {done
-                ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
-                : <><Check size={11} strokeWidth={2.5} /> Done</>
-              }
-            </button>
           </div>
 
           {/* ── Expanded details ── */}
@@ -612,6 +607,7 @@ export default function AnnouncementsPage() {
       <style>{`
         @keyframes expandIn  { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+        @media (max-width: 600px) { .dl-detail-label { display: none; } }
       `}</style>
     </div>
   )
