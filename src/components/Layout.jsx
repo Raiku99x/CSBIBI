@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../hooks/useNotifications'
 import { supabase } from '../lib/supabase'
 import {
-  Home, MessageSquare, Bell, BookMarked, Grid3X3,
-  LogOut, Settings, Check, X, Menu, Search
+  Home, MessageSquare, BookMarked, Grid3X3,
+  LogOut, Settings, Check, X, Menu, Search, CalendarClock
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -50,7 +50,6 @@ export default function Layout({ children, onOpenSearch }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [isMobile])
 
-  // Lock scroll only for drawer or mobile notif sheet
   useEffect(() => {
     document.body.style.overflow = (showDrawer || (showNotifs && isMobile)) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -79,10 +78,11 @@ export default function Layout({ children, onOpenSearch }) {
     navigate('/auth')
   }
 
+  // ── Changed: Bell → CalendarClock, label 'Announce' → 'Deadlines' ──
   const navItems = [
     { to: '/', icon: Home, label: 'Feed', exact: true },
     { to: '/messages', icon: MessageSquare, label: 'Messages', badge: dmUnread },
-    { to: '/announcements', icon: Bell, label: 'Announce' },
+    { to: '/announcements', icon: CalendarClock, label: 'Deadlines' },
     { to: '/subjects', icon: BookMarked, label: 'Subjects' },
     { to: '/apps', icon: Grid3X3, label: 'Apps' },
   ]
@@ -162,7 +162,7 @@ export default function Layout({ children, onOpenSearch }) {
               <button
                 onClick={() => { setShowNotifs(v => !v); setShowUserMenu(false) }}
                 style={{ width: 36, height: 36, borderRadius: 9, background: showNotifs ? '#FADBD8' : '#F4F6F8', border: `1.5px solid ${showNotifs ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'all 0.15s' }}>
-                <Bell size={17} color={showNotifs ? RED : '#65676B'} strokeWidth={showNotifs ? 2.5 : 2} />
+                <CalendarClock size={17} color={showNotifs ? RED : '#65676B'} strokeWidth={showNotifs ? 2.5 : 2} />
                 {unreadCount > 0 && (
                   <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 9, background: RED, color: 'white', fontSize: 9.5, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid white' }}>
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -170,15 +170,8 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </button>
 
-              {/* Desktop: dropdown BELOW the bell */}
               {showNotifs && !isMobile && (
-                <div style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 'calc(100% + 8px)',
-                  zIndex: 100,
-                  animation: 'slideDown 0.18s ease',
-                }}>
+                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 100, animation: 'slideDown 0.18s ease' }}>
                   <NotifPanel
                     notifications={notifications}
                     unreadCount={unreadCount}
@@ -217,16 +210,9 @@ export default function Layout({ children, onOpenSearch }) {
         </div>
       </header>
 
-      {/* Mobile notif — slides DOWN from top (just below header) */}
+      {/* Mobile notif sheet */}
       {showNotifs && isMobile && (
-        <div style={{
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          top: 52,
-          zIndex: 99,
-          animation: 'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)',
-        }}>
+        <div style={{ position: 'fixed', left: 0, right: 0, top: 52, zIndex: 99, animation: 'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
           <NotifPanel
             notifications={notifications}
             unreadCount={unreadCount}
@@ -309,18 +295,14 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
       background: 'white',
       borderRadius: mobile ? '0 0 16px 16px' : 13,
       border: mobile ? 'none' : '1px solid #E4E6EB',
-      boxShadow: mobile
-        ? '0 8px 32px rgba(0,0,0,0.18)'
-        : '0 8px 24px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
-      overflow: 'hidden',
-      width: mobile ? '100%' : 310,
+      boxShadow: mobile ? '0 8px 32px rgba(0,0,0,0.18)' : '0 8px 24px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06)',
+      overflow: 'hidden', width: mobile ? '100%' : 310,
       maxHeight: mobile ? '75vh' : 380,
-      display: 'flex',
-      flexDirection: 'column',
+      display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: mobile ? '14px 16px 12px' : '11px 14px 10px', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Bell size={15} color={RED} strokeWidth={2.5} />
+          <CalendarClock size={15} color={RED} strokeWidth={2.5} />
           <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>Notifications</span>
           {unreadCount > 0 && <span style={{ background: RED, color: 'white', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 10, padding: '1px 6px', borderRadius: 10 }}>{unreadCount}</span>}
         </div>
