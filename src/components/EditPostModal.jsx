@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { X, ChevronDown, Loader2, Megaphone, FileText, Globe } from 'lucide-react'
+import { X, ChevronDown, Loader2, Megaphone, FileText, Globe, MessageSquareQuote, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
@@ -10,8 +10,42 @@ function dicebearUrl(name = '') {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
 
+function parseQuoted(raw) {
+  if (!raw) return { from: '', message: '' }
+  try { const p = JSON.parse(raw); return { from: p.from || '', message: p.message || '' } }
+  catch { return { from: '', message: raw } }
+}
+
+function QuotedMessagePreview({ from, message }) {
+  if (!from && !message) return null
+  return (
+    <div style={{
+      background: '#F7F8FA', border: '1px solid #E4E6EB',
+      borderLeft: '3px solid #C0392B', borderRadius: '0 8px 8px 0',
+      padding: '8px 12px', marginTop: 8,
+    }}>
+      <p style={{
+        margin: '0 0 4px', fontFamily: '"Instrument Sans", system-ui',
+        fontWeight: 700, fontSize: 12, color: '#C0392B',
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        <MessageSquareQuote size={11} />
+        {from ? `From ${from}` : 'Quoted message'}
+      </p>
+      <p style={{
+        margin: 0, fontFamily: '"Instrument Sans", system-ui',
+        fontSize: 13.5, color: '#1c1e21', lineHeight: 1.5,
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>
+        {message || <span style={{ color: '#BCC0C4', fontStyle: 'italic' }}>Paste a message below to preview…</span>}
+      </p>
+    </div>
+  )
+}
+
 export default function EditPostModal({ post, profile, subjects, onClose, onUpdated }) {
   const isAnnouncement = post.post_type === 'announcement'
+  const existingQuoted = parseQuoted(post.quoted_message)
 
   const [form, setForm] = useState({
     caption: post.caption || '',
@@ -21,15 +55,18 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     announcement_type: post.announcement_type || '',
     due_date: post.due_date || '',
     due_time: post.due_time || '',
+    quoted_from: existingQuoted.from,
+    quoted_message: existingQuoted.message,
   })
   const [loading, setLoading] = useState(false)
+  const [showQuoteSection, setShowQuoteSection] = useState(!!(existingQuoted.from || existingQuoted.message))
+  const [showQuotePreview, setShowQuotePreview] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const formIsAnnouncement = form.post_type === 'announcement'
   const formIsDeadline = formIsAnnouncement && form.sub_type === 'deadline'
   const showDueDate = formIsDeadline || (formIsAnnouncement && form.sub_type === 'announcement')
 
-  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -39,9 +76,16 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     e.preventDefault()
     if (!form.caption.trim()) { toast.error('Caption cannot be empty'); return }
     if (formIsDeadline && !form.due_date) { toast.error('Please set a due date'); return }
+    if (showQuoteSection && form.quoted_message.trim() && !form.quoted_from.trim()) {
+      toast.error('Please enter who sent this message'); return
+    }
 
     setLoading(true)
     try {
+      const quoted_data = (showQuoteSection && form.quoted_message.trim())
+        ? JSON.stringify({ from: form.quoted_from.trim(), message: form.quoted_message.trim() })
+        : null
+
       const { data, error } = await supabase
         .from('posts')
         .update({
@@ -52,6 +96,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
           announcement_type: formIsAnnouncement && form.announcement_type ? form.announcement_type : null,
           due_date: form.due_date || null,
           due_time: form.due_time || null,
+          quoted_message: quoted_data,
           is_edited: true,
         })
         .eq('id', post.id)
@@ -71,38 +116,21 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
 
   return (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 50,
-      background: 'white',
-      display: 'flex',
-      flexDirection: 'column',
+      position: 'fixed', inset: 0, zIndex: 50, background: 'white',
+      display: 'flex', flexDirection: 'column',
       animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)',
     }}>
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '14px 16px',
-        borderBottom: '1px solid #E4E6EB',
-        flexShrink: 0,
-        background: 'white',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 16px', borderBottom: '1px solid #E4E6EB',
+        flexShrink: 0, background: 'white',
       }}>
-        <span style={{
-          fontFamily: '"Bricolage Grotesque", system-ui',
-          fontWeight: 800, fontSize: 18, color: '#050505',
-        }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505' }}>
           Edit Post
         </span>
-        <button
-          onClick={onClose}
-          style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: '#E4E6EB', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.12s',
-          }}
+        <button onClick={onClose}
+          style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}
           onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
           onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}
         >
@@ -110,65 +138,39 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
         </button>
       </div>
 
-      {/* ── Scrollable body ── */}
+      {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 0' }}>
 
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <img
-            src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-            style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', background: '#E4E6EB' }}
-            alt=""
-          />
+          <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', background: '#E4E6EB' }} alt="" />
           <div>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>
               {profile?.display_name}
             </p>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              background: '#E4E6EB', padding: '3px 10px', borderRadius: 6, marginTop: 3,
-            }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#E4E6EB', padding: '3px 10px', borderRadius: 6, marginTop: 3 }}>
               <Globe size={11} color="#050505" />
               <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
-                {form.sub_type === 'material' ? 'Material'
-                  : form.sub_type === 'deadline' ? 'Deadline'
-                  : form.sub_type === 'reminder' ? 'Reminder'
-                  : form.sub_type === 'announcement' ? 'Announcement'
-                  : form.sub_type === 'status' ? 'Status'
-                  : 'Post'} · Class
+                {form.sub_type === 'material' ? 'Material' : form.sub_type === 'deadline' ? 'Deadline' : form.sub_type === 'reminder' ? 'Reminder' : form.sub_type === 'announcement' ? 'Announcement' : form.sub_type === 'status' ? 'Status' : 'Post'} · Class
               </span>
             </div>
           </div>
         </div>
 
         {/* Post type toggle */}
-        <div style={{
-          display: 'flex', gap: 6, padding: 4,
-          background: '#F0F2F5', borderRadius: 10, marginBottom: 8,
-        }}>
+        <div style={{ display: 'flex', gap: 6, padding: 4, background: '#F0F2F5', borderRadius: 10, marginBottom: 8 }}>
           {[
             { key: 'status', label: 'Status', icon: <FileText size={14} /> },
             { key: 'announcement', label: 'Announcement', icon: <Megaphone size={14} /> },
           ].map(({ key, label, icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                set('post_type', key)
-                set('sub_type', '')
-                set('announcement_type', '')
-                if (key === 'status') { set('due_date', ''); set('due_time', '') }
-              }}
+            <button key={key} type="button"
+              onClick={() => { set('post_type', key); set('sub_type', ''); set('announcement_type', ''); if (key === 'status') { set('due_date', ''); set('due_time', '') } }}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                background: form.post_type === key
-                  ? key === 'announcement' ? '#0D7377' : 'white'
-                  : 'transparent',
-                color: form.post_type === key
-                  ? key === 'announcement' ? 'white' : '#050505'
-                  : '#65676B',
+                background: form.post_type === key ? (key === 'announcement' ? '#0D7377' : 'white') : 'transparent',
+                color: form.post_type === key ? (key === 'announcement' ? 'white' : '#050505') : '#65676B',
                 boxShadow: form.post_type === key && key === 'status' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
               }}
@@ -179,30 +181,13 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
         </div>
 
         {/* Sub-type toggle */}
-        <div style={{
-          display: 'flex', gap: 5, padding: '3px',
-          background: '#F7F8FA', borderRadius: 8,
-          border: '1px solid #E4E6EB',
-          marginBottom: 14,
-        }}>
+        <div style={{ display: 'flex', gap: 5, padding: '3px', background: '#F7F8FA', borderRadius: 8, border: '1px solid #E4E6EB', marginBottom: 14 }}>
           {(formIsAnnouncement
-            ? [
-                { key: 'announcement', label: '📢 Announcement' },
-                { key: 'reminder', label: '🔔 Reminder' },
-                { key: 'deadline', label: '📅 Deadline' },
-              ]
-            : [
-                { key: 'status', label: '💬 Status' },
-                { key: 'material', label: '📁 Material' },
-              ]
+            ? [{ key: 'announcement', label: '📢 Announcement' }, { key: 'reminder', label: '🔔 Reminder' }, { key: 'deadline', label: '📅 Deadline' }]
+            : [{ key: 'status', label: '💬 Status' }, { key: 'material', label: '📁 Material' }]
           ).map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                set('sub_type', key)
-                if (key !== 'deadline' && key !== 'announcement') { set('due_date', ''); set('due_time', '') }
-              }}
+            <button key={key} type="button"
+              onClick={() => { set('sub_type', key); if (key !== 'deadline' && key !== 'announcement') { set('due_date', ''); set('due_time', '') } }}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '9px 6px', borderRadius: 6, border: 'none', cursor: 'pointer',
@@ -212,10 +197,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                 transition: 'all 0.15s',
               }}
             >
-              <span style={{
-                fontWeight: 700, fontSize: 13,
-                color: form.sub_type === key ? '#050505' : '#65676B',
-              }}>{label}</span>
+              <span style={{ fontWeight: 700, fontSize: 13, color: form.sub_type === key ? '#050505' : '#65676B' }}>{label}</span>
             </button>
           ))}
         </div>
@@ -223,19 +205,8 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
         {/* Announcement type dropdown */}
         {formIsAnnouncement && form.sub_type && (
           <div style={{ position: 'relative', marginBottom: 14 }}>
-            <select
-              value={form.announcement_type}
-              onChange={e => set('announcement_type', e.target.value)}
-              style={{
-                width: '100%', padding: '11px 36px 11px 14px',
-                borderRadius: 10, border: '1px solid #E4E6EB',
-                background: form.announcement_type ? '#E6F4F4' : '#F7F8FA',
-                appearance: 'none',
-                fontFamily: '"Instrument Sans", system-ui', fontSize: 14,
-                color: form.announcement_type ? '#0D7377' : '#8A8D91',
-                fontWeight: form.announcement_type ? 700 : 400,
-                cursor: 'pointer', outline: 'none',
-              }}
+            <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
+              style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: form.announcement_type ? '#E6F4F4' : '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.announcement_type ? '#0D7377' : '#8A8D91', fontWeight: form.announcement_type ? 700 : 400, cursor: 'pointer', outline: 'none' }}
             >
               <option value="">Type (optional)</option>
               {['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting'].map(t => (
@@ -248,125 +219,145 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
 
         {/* Textarea */}
         <textarea
-          placeholder="What's on your mind?"
-          rows={5}
-          value={form.caption}
-          onChange={e => set('caption', e.target.value)}
-          style={{
-            width: '100%', border: 'none', outline: 'none', resize: 'none',
-            fontFamily: '"Instrument Sans", system-ui', fontSize: 18, color: '#050505',
-            background: 'transparent', lineHeight: 1.5,
-          }}
+          placeholder="What's on your mind?" rows={5} value={form.caption} onChange={e => set('caption', e.target.value)}
+          style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 18, color: '#050505', background: 'transparent', lineHeight: 1.5 }}
         />
 
         {/* Subject selector */}
         <div style={{ position: 'relative', marginTop: 8 }}>
-          <select
-            value={form.subject_id}
-            onChange={e => set('subject_id', e.target.value)}
-            style={{
-              width: '100%', padding: '11px 36px 11px 14px',
-              borderRadius: 10, border: '1px solid #E4E6EB',
-              background: '#F7F8FA', appearance: 'none',
-              fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
-              cursor: 'pointer', outline: 'none',
-            }}
+          <select value={form.subject_id} onChange={e => set('subject_id', e.target.value)}
+            style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', cursor: 'pointer', outline: 'none' }}
           >
             <option value="">No subject (General)</option>
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* ── QUOTED MESSAGE SECTION ── */}
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', padding: '10px 14px', borderRadius: 10,
+              border: `1.5px solid ${showQuoteSection ? '#C0392B' : '#E4E6EB'}`,
+              background: showQuoteSection ? '#FFF8F8' : '#F7F8FA',
+              cursor: 'pointer', transition: 'all 0.15s',
+              fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5,
+              color: showQuoteSection ? '#C0392B' : '#65676B',
+            }}
+          >
+            <MessageSquareQuote size={16} color={showQuoteSection ? '#C0392B' : '#8A8D91'} />
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {showQuoteSection ? 'Remove quoted message' : 'Attach a quoted message'}
+            </span>
+            {showQuoteSection ? <X size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {showQuoteSection && (
+            <div style={{
+              marginTop: 8, padding: 12,
+              background: '#FAFAFA', borderRadius: 10, border: '1px solid #E4E6EB',
+              animation: 'expandIn 0.18s ease',
+            }}>
+              <p style={{ margin: '0 0 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Quoted message
+              </p>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                {/* From field */}
+                <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                  <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', marginBottom: 4, display: 'block' }}>
+                    From
+                  </label>
+                  <input
+                    type="text" value={form.quoted_from} onChange={e => set('quoted_from', e.target.value)}
+                    placeholder="e.g. Sir Cruz" maxLength={40}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_from ? '#C0392B' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
+                      background: 'white', outline: 'none', transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? '#C0392B' : '#E4E6EB'}
+                  />
+                </div>
+
+                {/* Message box */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', marginBottom: 4, display: 'block' }}>
+                    Paste message
+                  </label>
+                  <textarea
+                    value={form.quoted_message} onChange={e => set('quoted_message', e.target.value)}
+                    placeholder="Paste the exact message here…" rows={3}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_message ? '#C0392B' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
+                      background: 'white', outline: 'none', resize: 'vertical', lineHeight: 1.45, minHeight: 70,
+                      transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? '#C0392B' : '#E4E6EB'}
+                  />
+                </div>
+              </div>
+
+              {(form.quoted_from || form.quoted_message) && (
+                <button
+                  type="button" onClick={() => setShowQuotePreview(v => !v)}
+                  style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#C0392B' }}
+                >
+                  {showQuotePreview ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showQuotePreview ? 'Hide preview' : 'Preview how it looks on feed'}
+                </button>
+              )}
+
+              {showQuotePreview && <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} />}
+
+              <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>
+                💡 This will appear as a quoted block on the post — the text cannot be edited by others.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Due date + time */}
         {showDueDate && (
           <div style={{ marginTop: 12 }}>
-            <label style={{
-              fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
-              color: formIsDeadline ? '#E41E3F' : '#65676B',
-              display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6,
-              textTransform: 'uppercase', letterSpacing: 0.4,
-            }}>
+            <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: formIsDeadline ? '#E41E3F' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               📅 Due Date &amp; Time
-              {formIsDeadline
-                ? <span style={{ color: '#E41E3F', fontWeight: 700 }}>*</span>
-                : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-              }
+              {formIsDeadline ? <span style={{ color: '#E41E3F', fontWeight: 700 }}>*</span> : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>}
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                type="date"
-                value={form.due_date}
-                onChange={e => set('due_date', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                style={{
-                  flex: 3, padding: '10px 12px', borderRadius: 10,
-                  border: `1px solid ${form.due_date ? '#0D7377' : formIsDeadline ? '#E41E3F' : '#E4E6EB'}`,
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
-                  background: '#F7F8FA', outline: 'none', boxSizing: 'border-box',
-                }}
+              <input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} min={new Date().toISOString().split('T')[0]}
+                style={{ flex: 3, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_date ? '#0D7377' : formIsDeadline ? '#E41E3F' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: '#F7F8FA', outline: 'none', boxSizing: 'border-box' }}
               />
-              <input
-                type="time"
-                value={form.due_time}
-                onChange={e => set('due_time', e.target.value)}
-                disabled={!form.due_date}
-                style={{
-                  flex: 2, padding: '10px 12px', borderRadius: 10,
-                  border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`,
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
-                  color: form.due_date ? '#050505' : '#BCC0C4',
-                  background: form.due_date ? '#F7F8FA' : '#F0F2F5',
-                  outline: 'none', boxSizing: 'border-box',
-                  opacity: form.due_date ? 1 : 0.5,
-                  cursor: form.due_date ? 'text' : 'not-allowed',
-                }}
+              <input type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} disabled={!form.due_date}
+                style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.due_date ? '#050505' : '#BCC0C4', background: form.due_date ? '#F7F8FA' : '#F0F2F5', outline: 'none', boxSizing: 'border-box', opacity: form.due_date ? 1 : 0.5, cursor: form.due_date ? 'text' : 'not-allowed' }}
               />
             </div>
           </div>
         )}
 
-        {/* bottom padding */}
         <div style={{ height: 16 }} />
       </div>
 
-      {/* ── Footer ── */}
-      <div style={{
-        borderTop: '1px solid #E4E6EB',
-        background: 'white',
-        flexShrink: 0,
-        padding: '10px 16px',
-        paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
-        display: 'flex', gap: 8,
-      }}>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '13px 0', borderRadius: 12,
-            border: '1.5px solid #E4E6EB', background: 'white',
-            fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15,
-            color: '#65676B', cursor: 'pointer', transition: 'background 0.12s',
-          }}
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0, padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))', display: 'flex', gap: 8 }}>
+        <button type="button" onClick={onClose}
+          style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: '1.5px solid #E4E6EB', background: 'white', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#65676B', cursor: 'pointer', transition: 'background 0.12s' }}
           onMouseEnter={e => e.currentTarget.style.background = '#F7F8FA'}
           onMouseLeave={e => e.currentTarget.style.background = 'white'}
         >
           Cancel
         </button>
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          style={{
-            flex: 2, padding: '13px 0',
-            borderRadius: 12, border: 'none',
-            background: loading ? '#7EC8C8' : '#0D7377',
-            color: 'white', cursor: loading ? 'not-allowed' : 'pointer',
-            fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            transition: 'background 0.15s, transform 0.1s',
-          }}
+        <button onClick={handleSave} disabled={loading}
+          style={{ flex: 2, padding: '13px 0', borderRadius: 12, border: 'none', background: loading ? '#7EC8C8' : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
           onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.985)' }}
           onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
         >
@@ -376,11 +367,9 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
       </div>
 
       <style>{`
-        @keyframes fullscreenIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes expandIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   )

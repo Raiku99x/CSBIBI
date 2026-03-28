@@ -11,7 +11,7 @@ function dicebearUrl(name = '') {
 
 import {
   X, Image, Paperclip, ChevronDown, Loader2,
-  Megaphone, FileText, Plus, Globe
+  Megaphone, FileText, Plus, Globe, MessageSquareQuote, Eye, EyeOff
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -31,6 +31,41 @@ const FILE_ACCEPT = [
   'application/x-zip-compressed',
 ].join(',')
 
+// ── Quoted Message Block (preview inside modal) ───────────────
+function QuotedMessagePreview({ from, message }) {
+  if (!from && !message) return null
+  return (
+    <div style={{
+      background: '#F7F8FA',
+      border: '1px solid #E4E6EB',
+      borderLeft: '3px solid #C0392B',
+      borderRadius: '0 8px 8px 0',
+      padding: '8px 12px',
+      marginTop: 8,
+    }}>
+      <p style={{
+        margin: '0 0 4px',
+        fontFamily: '"Instrument Sans", system-ui',
+        fontWeight: 700, fontSize: 12,
+        color: '#C0392B',
+        display: 'flex', alignItems: 'center', gap: 5,
+      }}>
+        <MessageSquareQuote size={11} />
+        {from ? `From ${from}` : 'Quoted message'}
+      </p>
+      <p style={{
+        margin: 0,
+        fontFamily: '"Instrument Sans", system-ui',
+        fontSize: 13.5, color: '#1c1e21',
+        lineHeight: 1.5,
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>
+        {message || <span style={{ color: '#BCC0C4', fontStyle: 'italic' }}>Paste a message below to preview…</span>}
+      </p>
+    </div>
+  )
+}
+
 export default function CreatePostModal({
   onClose,
   onCreated,
@@ -49,6 +84,9 @@ export default function CreatePostModal({
     due_date: '',
     due_time: '',
     announcement_type: '',
+    // quoted message fields
+    quoted_from: '',
+    quoted_message: '',
   })
   const [photoFiles, setPhotoFiles] = useState([])
   const [photoPreviews, setPhotoPreviews] = useState([])
@@ -56,6 +94,10 @@ export default function CreatePostModal({
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const [showSubTypeError, setShowSubTypeError] = useState(false)
+  // quoted message UI state
+  const [showQuoteSection, setShowQuoteSection] = useState(false)
+  const [showQuotePreview, setShowQuotePreview] = useState(false)
+
   const photoRef = useRef()
   const fileRef = useRef()
   const uploadCounter = useRef(0)
@@ -81,6 +123,7 @@ export default function CreatePostModal({
   const isAnnouncement = form.post_type === 'announcement'
   const isDeadline = isAnnouncement && form.sub_type === 'deadline'
   const isMaterial = form.sub_type === 'material'
+  const hasQuote = form.quoted_from.trim() || form.quoted_message.trim()
 
   function handlePhoto(e) {
     const chosen = Array.from(e.target.files || [])
@@ -122,8 +165,8 @@ export default function CreatePostModal({
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.caption.trim() && photoFiles.length === 0 && attachFiles.length === 0) {
-      toast.error('Add a caption, photo, or file')
+    if (!form.caption.trim() && photoFiles.length === 0 && attachFiles.length === 0 && !hasQuote) {
+      toast.error('Add a caption, photo, file, or quoted message')
       return
     }
     if (!form.sub_type) {
@@ -135,6 +178,12 @@ export default function CreatePostModal({
       toast.error('Please set a due date for Deadline posts')
       return
     }
+    // Validate quote: if section open, at least message must be filled
+    if (showQuoteSection && form.quoted_message.trim() && !form.quoted_from.trim()) {
+      toast.error('Please enter who sent this message')
+      return
+    }
+
     setLoading(true)
     try {
       let photo_url = null
@@ -160,6 +209,12 @@ export default function CreatePostModal({
       }
 
       setUploadProgress('Saving…')
+
+      // Build quoted_message JSON if present
+      const quoted_data = (showQuoteSection && form.quoted_message.trim())
+        ? JSON.stringify({ from: form.quoted_from.trim(), message: form.quoted_message.trim() })
+        : null
+
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
@@ -172,6 +227,7 @@ export default function CreatePostModal({
           announcement_type: isAnnouncement && form.announcement_type ? form.announcement_type : null,
           due_date: form.due_date || null,
           due_time: form.due_time || null,
+          quoted_message: quoted_data,
         })
         .select('*, profiles(*), subjects(*)')
         .single()
@@ -212,38 +268,22 @@ export default function CreatePostModal({
 
   return (
     <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 50,
-      background: 'white',
-      display: 'flex',
-      flexDirection: 'column',
+      position: 'fixed', inset: 0, zIndex: 50,
+      background: 'white', display: 'flex', flexDirection: 'column',
       animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)',
     }}>
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '14px 16px',
-        borderBottom: '1px solid #E4E6EB',
-        flexShrink: 0,
-        background: 'white',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 16px', borderBottom: '1px solid #E4E6EB',
+        flexShrink: 0, background: 'white',
       }}>
-        <span style={{
-          fontFamily: '"Bricolage Grotesque", system-ui',
-          fontWeight: 800, fontSize: 18, color: '#050505',
-        }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505' }}>
           Create Post
         </span>
         <button
           onClick={onClose}
-          style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: '#E4E6EB', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.12s',
-          }}
+          style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}
           onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
           onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}
         >
@@ -251,7 +291,7 @@ export default function CreatePostModal({
         </button>
       </div>
 
-      {/* ── Scrollable body ── */}
+      {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 0' }}>
 
         {/* Author row */}
@@ -265,10 +305,7 @@ export default function CreatePostModal({
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>
               {profile?.display_name}
             </p>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              background: '#E4E6EB', padding: '3px 10px', borderRadius: 6, marginTop: 3,
-            }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#E4E6EB', padding: '3px 10px', borderRadius: 6, marginTop: 3 }}>
               <Globe size={11} color="#050505" />
               <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#050505' }}>
                 {form.sub_type === 'material' ? 'Material'
@@ -282,21 +319,15 @@ export default function CreatePostModal({
         </div>
 
         {/* Post type toggle */}
-        <div style={{
-          display: 'flex', gap: 6, padding: 4,
-          background: '#F0F2F5', borderRadius: 10, marginBottom: 8,
-        }}>
+        <div style={{ display: 'flex', gap: 6, padding: 4, background: '#F0F2F5', borderRadius: 10, marginBottom: 8 }}>
           {[
             { key: 'status', label: 'Status', icon: <FileText size={14} /> },
             { key: 'announcement', label: 'Announcement', icon: <Megaphone size={14} /> },
           ].map(({ key, label, icon }) => (
             <button
-              key={key}
-              type="button"
+              key={key} type="button"
               onClick={() => {
-                set('post_type', key)
-                set('sub_type', '')
-                set('announcement_type', '')
+                set('post_type', key); set('sub_type', ''); set('announcement_type', '')
                 setShowSubTypeError(false)
                 if (key === 'status') { set('due_date', ''); set('due_time', ''); setAttachFiles([]) }
               }}
@@ -304,12 +335,8 @@ export default function CreatePostModal({
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13,
-                background: form.post_type === key
-                  ? key === 'announcement' ? '#0D7377' : 'white'
-                  : 'transparent',
-                color: form.post_type === key
-                  ? key === 'announcement' ? 'white' : '#050505'
-                  : '#65676B',
+                background: form.post_type === key ? (key === 'announcement' ? '#0D7377' : 'white') : 'transparent',
+                color: form.post_type === key ? (key === 'announcement' ? 'white' : '#050505') : '#65676B',
                 boxShadow: form.post_type === key && key === 'status' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
                 transition: 'all 0.15s',
               }}
@@ -332,22 +359,12 @@ export default function CreatePostModal({
           marginBottom: 14,
         }}>
           {(isAnnouncement
-            ? [
-                { key: 'announcement', label: '📢 Announcement' },
-                { key: 'reminder', label: '🔔 Reminder' },
-                { key: 'deadline', label: '📅 Deadline' },
-              ]
-            : [
-                { key: 'status', label: '💬 Status' },
-                { key: 'material', label: '📁 Material' },
-              ]
+            ? [{ key: 'announcement', label: '📢 Announcement' }, { key: 'reminder', label: '🔔 Reminder' }, { key: 'deadline', label: '📅 Deadline' }]
+            : [{ key: 'status', label: '💬 Status' }, { key: 'material', label: '📁 Material' }]
           ).map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
+            <button key={key} type="button"
               onClick={() => {
-                set('sub_type', key)
-                setShowSubTypeError(false)
+                set('sub_type', key); setShowSubTypeError(false)
                 if (key !== 'deadline' && key !== 'announcement') { set('due_date', ''); set('due_time', '') }
                 if (key !== 'material' && !isAnnouncement) setAttachFiles([])
               }}
@@ -360,10 +377,7 @@ export default function CreatePostModal({
                 transition: 'all 0.15s',
               }}
             >
-              <span style={{
-                fontWeight: 700, fontSize: 13,
-                color: form.sub_type === key ? '#050505' : '#65676B',
-              }}>{label}</span>
+              <span style={{ fontWeight: 700, fontSize: 13, color: form.sub_type === key ? '#050505' : '#65676B' }}>{label}</span>
             </button>
           ))}
         </div>
@@ -372,17 +386,13 @@ export default function CreatePostModal({
         {isAnnouncement && form.sub_type && (
           <div style={{ position: 'relative', marginBottom: 14 }}>
             <select
-              value={form.announcement_type}
-              onChange={e => set('announcement_type', e.target.value)}
+              value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
               style={{
-                width: '100%', padding: '11px 36px 11px 14px',
-                borderRadius: 10, border: '1px solid #E4E6EB',
-                background: form.announcement_type ? '#E6F4F4' : '#F7F8FA',
-                appearance: 'none',
+                width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB',
+                background: form.announcement_type ? '#E6F4F4' : '#F7F8FA', appearance: 'none',
                 fontFamily: '"Instrument Sans", system-ui', fontSize: 14,
                 color: form.announcement_type ? '#0D7377' : '#8A8D91',
-                fontWeight: form.announcement_type ? 700 : 400,
-                cursor: 'pointer', outline: 'none',
+                fontWeight: form.announcement_type ? 700 : 400, cursor: 'pointer', outline: 'none',
               }}
             >
               <option value="">Type (optional)</option>
@@ -404,9 +414,7 @@ export default function CreatePostModal({
               : isMaterial ? "Add a description for this material…"
               : `What's on your mind, ${profile?.display_name?.split(' ')[0] || 'there'}?`
           }
-          rows={5}
-          value={form.caption}
-          onChange={e => set('caption', e.target.value)}
+          rows={5} value={form.caption} onChange={e => set('caption', e.target.value)}
           style={{
             width: '100%', border: 'none', outline: 'none', resize: 'none',
             fontFamily: '"Instrument Sans", system-ui', fontSize: 18, color: '#050505',
@@ -417,22 +425,148 @@ export default function CreatePostModal({
         {/* Subject selector */}
         <div style={{ position: 'relative', marginTop: 8 }}>
           <select
-            value={form.subject_id}
-            onChange={e => set('subject_id', e.target.value)}
+            value={form.subject_id} onChange={e => set('subject_id', e.target.value)}
             style={{
-              width: '100%', padding: '11px 36px 11px 14px',
-              borderRadius: 10, border: '1px solid #E4E6EB',
+              width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB',
               background: '#F7F8FA', appearance: 'none',
               fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505',
               cursor: 'pointer', outline: 'none',
             }}
           >
             <option value="">No subject (General)</option>
-            {subjects.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* ── QUOTED MESSAGE SECTION ── */}
+        <div style={{ marginTop: 12 }}>
+          {/* Toggle button */}
+          <button
+            type="button"
+            onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', padding: '10px 14px', borderRadius: 10,
+              border: `1.5px solid ${showQuoteSection ? '#C0392B' : '#E4E6EB'}`,
+              background: showQuoteSection ? '#FFF8F8' : '#F7F8FA',
+              cursor: 'pointer', transition: 'all 0.15s',
+              fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5,
+              color: showQuoteSection ? '#C0392B' : '#65676B',
+            }}
+          >
+            <MessageSquareQuote size={16} color={showQuoteSection ? '#C0392B' : '#8A8D91'} />
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {showQuoteSection ? 'Remove quoted message' : 'Attach a quoted message'}
+            </span>
+            {showQuoteSection ? <X size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {/* Quote fields */}
+          {showQuoteSection && (
+            <div style={{
+              marginTop: 8, padding: 12,
+              background: '#FAFAFA', borderRadius: 10,
+              border: '1px solid #E4E6EB',
+              animation: 'expandIn 0.18s ease',
+            }}>
+              <p style={{
+                margin: '0 0 10px',
+                fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5,
+              }}>
+                Quoted message
+              </p>
+
+              {/* Row: From + Message box */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+
+                {/* From field */}
+                <div style={{
+                  width: 90, flexShrink: 0,
+                  display: 'flex', flexDirection: 'column',
+                }}>
+                  <label style={{
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                    color: '#65676B', marginBottom: 4, display: 'block',
+                  }}>
+                    From
+                  </label>
+                  <input
+                    type="text"
+                    value={form.quoted_from}
+                    onChange={e => set('quoted_from', e.target.value)}
+                    placeholder="e.g. Sir Cruz"
+                    maxLength={40}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_from ? '#C0392B' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
+                      color: '#050505', background: 'white', outline: 'none',
+                      transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? '#C0392B' : '#E4E6EB'}
+                  />
+                </div>
+
+                {/* Message paste box */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <label style={{
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                    color: '#65676B', marginBottom: 4, display: 'block',
+                  }}>
+                    Paste message
+                  </label>
+                  <textarea
+                    value={form.quoted_message}
+                    onChange={e => set('quoted_message', e.target.value)}
+                    placeholder="Paste the exact message here…"
+                    rows={3}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_message ? '#C0392B' : '#E4E6EB'}`,
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
+                      color: '#050505', background: 'white', outline: 'none',
+                      resize: 'vertical', lineHeight: 1.45, minHeight: 70,
+                      transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? '#C0392B' : '#E4E6EB'}
+                  />
+                </div>
+              </div>
+
+              {/* Preview toggle */}
+              {(form.quoted_from || form.quoted_message) && (
+                <button
+                  type="button"
+                  onClick={() => setShowQuotePreview(v => !v)}
+                  style={{
+                    marginTop: 8, display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12,
+                    color: '#C0392B',
+                  }}
+                >
+                  {showQuotePreview ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showQuotePreview ? 'Hide preview' : 'Preview how it looks on feed'}
+                </button>
+              )}
+
+              {/* Preview */}
+              {showQuotePreview && (
+                <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} />
+              )}
+
+              <p style={{
+                margin: '8px 0 0',
+                fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4',
+              }}>
+                💡 This will appear as a quoted block on the post — the text cannot be edited by others.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Due date + time */}
@@ -452,9 +586,7 @@ export default function CreatePostModal({
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
-                type="date"
-                value={form.due_date}
-                onChange={e => set('due_date', e.target.value)}
+                type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
                 style={{
                   flex: 3, padding: '10px 12px', borderRadius: 10,
@@ -464,9 +596,7 @@ export default function CreatePostModal({
                 }}
               />
               <input
-                type="time"
-                value={form.due_time}
-                onChange={e => set('due_time', e.target.value)}
+                type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)}
                 disabled={!form.due_date}
                 style={{
                   flex: 2, padding: '10px 12px', borderRadius: 10,
@@ -475,8 +605,7 @@ export default function CreatePostModal({
                   color: form.due_date ? '#050505' : '#BCC0C4',
                   background: form.due_date ? '#F7F8FA' : '#F0F2F5',
                   outline: 'none', boxSizing: 'border-box',
-                  opacity: form.due_date ? 1 : 0.5,
-                  cursor: form.due_date ? 'text' : 'not-allowed',
+                  opacity: form.due_date ? 1 : 0.5, cursor: form.due_date ? 'text' : 'not-allowed',
                 }}
               />
             </div>
@@ -500,24 +629,14 @@ export default function CreatePostModal({
                 <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 10, overflow: 'hidden', background: '#E4E6EB' }}>
                   <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
                   <button type="button" onClick={() => removePhoto(i)}
-                    style={{
-                      position: 'absolute', top: 4, right: 4,
-                      width: 22, height: 22, borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
+                    style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <X size={11} color="white" />
                   </button>
                 </div>
               ))}
               {photoPreviews.length < MAX_PHOTOS && (
                 <button type="button" onClick={() => photoRef.current.click()}
-                  style={{
-                    aspectRatio: '1/1', borderRadius: 10,
-                    border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-                    color: '#65676B',
-                  }}>
+                  style={{ aspectRatio: '1/1', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, color: '#65676B' }}>
                   <Plus size={18} />
                   <span style={{ fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add</span>
                 </button>
@@ -539,11 +658,7 @@ export default function CreatePostModal({
               </button>
             </div>
             {attachFiles.map((file, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 12px', background: '#F7F8FA',
-                borderRadius: 10, border: '1px solid #E4E6EB',
-              }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#F7F8FA', borderRadius: 10, border: '1px solid #E4E6EB' }}>
                 <FileText size={15} color="#0D7377" />
                 <span style={{ flex: 1, fontSize: 13, color: '#050505', fontFamily: '"Instrument Sans", system-ui', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {file.name}
@@ -555,12 +670,7 @@ export default function CreatePostModal({
             ))}
             {attachFiles.length < MAX_FILES && (
               <button type="button" onClick={() => fileRef.current.click()}
-                style={{
-                  padding: '9px 0', borderRadius: 10,
-                  border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  color: '#65676B', transition: 'border-color 0.15s, color 0.15s',
-                }}
+                style={{ padding: '9px 0', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#65676B', transition: 'border-color 0.15s, color 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#0D7377'; e.currentTarget.style.color = '#0D7377' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#CED0D4'; e.currentTarget.style.color = '#65676B' }}
               >
@@ -571,68 +681,30 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* bottom padding */}
         <div style={{ height: 16 }} />
       </div>
 
-      {/* ── Hidden inputs ── */}
-      <input
-        ref={photoRef}
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif"
-        multiple
-        style={{ display: 'none' }}
-        onChange={handlePhoto}
-      />
-      <input
-        ref={fileRef}
-        type="file"
-        accept={FILE_ACCEPT}
-        multiple
-        style={{ display: 'none' }}
-        onChange={handleFile}
-      />
+      {/* Hidden inputs */}
+      <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
+      <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
 
-      {/* ── Footer (add to post bar + submit) ── */}
-      <div style={{
-        borderTop: '1px solid #E4E6EB',
-        background: 'white',
-        flexShrink: 0,
-      }}>
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
         {/* Add to post bar */}
-        <div style={{
-          padding: '8px 16px',
-          display: 'flex', alignItems: 'center',
-          borderBottom: '1px solid #F0F2F5',
-        }}>
+        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>
             Add to your post
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
-            <MediaBtn
-              icon={<Image size={22} color="#45BD62" />}
-              title="Photos"
-              onClick={() => photoRef.current.click()}
-              badge={photoFiles.length > 0 ? photoFiles.length : null}
-            />
+            <MediaBtn icon={<Image size={22} color="#45BD62" />} title="Photos" onClick={() => photoRef.current.click()} badge={photoFiles.length > 0 ? photoFiles.length : null} />
             {(isMaterial || isAnnouncement) && (
-              <MediaBtn
-                icon={<Paperclip size={22} color="#1877F2" />}
-                title="Attach files (PDF, DOCX, PPT…)"
-                onClick={() => fileRef.current.click()}
-                badge={attachFiles.length > 0 ? attachFiles.length : null}
-              />
+              <MediaBtn icon={<Paperclip size={22} color="#1877F2" />} title="Attach files (PDF, DOCX, PPT…)" onClick={() => fileRef.current.click()} badge={attachFiles.length > 0 ? attachFiles.length : null} />
             )}
           </div>
         </div>
 
-        {/* Hint */}
         {!isMaterial && !isAnnouncement && (
-          <p style={{
-            margin: '0', padding: '6px 16px 0',
-            fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91',
-            lineHeight: 1.4,
-          }}>
+          <p style={{ margin: '0', padding: '6px 16px 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', lineHeight: 1.4 }}>
             💡 Switch to <strong>Material</strong> to attach PDF, DOCX, PPT, and other files.
           </p>
         )}
@@ -640,11 +712,9 @@ export default function CreatePostModal({
         {/* Submit */}
         <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
           <button
-            onClick={handleSubmit}
-            disabled={loading}
+            onClick={handleSubmit} disabled={loading}
             style={{
-              width: '100%', padding: '13px 0',
-              borderRadius: 12, border: 'none',
+              width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
               background: loading ? '#7EC8C8' : '#0D7377',
               color: 'white', cursor: loading ? 'not-allowed' : 'pointer',
               fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16,
@@ -661,11 +731,9 @@ export default function CreatePostModal({
       </div>
 
       <style>{`
-        @keyframes fullscreenIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes expandIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   )
@@ -675,10 +743,8 @@ function MediaBtn({ icon, title, onClick, badge }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      type="button" onClick={onClick}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       title={title}
       style={{
         position: 'relative', width: 38, height: 38, borderRadius: '50%',
@@ -695,8 +761,7 @@ function MediaBtn({ icon, title, onClick, badge }) {
           minWidth: 16, height: 16, borderRadius: 8,
           background: '#0D7377', color: 'white',
           fontSize: 10, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '0 3px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
         }}>
           {badge}
         </span>
