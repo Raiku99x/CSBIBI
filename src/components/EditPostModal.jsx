@@ -117,7 +117,10 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!form.caption.trim()) { toast.error('Caption cannot be empty'); return }
+    const hasQuote = showQuoteSection && form.quoted_message.trim()
+    if (!form.caption.trim() && !hasQuote) {
+      toast.error('Add a caption or a quoted message'); return
+    }
     if (formIsDeadline && !form.due_date) { toast.error('Please set a due date'); return }
     if (showQuoteSection && form.quoted_message.trim() && !form.quoted_from.trim()) {
       toast.error('Please enter who sent this message'); return
