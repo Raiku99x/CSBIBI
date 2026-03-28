@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useState } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { DarkModeProvider } from './contexts/DarkModeContext'
-import { SavedPostsProvider } from './contexts/SavedPostsContext'
 import Layout from './components/Layout'
 import SearchOverlay from './components/SearchOverlay'
 import AuthPage from './pages/AuthPage'
@@ -112,26 +110,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <DarkModeProvider>
-          <SavedPostsProvider>
-            <AppRoutes />
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  background: '#1e293b',
-                  color: '#f8fafc',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  padding: '12px 16px',
-                },
-                success: { iconTheme: { primary: '#10b981', secondary: '#f8fafc' } },
-                error: { iconTheme: { primary: '#f43f5e', secondary: '#f8fafc' } },
-              }}
-            />
-          </SavedPostsProvider>
-        </DarkModeProvider>
+        <AppRoutes />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#1e293b',
+              color: '#f8fafc',
+              borderRadius: '12px',
+              fontSize: '14px',
+              padding: '12px 16px',
+            },
+            success: { iconTheme: { primary: '#10b981', secondary: '#f8fafc' } },
+            error: { iconTheme: { primary: '#f43f5e', secondary: '#f8fafc' } },
+          }}
+        />
       </AuthProvider>
     </BrowserRouter>
   )
