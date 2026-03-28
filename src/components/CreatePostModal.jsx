@@ -134,7 +134,7 @@ export default function CreatePostModal({
   const isAnnouncement = form.post_type === 'announcement'
   const isDeadline = isAnnouncement && form.sub_type === 'deadline'
   const isMaterial = form.sub_type === 'material'
-  const hasQuote = form.quoted_from.trim() || form.quoted_message.trim()
+  const hasQuote = showQuoteSection && (form.quoted_from.trim() || form.quoted_message.trim())
   const accent = getQuoteAccent(form.post_type, form.sub_type)
 
   // ── Paste-only: block all keyboard except Ctrl+V / Cmd+V ──
