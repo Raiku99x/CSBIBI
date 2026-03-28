@@ -11,7 +11,8 @@ function dicebearUrl(name = '') {
 
 import {
   X, Image, Paperclip, ChevronDown, Loader2,
-  Megaphone, FileText, Plus, Globe, MessageSquareQuote, Eye, EyeOff
+  Megaphone, FileText, Plus, Globe, MessageSquareQuote, Eye, EyeOff,
+  ClipboardPaste, Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -31,14 +32,24 @@ const FILE_ACCEPT = [
   'application/x-zip-compressed',
 ].join(',')
 
+// ── Derive accent color from selected post type ──────────────
+function getQuoteAccent(postType, subType) {
+  if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
+  if (subType === 'reminder')      return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
+  if (subType === 'announcement')  return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
+  if (postType === 'announcement') return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
+  if (subType === 'material')      return { color: '#1A5276', bg: '#EBF5FB', light: '#D6EAF8', border: '#AED6F1' }
+  return                                  { color: '#65676B', bg: '#F7F8FA', light: '#E4E6EB', border: '#DADDE1' }
+}
+
 // ── Quoted Message Block (preview inside modal) ───────────────
-function QuotedMessagePreview({ from, message }) {
+function QuotedMessagePreview({ from, message, accent }) {
   if (!from && !message) return null
   return (
     <div style={{
-      background: '#F7F8FA',
-      border: '1px solid #E4E6EB',
-      borderLeft: '3px solid #C0392B',
+      background: accent.bg,
+      border: `1px solid ${accent.border}`,
+      borderLeft: `3px solid ${accent.color}`,
       borderRadius: '0 8px 8px 0',
       padding: '8px 12px',
       marginTop: 8,
@@ -47,7 +58,7 @@ function QuotedMessagePreview({ from, message }) {
         margin: '0 0 4px',
         fontFamily: '"Instrument Sans", system-ui',
         fontWeight: 700, fontSize: 12,
-        color: '#C0392B',
+        color: accent.color,
         display: 'flex', alignItems: 'center', gap: 5,
       }}>
         <MessageSquareQuote size={11} />
@@ -84,7 +95,6 @@ export default function CreatePostModal({
     due_date: '',
     due_time: '',
     announcement_type: '',
-    // quoted message fields
     quoted_from: '',
     quoted_message: '',
   })
@@ -94,13 +104,14 @@ export default function CreatePostModal({
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const [showSubTypeError, setShowSubTypeError] = useState(false)
-  // quoted message UI state
   const [showQuoteSection, setShowQuoteSection] = useState(false)
   const [showQuotePreview, setShowQuotePreview] = useState(false)
+  const [pastingMsg, setPastingMsg] = useState(false)
 
   const photoRef = useRef()
   const fileRef = useRef()
   const uploadCounter = useRef(0)
+  const pasteAreaRef = useRef()
 
   // Lock body scroll
   useEffect(() => {
@@ -124,6 +135,39 @@ export default function CreatePostModal({
   const isDeadline = isAnnouncement && form.sub_type === 'deadline'
   const isMaterial = form.sub_type === 'material'
   const hasQuote = form.quoted_from.trim() || form.quoted_message.trim()
+  const accent = getQuoteAccent(form.post_type, form.sub_type)
+
+  // ── Paste-only: block all keyboard except Ctrl+V / Cmd+V ──
+  function handlePasteAreaKeyDown(e) {
+    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
+    const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
+    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
+    // allow only paste, select-all, copy, and navigation arrow keys
+    if (!isPaste && !isSelectAll && !isCopy &&
+        !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+      e.preventDefault()
+    }
+  }
+
+  // ── Paste button: read from clipboard ────────────────────
+  async function handlePasteButton() {
+    setPastingMsg(true)
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        set('quoted_message', text)
+        toast.success('Message pasted!')
+      } else {
+        toast.error('Clipboard is empty')
+      }
+    } catch {
+      // Fallback: focus the area so the user can Ctrl+V manually
+      pasteAreaRef.current?.focus()
+      toast('Press Ctrl+V / Cmd+V to paste', { icon: '📋' })
+    } finally {
+      setPastingMsg(false)
+    }
+  }
 
   function handlePhoto(e) {
     const chosen = Array.from(e.target.files || [])
@@ -178,7 +222,6 @@ export default function CreatePostModal({
       toast.error('Please set a due date for Deadline posts')
       return
     }
-    // Validate quote: if section open, at least message must be filled
     if (showQuoteSection && form.quoted_message.trim() && !form.quoted_from.trim()) {
       toast.error('Please enter who sent this message')
       return
@@ -210,7 +253,6 @@ export default function CreatePostModal({
 
       setUploadProgress('Saving…')
 
-      // Build quoted_message JSON if present
       const quoted_data = (showQuoteSection && form.quoted_message.trim())
         ? JSON.stringify({ from: form.quoted_from.trim(), message: form.quoted_message.trim() })
         : null
@@ -441,21 +483,21 @@ export default function CreatePostModal({
 
         {/* ── QUOTED MESSAGE SECTION ── */}
         <div style={{ marginTop: 12 }}>
-          {/* Toggle button */}
+          {/* Toggle button — color matches post type */}
           <button
             type="button"
             onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               width: '100%', padding: '10px 14px', borderRadius: 10,
-              border: `1.5px solid ${showQuoteSection ? '#C0392B' : '#E4E6EB'}`,
-              background: showQuoteSection ? '#FFF8F8' : '#F7F8FA',
+              border: `1.5px solid ${showQuoteSection ? accent.border : '#E4E6EB'}`,
+              background: showQuoteSection ? accent.bg : '#F7F8FA',
               cursor: 'pointer', transition: 'all 0.15s',
               fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5,
-              color: showQuoteSection ? '#C0392B' : '#65676B',
+              color: showQuoteSection ? accent.color : '#65676B',
             }}
           >
-            <MessageSquareQuote size={16} color={showQuoteSection ? '#C0392B' : '#8A8D91'} />
+            <MessageSquareQuote size={16} color={showQuoteSection ? accent.color : '#8A8D91'} />
             <span style={{ flex: 1, textAlign: 'left' }}>
               {showQuoteSection ? 'Remove quoted message' : 'Attach a quoted message'}
             </span>
@@ -465,27 +507,25 @@ export default function CreatePostModal({
           {/* Quote fields */}
           {showQuoteSection && (
             <div style={{
-              marginTop: 8, padding: 12,
+              marginTop: 8,
+              padding: '10px 8px',          /* ← reduced L/R padding */
               background: '#FAFAFA', borderRadius: 10,
-              border: '1px solid #E4E6EB',
+              border: `1px solid ${accent.border}`,
               animation: 'expandIn 0.18s ease',
             }}>
               <p style={{
-                margin: '0 0 10px',
+                margin: '0 0 8px',
                 fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
-                color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5,
+                color: accent.color, textTransform: 'uppercase', letterSpacing: 0.5,
               }}>
                 Quoted message
               </p>
 
               {/* Row: From + Message box */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
 
                 {/* From field */}
-                <div style={{
-                  width: 90, flexShrink: 0,
-                  display: 'flex', flexDirection: 'column',
-                }}>
+                <div style={{ width: 86, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                   <label style={{
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
                     color: '#65676B', marginBottom: 4, display: 'block',
@@ -499,41 +539,99 @@ export default function CreatePostModal({
                     placeholder="e.g. Sir Cruz"
                     maxLength={40}
                     style={{
-                      flex: 1, padding: '9px 10px', borderRadius: 8,
-                      border: `1.5px solid ${form.quoted_from ? '#C0392B' : '#E4E6EB'}`,
+                      flex: 1, padding: '8px 9px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_from ? accent.color : '#E4E6EB'}`,
                       fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
                       color: '#050505', background: 'white', outline: 'none',
                       transition: 'border-color 0.15s',
                     }}
-                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
-                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? '#C0392B' : '#E4E6EB'}
+                    onFocus={e => e.currentTarget.style.borderColor = accent.color}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? accent.color : '#E4E6EB'}
                   />
                 </div>
 
-                {/* Message paste box */}
+                {/* Paste-only message box */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <label style={{
-                    fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
-                    color: '#65676B', marginBottom: 4, display: 'block',
-                  }}>
-                    Paste message
-                  </label>
+                  {/* Label row with Paste + Clear buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label style={{
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                      color: '#65676B',
+                    }}>
+                      Paste message
+                    </label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {/* Paste button */}
+                      <button
+                        type="button"
+                        onClick={handlePasteButton}
+                        disabled={pastingMsg}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          background: accent.light,
+                          color: accent.color,
+                          fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
+                          transition: 'opacity 0.12s',
+                          opacity: pastingMsg ? 0.6 : 1,
+                        }}
+                        title="Paste from clipboard"
+                      >
+                        <ClipboardPaste size={11} />
+                        Paste
+                      </button>
+                      {/* Clear button — only visible when there's text */}
+                      {form.quoted_message && (
+                        <button
+                          type="button"
+                          onClick={() => set('quoted_message', '')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: '#F0F2F5',
+                            color: '#65676B',
+                            fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
+                            transition: 'background 0.12s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#FADBD8'; e.currentTarget.style.color = '#C0392B' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#F0F2F5'; e.currentTarget.style.color = '#65676B' }}
+                          title="Clear message"
+                        >
+                          <Trash2 size={11} />
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <textarea
+                    ref={pasteAreaRef}
                     value={form.quoted_message}
                     onChange={e => set('quoted_message', e.target.value)}
+                    onKeyDown={handlePasteAreaKeyDown}
                     placeholder="Paste the exact message here…"
                     rows={3}
                     style={{
-                      flex: 1, padding: '9px 10px', borderRadius: 8,
-                      border: `1.5px solid ${form.quoted_message ? '#C0392B' : '#E4E6EB'}`,
+                      flex: 1, padding: '8px 9px', borderRadius: 8,
+                      border: `1.5px solid ${form.quoted_message ? accent.color : '#E4E6EB'}`,
                       fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
                       color: '#050505', background: 'white', outline: 'none',
                       resize: 'vertical', lineHeight: 1.45, minHeight: 70,
                       transition: 'border-color 0.15s',
+                      cursor: 'text',
                     }}
-                    onFocus={e => e.currentTarget.style.borderColor = '#C0392B'}
-                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? '#C0392B' : '#E4E6EB'}
+                    onFocus={e => e.currentTarget.style.borderColor = accent.color}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'}
                   />
+
+                  {/* Paste-only hint */}
+                  <p style={{
+                    margin: '4px 0 0',
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5,
+                    color: '#BCC0C4', display: 'flex', alignItems: 'center', gap: 4,
+                  }}>
+                    🔒 Paste-only field — use the Paste button or Ctrl+V / ⌘V
+                  </p>
                 </div>
               </div>
 
@@ -546,7 +644,7 @@ export default function CreatePostModal({
                     marginTop: 8, display: 'flex', alignItems: 'center', gap: 5,
                     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                     fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12,
-                    color: '#C0392B',
+                    color: accent.color,
                   }}
                 >
                   {showQuotePreview ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -556,7 +654,7 @@ export default function CreatePostModal({
 
               {/* Preview */}
               {showQuotePreview && (
-                <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} />
+                <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} accent={accent} />
               )}
 
               <p style={{
