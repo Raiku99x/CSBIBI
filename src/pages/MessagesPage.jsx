@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDistanceToNow } from 'date-fns'
 import {
-  Send, Trash2, Lock, AtSign, Loader2,
-  ArrowLeft, Search, X, Check, CheckCheck, Users
+  Send, Trash2, AtSign, Loader2,
+  ArrowLeft, Search, X, Check, CheckCheck, Users, Plus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -18,33 +18,33 @@ function dicebearUrl(name = '') {
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
+// Detect touch device — used to skip Enter-to-send on mobile
+const isTouchDevice = () => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
 // ─────────────────────────────────────────────
 // INBOX
 // ─────────────────────────────────────────────
 function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
-  const [dmConvos, setDmConvos]         = useState([])
-  const [allUsers, setAllUsers]         = useState([])
-  const [latestGroup, setLatestGroup]   = useState(null)
-  const [loading, setLoading]           = useState(true)
-  const [search, setSearch]             = useState('')
-  const [showNew, setShowNew]           = useState(false)
+  const [dmConvos, setDmConvos]       = useState([])
+  const [allUsers, setAllUsers]       = useState([])
+  const [latestGroup, setLatestGroup] = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [search, setSearch]           = useState('')
+  const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
-    // ── DM conversations ──────────────────────
     const { data: dmRows } = await supabase
       .from('direct_messages')
       .select('*, sender:profiles!direct_messages_sender_id_fkey(*), receiver:profiles!direct_messages_receiver_id_fkey(*)')
       .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false })
 
-    // keep only latest message per partner
     const seen = new Map()
     for (const msg of dmRows || []) {
       const pid = msg.sender_id === currentUserId ? msg.receiver_id : msg.sender_id
       if (!seen.has(pid)) seen.set(pid, msg)
     }
 
-    // unread counts
     const { data: unread } = await supabase
       .from('direct_messages').select('sender_id')
       .eq('receiver_id', currentUserId).eq('is_read', false)
@@ -60,7 +60,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
       }))
     )
 
-    // ── Latest group chat message ──────────────
     const { data: gc } = await supabase
       .from('chat')
       .select('*, sender:profiles!chat_sender_id_fkey(*)')
@@ -96,8 +95,31 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
       {/* Header */}
       <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
-        <button onClick={() => setShowNew(v => !v)} style={{ width: 34, height: 34, borderRadius: 9, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
-          {showNew ? <X size={15} color={RED} /> : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#65676B" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>}
+
+        {/* Add Conversation button with label */}
+        <button
+          onClick={() => setShowNew(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 12px',
+            borderRadius: 10,
+            background: showNew ? '#FADBD8' : '#F0F2F5',
+            border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}>
+          {showNew
+            ? <X size={14} color={RED} />
+            : <Plus size={14} color="#65676B" strokeWidth={2.5} />
+          }
+          <span style={{
+            fontFamily: '"Instrument Sans", system-ui',
+            fontWeight: 600,
+            fontSize: 13,
+            color: showNew ? RED : '#65676B',
+          }}>
+            Add Conversation
+          </span>
         </button>
       </div>
 
@@ -119,7 +141,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
           </div>
         ) : (
           <>
-            {/* ── New conversation section ── */}
             {showNew && newableUsers.length > 0 && (
               <div>
                 <SectionLabel label="Start a conversation" />
@@ -135,14 +156,12 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
               </div>
             )}
 
-            {/* ── Pinned: Class Chat ── */}
             {groupVisible && (
               <>
                 <SectionLabel label="Group" />
                 <button onClick={onOpenGroup} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: 'white', borderBottom: '1px solid #F0F2F5', transition: 'background 0.12s' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#F7F8FA'}
                   onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                  {/* group avatar */}
                   <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'linear-gradient(135deg, #0084FF 0%, #0D7377 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,132,255,0.2)' }}>
                     <Users size={20} color="white" />
                   </div>
@@ -164,7 +183,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
               </>
             )}
 
-            {/* ── DM conversations ── */}
             {filteredDMs.length > 0 && <SectionLabel label="Direct Messages" />}
             {filteredDMs.map(c => (
               <ConvoRow key={c.partnerId}
@@ -177,7 +195,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
               />
             ))}
 
-            {/* Empty state */}
             {!showNew && filteredDMs.length === 0 && !groupVisible && (
               <div style={{ padding: '56px 24px', textAlign: 'center' }}>
                 <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
@@ -234,18 +251,17 @@ function ConvoRow({ avatar, name, preview, timestamp, unread = 0, onClick }) {
 }
 
 // ─────────────────────────────────────────────
-// CLASS CHAT (group)
+// CLASS CHAT (group) — whisper removed
 // ─────────────────────────────────────────────
 function ClassChat({ onBack, currentUser, profile }) {
-  const [messages, setMessages]     = useState([])
-  const [users, setUsers]           = useState([])
-  const [text, setText]             = useState('')
-  const [isWhisper, setIsWhisper]   = useState(false)
-  const [tagUser, setTagUser]       = useState(null)
-  const [tagPublic, setTagPublic]   = useState(true)
+  const [messages, setMessages]       = useState([])
+  const [users, setUsers]             = useState([])
+  const [text, setText]               = useState('')
+  const [tagUser, setTagUser]         = useState(null)
+  const [tagPublic, setTagPublic]     = useState(true)
   const [showTagMenu, setShowTagMenu] = useState(false)
-  const [sending, setSending]       = useState(false)
-  const [loading, setLoading]       = useState(true)
+  const [sending, setSending]         = useState(false)
+  const [loading, setLoading]         = useState(true)
   const bottomRef  = useRef()
   const tagMenuRef = useRef()
   const inputRef   = useRef()
@@ -253,14 +269,12 @@ function ClassChat({ onBack, currentUser, profile }) {
   const fetchMessages = useCallback(async () => {
     const { data } = await supabase
       .from('chat')
-      .select('*, sender:profiles!chat_sender_id_fkey(*), receiver:profiles!chat_receiver_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
+      .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
       .order('created_at', { ascending: true })
       .limit(100)
-    if (data) {
-      setMessages(data.filter(m => !m.is_whisper || m.sender_id === currentUser.id || m.receiver_id === currentUser.id))
-    }
+    if (data) setMessages(data)
     setLoading(false)
-  }, [currentUser.id])
+  }, [])
 
   useEffect(() => {
     fetchMessages()
@@ -270,12 +284,9 @@ function ClassChat({ onBack, currentUser, profile }) {
     const ch = supabase.channel('class-chat-msg')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, async (payload) => {
         const { data } = await supabase.from('chat')
-          .select('*, sender:profiles!chat_sender_id_fkey(*), receiver:profiles!chat_receiver_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
+          .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
           .eq('id', payload.new.id).single()
-        if (data) {
-          const visible = !data.is_whisper || data.sender_id === currentUser.id || data.receiver_id === currentUser.id
-          if (visible) setMessages(prev => [...prev, data])
-        }
+        if (data) setMessages(prev => [...prev, data])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat' },
         (payload) => setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
@@ -286,6 +297,7 @@ function ClassChat({ onBack, currentUser, profile }) {
   }, [fetchMessages, currentUser.id])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
   useEffect(() => {
     function h(e) { if (tagMenuRef.current && !tagMenuRef.current.contains(e.target)) setShowTagMenu(false) }
     document.addEventListener('mousedown', h)
@@ -300,18 +312,22 @@ function ClassChat({ onBack, currentUser, profile }) {
       const { data: inserted, error } = await supabase.from('chat').insert({
         sender_id: currentUser.id,
         content: text.trim(),
-        is_whisper: isWhisper,
+        is_whisper: false,
         is_deleted: false,
-        receiver_id: isWhisper && tagUser ? tagUser.id : null,
+        receiver_id: null,
         tag_user_id: tagUser ? tagUser.id : null,
         tag_public: tagUser ? tagPublic : null,
       }).select('id').single()
       if (error) throw error
 
-      if (isWhisper && tagUser) {
-        await supabase.from('notifications').insert({ user_id: tagUser.id, chat_message_id: inserted.id, type: 'whisper', message: `💬 ${profile?.display_name} sent you a whisper`, is_read: false })
-      } else if (tagUser && tagPublic) {
-        await supabase.from('notifications').insert({ user_id: tagUser.id, chat_message_id: inserted.id, type: 'tag', message: `🏷️ ${profile?.display_name} mentioned you in chat`, is_read: false })
+      if (tagUser && tagPublic) {
+        await supabase.from('notifications').insert({
+          user_id: tagUser.id,
+          chat_message_id: inserted.id,
+          type: 'tag',
+          message: `🏷️ ${profile?.display_name} mentioned you in chat`,
+          is_read: false,
+        })
       }
       setText('')
       setTagUser(null)
@@ -372,16 +388,14 @@ function ClassChat({ onBack, currentUser, profile }) {
       {/* Compose */}
       <div style={{ background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', flexShrink: 0 }}>
         {tagUser && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: isWhisper ? '#E6F4F4' : '#F0F2F5', border: `1px solid ${isWhisper ? '#7EC8C8' : '#DADDE1'}` }}>
-            {isWhisper ? <Lock size={12} color="#0D7377" /> : <AtSign size={12} color="#65676B" />}
-            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: isWhisper ? '#0D7377' : '#050505', flex: 1 }}>
-              {isWhisper ? `Whispering to @${tagUser.display_name}` : `Tagging @${tagUser.display_name}`}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: '#F0F2F5', border: '1px solid #DADDE1' }}>
+            <AtSign size={12} color="#65676B" />
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#050505', flex: 1 }}>
+              Tagging @{tagUser.display_name}
             </span>
-            {!isWhisper && (
-              <button onClick={() => setTagPublic(p => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#65676B', fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>
-                {tagPublic ? 'Public' : 'Private'}
-              </button>
-            )}
+            <button onClick={() => setTagPublic(p => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#65676B', fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>
+              {tagPublic ? 'Public' : 'Private'}
+            </button>
             <button onClick={() => setTagUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
               <X size={13} color="#65676B" />
             </button>
@@ -389,9 +403,10 @@ function ClassChat({ onBack, currentUser, profile }) {
         )}
 
         <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 7 }}>
+          {/* Tag button */}
           <div style={{ display: 'flex', gap: 2, flexShrink: 0, paddingBottom: 5 }}>
             <div ref={tagMenuRef} style={{ position: 'relative' }}>
-              <IconBtn active={!!tagUser && !isWhisper} onClick={() => { setIsWhisper(false); setShowTagMenu(t => !t) }} title="Tag someone">
+              <IconBtn active={!!tagUser} onClick={() => setShowTagMenu(t => !t)} title="Tag someone">
                 <AtSign size={19} />
               </IconBtn>
               {showTagMenu && (
@@ -412,21 +427,39 @@ function ClassChat({ onBack, currentUser, profile }) {
                 </div>
               )}
             </div>
-            <IconBtn active={isWhisper} onClick={() => setIsWhisper(w => !w)} title="Whisper" color={isWhisper ? '#0D7377' : undefined}>
-              <Lock size={19} />
-            </IconBtn>
           </div>
 
-          <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, border: `1.5px solid ${isWhisper ? '#7EC8C8' : 'transparent'}`, padding: '8px 14px', transition: 'border-color 0.15s' }}>
-            <textarea ref={inputRef} rows={1} value={text}
-              onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px' }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }}
-              placeholder={isWhisper ? '🔒 Send a whisper…' : 'Message the class…'}
+          <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={text}
+              onChange={e => {
+                setText(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'
+              }}
+              onKeyDown={e => {
+                // Only send on Enter for non-touch (desktop) devices
+                if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) {
+                  e.preventDefault()
+                  send(e)
+                }
+              }}
+              onFocus={() => {
+                // Scroll compose into view when keyboard opens on mobile
+                setTimeout(() => {
+                  inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+                  bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                }, 300)
+              }}
+              placeholder="Message the class…"
               style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block' }}
             />
           </div>
 
-          <button type="submit" disabled={sending || !text.trim()} style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: text.trim() ? (isWhisper ? '#0D7377' : '#0084FF') : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s' }}
+          <button type="submit" disabled={sending || !text.trim()}
+            style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: text.trim() ? '#0084FF' : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s' }}
             onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
             onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
             {sending ? <Loader2 size={16} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
@@ -445,7 +478,6 @@ function ClassChat({ onBack, currentUser, profile }) {
 function GroupBubble({ msg, currentUserId, onDelete }) {
   const [hovered, setHovered] = useState(false)
   const isOwn = msg.sender_id === currentUserId
-  const isWhisper = msg.is_whisper
 
   if (msg.is_deleted) {
     return (
@@ -472,19 +504,19 @@ function GroupBubble({ msg, currentUserId, onDelete }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
           <div style={{
             padding: '8px 13px',
-            background: isOwn ? (isWhisper ? '#0D7377' : '#0084FF') : (isWhisper ? '#E6F4F4' : 'white'),
-            color: isOwn ? 'white' : (isWhisper ? '#0D7377' : '#050505'),
-            borderRadius: isOwn ? `18px ${msg.isFirst ? 18 : 4}px ${msg.isLast ? 4 : 18}px 18px` : `${msg.isFirst ? 18 : 4}px 18px 18px ${msg.isLast ? 4 : 18}px`,
+            background: isOwn ? '#0084FF' : 'white',
+            color: isOwn ? 'white' : '#050505',
+            borderRadius: isOwn
+              ? `18px ${msg.isFirst ? 18 : 4}px ${msg.isLast ? 4 : 18}px 18px`
+              : `${msg.isFirst ? 18 : 4}px 18px 18px ${msg.isLast ? 4 : 18}px`,
             boxShadow: isOwn ? 'none' : '0 1px 2px rgba(0,0,0,0.08)',
-            border: !isOwn && !isWhisper ? '1px solid #E4E6EB' : 'none',
+            border: !isOwn ? '1px solid #E4E6EB' : 'none',
           }}>
-            {isWhisper && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3, opacity: 0.75 }}>
-                <Lock size={9} color={isOwn ? 'white' : '#0D7377'} />
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: isOwn ? 'white' : '#0D7377', textTransform: 'uppercase', letterSpacing: 0.5 }}>Whisper</span>
-              </div>
+            {msg.tag_user_id && (
+              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 700, color: isOwn ? 'rgba(255,255,255,0.85)' : '#0D7377', marginRight: 4 }}>
+                @{msg.tagged?.display_name}
+              </span>
             )}
-            {msg.tag_user_id && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 700, color: isOwn ? 'rgba(255,255,255,0.85)' : '#0D7377', marginRight: 4 }}>@{msg.tagged?.display_name}</span>}
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, lineHeight: 1.4, wordBreak: 'break-word' }}>{msg.content}</span>
           </div>
           {isOwn && hovered && (
@@ -514,6 +546,7 @@ function DMConversation({ partner, currentUserId, onBack }) {
   const [loading, setLoading]   = useState(true)
   const [sending, setSending]   = useState(false)
   const bottomRef = useRef()
+  const inputRef  = useRef()
 
   const fetchMessages = useCallback(async () => {
     const { data } = await supabase
@@ -618,14 +651,35 @@ function DMConversation({ partner, currentUserId, onBack }) {
       <div style={{ background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', flexShrink: 0 }}>
         <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
-            <textarea rows={1} value={text}
-              onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }}
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={text}
+              onChange={e => {
+                setText(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+              }}
+              onKeyDown={e => {
+                // Only send on Enter for non-touch (desktop) devices
+                if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) {
+                  e.preventDefault()
+                  send(e)
+                }
+              }}
+              onFocus={() => {
+                // Scroll compose into view when keyboard opens on mobile
+                setTimeout(() => {
+                  inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+                  bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                }, 300)
+              }}
               placeholder={`Message ${partner.display_name}…`}
               style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 120, overflow: 'hidden', display: 'block' }}
             />
           </div>
-          <button type="submit" disabled={sending || !text.trim()} style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: text.trim() ? RED : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s', boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none' }}
+          <button type="submit" disabled={sending || !text.trim()}
+            style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: text.trim() ? RED : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s', boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none' }}
             onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
             onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
             {sending ? <Loader2 size={17} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
@@ -702,11 +756,20 @@ function IconBtn({ onClick, active, children, title, color }) {
 // ─────────────────────────────────────────────
 export default function MessagesPage() {
   const { user, profile } = useAuth()
-  // view = 'inbox' | 'group' | { type:'dm', partner }
   const [view, setView] = useState('inbox')
 
+  // When in a chat view on mobile, use dvh so keyboard pushes content up
+  // instead of the fixed bottom nav overlapping the compose bar
+  const isChat = view !== 'inbox'
+
   return (
-    <div style={{ height: 'calc(100vh - 52px - 52px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      height: isChat
+        ? 'calc(100dvh - 52px - env(safe-area-inset-bottom, 0px))'
+        : 'calc(100dvh - 52px - 52px)',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
       {view === 'inbox' ? (
         <Inbox
           currentUserId={user.id}
