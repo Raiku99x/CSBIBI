@@ -63,6 +63,16 @@ function parseFiles(file_url, file_name) {
   } catch { return [{ url: file_url, name: file_name || 'Attachment' }] }
 }
 
+function parseQuoted(raw) {
+  if (!raw) return null
+  try {
+    const p = JSON.parse(raw)
+    if (p.from || p.message) return p
+    return null
+  } catch {
+    return { from: '', message: raw }
+  }
+}
 // ── Share Sheet ───────────────────────────────────────────────
 function ShareSheet({ post, onClose }) {
   const [copied, setCopied] = useState(false)
@@ -244,6 +254,85 @@ function PhotoGrid({ photos, onPhotoClick }) {
   return <div style={{display:'flex',flexDirection:'column',gap:2}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,height:200}}>{display.slice(0,2).map((u,i)=>wrap(u,i))}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,height:130}}>{display.slice(2,5).map((u,i)=>wrap(u,i+2))}</div></div>
 }
 
+// ── AttachMessa ──────────────────────────────────────────────────
+function QuotedMessageBlock({ from, message }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = message.length > 180
+  const displayText = isLong && !expanded ? message.slice(0, 180) + '…' : message
+ 
+  return (
+    <div style={{
+      margin: '8px 12px 4px',
+      background: '#FAFAFA',
+      border: '1px solid #E8EAED',
+      borderLeft: '3px solid #C0392B',
+      borderRadius: '0 10px 10px 0',
+      overflow: 'hidden',
+    }}>
+      {/* Header row — who sent it */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '8px 12px 6px',
+        borderBottom: '1px solid #F0F2F5',
+        background: '#FFF5F5',
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          background: '#FADBD8',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          {/* MessageSquareQuote icon inline as SVG */}
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <line x1="9" y1="10" x2="15" y2="10"/>
+            <line x1="9" y1="14" x2="13" y2="14"/>
+          </svg>
+        </div>
+        <span style={{
+          fontFamily: '"Instrument Sans", system-ui',
+          fontWeight: 700, fontSize: 12.5,
+          color: '#C0392B',
+        }}>
+          {from ? `From ${from}` : 'Quoted message'}
+        </span>
+        <span style={{
+          marginLeft: 'auto',
+          fontFamily: '"Instrument Sans", system-ui',
+          fontSize: 10.5, color: '#BCC0C4',
+          fontStyle: 'italic',
+        }}>
+          forwarded
+        </span>
+      </div>
+ 
+      {/* Message body */}
+      <div style={{ padding: '9px 12px 10px' }}>
+        <p style={{
+          margin: 0,
+          fontFamily: '"Instrument Sans", system-ui',
+          fontSize: 13.5, color: '#1c1e21',
+          lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        }}>
+          {displayText}
+          {isLong && (
+            <button
+              onClick={() => setExpanded(e => !e)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#C0392B', fontWeight: 700, fontSize: 13,
+                fontFamily: '"Instrument Sans", system-ui',
+                marginLeft: 4, padding: 0,
+              }}
+            >
+              {expanded ? 'See less' : 'See more'}
+            </button>
+          )}
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ── PostCard ──────────────────────────────────────────────────
 export default function PostCard({ post, currentUserId, subjects = [], profile }) {
@@ -351,6 +440,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
 
   const photos = parsePhotos(postData.photo_url)
   const files  = parseFiles(postData.file_url, postData.file_name)
+  const quoted = parseQuoted(postData.quoted_message)
   const caption = postData.caption || ''
   const isLong = caption.length > 220
   const displayCaption = isLong && !expanded ? caption.slice(0,220)+'…' : caption
@@ -474,6 +564,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
               {displayCaption}
               {isLong && <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>{expanded?'See less':'See more'}</button>}
             </p>
+
+            {/* ── Quoted Message ── */}
+            {quoted && <QuotedMessageBlock from={quoted.from} message={quoted.message} />}
           </div>
         )}
 
