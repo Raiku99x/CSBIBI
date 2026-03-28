@@ -47,6 +47,16 @@ function getTypeLabel(subType, postType) {
   return 'Post'
 }
 
+// ── Quoted block accent color based on sub_type ───────────────
+function getQuoteBlockAccent(subType, postType) {
+  if (subType === 'deadline')      return '#922B21'
+  if (subType === 'reminder')      return '#C0392B'
+  if (subType === 'announcement')  return '#C0392B'
+  if (postType === 'announcement') return '#C0392B'
+  if (subType === 'material')      return '#1A5276'
+  return '#65676B'
+}
+
 function parsePhotos(photo_url) {
   if (!photo_url) return []
   try { const p = JSON.parse(photo_url); return Array.isArray(p) ? p : [photo_url] }
@@ -73,6 +83,7 @@ function parseQuoted(raw) {
     return { from: '', message: raw }
   }
 }
+
 // ── Share Sheet ───────────────────────────────────────────────
 function ShareSheet({ post, onClose }) {
   const [copied, setCopied] = useState(false)
@@ -88,9 +99,7 @@ function ShareSheet({ post, onClose }) {
     try {
       await navigator.share({ title: 'CSB Post', text: shareText, url: shareUrl })
       onClose()
-    } catch {
-      // user cancelled or not supported
-    }
+    } catch {}
   }
 
   async function handleCopyLink() {
@@ -110,7 +119,6 @@ function ShareSheet({ post, onClose }) {
     }
   }
 
-  // Close on outside click
   useEffect(() => {
     function h(e) {
       if (sheetRef.current && !sheetRef.current.contains(e.target)) onClose()
@@ -136,7 +144,6 @@ function ShareSheet({ post, onClose }) {
       zIndex: 30,
       animation: 'slideUp 0.18s ease',
     }}>
-      {/* Header */}
       <div style={{
         padding: '11px 14px 8px',
         borderBottom: '1px solid #F0F2F5',
@@ -149,25 +156,12 @@ function ShareSheet({ post, onClose }) {
           <X size={13} color="#65676B" />
         </button>
       </div>
-
-      {/* Options */}
       <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-
-        {/* Native share (mobile) */}
         {hasNativeShare && (
-          <ShareOption
-            icon={<Share2 size={18} color="#65676B" />}
-            label="More options…"
-            onClick={handleNativeShare}
-          />
+          <ShareOption icon={<Share2 size={18} color="#65676B" />} label="More options…" onClick={handleNativeShare} />
         )}
-
-        {/* Copy link */}
         <ShareOption
-          icon={copied
-            ? <Check size={18} color="#16a34a" />
-            : <Link size={18} color="#65676B" />
-          }
+          icon={copied ? <Check size={18} color="#16a34a" /> : <Link size={18} color="#65676B" />}
           label={copied ? 'Link copied!' : 'Copy link'}
           onClick={handleCopyLink}
           success={copied}
@@ -254,36 +248,37 @@ function PhotoGrid({ photos, onPhotoClick }) {
   return <div style={{display:'flex',flexDirection:'column',gap:2}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,height:200}}>{display.slice(0,2).map((u,i)=>wrap(u,i))}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,height:130}}>{display.slice(2,5).map((u,i)=>wrap(u,i+2))}</div></div>
 }
 
-// ── AttachMessa ──────────────────────────────────────────────────
-function QuotedMessageBlock({ from, message }) {
+// ── Quoted Message Block ──────────────────────────────────────
+// Simplified: no background fills, just left border accent colored by sub_type
+// Horizontal padding reduced ~70% (12px → 4px inside the block)
+function QuotedMessageBlock({ from, message, subType, postType }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = message.length > 180
   const displayText = isLong && !expanded ? message.slice(0, 180) + '…' : message
- 
+  const accentColor = getQuoteBlockAccent(subType, postType)
+
   return (
     <div style={{
-      margin: '8px 12px 4px',
-      background: '#FAFAFA',
+      margin: '8px 0 4px',
       border: '1px solid #E8EAED',
-      borderLeft: '3px solid #C0392B',
-      borderRadius: '0 10px 10px 0',
+      borderLeft: `3px solid ${accentColor}`,
+      borderRadius: '0 8px 8px 0',
       overflow: 'hidden',
+      background: 'transparent',
     }}>
-      {/* Header row — who sent it */}
+      {/* Header row — no background, just border bottom */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 7,
-        padding: '8px 12px 6px',
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 4px 5px',
         borderBottom: '1px solid #F0F2F5',
-        background: '#FFF5F5',
       }}>
+        {/* Icon */}
         <div style={{
-          width: 22, height: 22, borderRadius: '50%',
-          background: '#FADBD8',
+          width: 18, height: 18, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}>
-          {/* MessageSquareQuote icon inline as SVG */}
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             <line x1="9" y1="10" x2="15" y2="10"/>
             <line x1="9" y1="14" x2="13" y2="14"/>
@@ -291,8 +286,8 @@ function QuotedMessageBlock({ from, message }) {
         </div>
         <span style={{
           fontFamily: '"Instrument Sans", system-ui',
-          fontWeight: 700, fontSize: 12.5,
-          color: '#C0392B',
+          fontWeight: 700, fontSize: 12,
+          color: accentColor,
         }}>
           {from ? `From ${from}` : 'Quoted message'}
         </span>
@@ -301,13 +296,14 @@ function QuotedMessageBlock({ from, message }) {
           fontFamily: '"Instrument Sans", system-ui',
           fontSize: 10.5, color: '#BCC0C4',
           fontStyle: 'italic',
+          paddingRight: 4,
         }}>
           forwarded
         </span>
       </div>
- 
+
       {/* Message body */}
-      <div style={{ padding: '9px 12px 10px' }}>
+      <div style={{ padding: '7px 4px 8px' }}>
         <p style={{
           margin: 0,
           fontFamily: '"Instrument Sans", system-ui',
@@ -320,7 +316,7 @@ function QuotedMessageBlock({ from, message }) {
               onClick={() => setExpanded(e => !e)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                color: '#C0392B', fontWeight: 700, fontSize: 13,
+                color: accentColor, fontWeight: 700, fontSize: 13,
                 fontFamily: '"Instrument Sans", system-ui',
                 marginLeft: 4, padding: 0,
               }}
@@ -557,21 +553,30 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           </div>
         </div>
 
-        {/* ── Caption ── */}
-        {caption && (
+        {/* ── Caption + Quoted block ── */}
+        {(caption || quoted) && (
           <div style={{ padding:`0 12px ${photos.length>0?'8px':'0'}` }}>
-            <p style={{ margin:0,fontSize:14.5,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
-              {displayCaption}
-              {isLong && <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>{expanded?'See less':'See more'}</button>}
-            </p>
+            {caption && (
+              <p style={{ margin:0,fontSize:14.5,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
+                {displayCaption}
+                {isLong && <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>{expanded?'See less':'See more'}</button>}
+              </p>
+            )}
 
-            {/* ── Quoted Message ── */}
-            {quoted && <QuotedMessageBlock from={quoted.from} message={quoted.message} />}
+            {/* ── Quoted Message ── passes sub_type + post_type for color */}
+            {quoted && (
+              <QuotedMessageBlock
+                from={quoted.from}
+                message={quoted.message}
+                subType={postData.sub_type}
+                postType={postData.post_type}
+              />
+            )}
           </div>
         )}
 
         {/* ── Photos ── */}
-        {photos.length>0 && <div style={{marginTop:caption?4:8}}><PhotoGrid photos={photos} onPhotoClick={setLightboxIndex}/></div>}
+        {photos.length>0 && <div style={{marginTop:caption||quoted?4:8}}><PhotoGrid photos={photos} onPhotoClick={setLightboxIndex}/></div>}
 
         {/* ── Files ── */}
         {files.length>0 && (
@@ -628,7 +633,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
           <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED} />
           <ActionBtn onClick={() => setShowComments(true)} icon={<MessageCircle size={17} color="#65676B"/>} label="Comment" />
 
-          {/* Share button — relative wrapper for the popover */}
           <div ref={shareRef} style={{ flex:1, position:'relative' }}>
             <ActionBtn
               onClick={() => setShowShare(v => !v)}
