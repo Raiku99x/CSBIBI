@@ -124,6 +124,8 @@ export default function Layout({ children, onOpenSearch }) {
   const textSec   = dark ? '#B0B3B8' : '#65676B'
   const textMut   = dark ? '#6A6D70' : '#BCC0C4'
   const surfaceBg = dark ? '#3A3B3C' : '#E9EBEE'
+  // divider color for sidebar sections — subtle, no cards
+  const dividerCol = dark ? '#2E2F30' : '#D8DADF'
 
   // ── LEFT SIDEBAR CONTENT ────────────────────────────────────
   function LeftSidebar({ onClose }) {
@@ -139,15 +141,12 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: isDesktop ? '12px 10px' : '8px 10px' }}>
+        <div className="csb-sidebar-scroll" style={{ flex: 1, overflowY: 'auto', padding: isDesktop ? '12px 10px' : '8px 10px' }}>
 
-          {/* ── PROFILE CARD ── clean white, no gradient */}
+          {/* ── PROFILE — flat, no card, no border ── */}
           <div style={{
-            background: cardBg,
-            borderRadius: 14,
-            border: `1px solid ${borderCol}`,
-            padding: '16px 14px',
-            marginBottom: 8,
+            padding: '14px 10px 14px',
+            marginBottom: 4,
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -155,40 +154,36 @@ export default function Layout({ children, onOpenSearch }) {
             <img
               src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
               alt="avatar"
-              style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: `1px solid ${borderCol}` }}
+              style={{ width: 40, height: 40, borderRadius: 11, objectFit: 'cover', flexShrink: 0, border: `1.5px solid ${dividerCol}` }}
             />
             <div style={{ minWidth: 0, flex: 1 }}>
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 14, color: textPri, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.display_name}
               </p>
-              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: textMut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: textMut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {profile?.email}
               </p>
             </div>
           </div>
 
-          {/* ── NAV LINKS ── */}
-          <div style={{
-            background: cardBg,
-            borderRadius: 14,
-            border: `1px solid ${borderCol}`,
-            padding: '6px',
-            marginBottom: 8,
-          }}>
+          {/* faint divider */}
+          <div style={{ height: 1, background: dividerCol, margin: '0 4px 8px' }} />
+
+          {/* ── NAV LINKS — flat, no card ── */}
+          <div style={{ marginBottom: 4 }}>
             {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
               <NavLink key={to} to={to} end={exact} style={{ textDecoration: 'none' }}
                 onClick={() => !isDesktop && onClose?.()}>
                 {({ isActive }) => (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 11,
-                    padding: '9px 10px', borderRadius: 10, marginBottom: 2, cursor: 'pointer',
+                    padding: '8px 10px', borderRadius: 10, marginBottom: 2, cursor: 'pointer',
                     background: isActive ? (dark ? '#3A1A1A' : '#FFF0EF') : 'transparent',
                     transition: 'background 0.12s',
                   }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = dark ? '#2A2B2C' : '#F0F2F5' }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = dark ? '#2A2B2C' : 'rgba(0,0,0,0.05)' }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
                   >
-                    {/* Icon pill */}
                     <div style={{
                       width: 32, height: 32, borderRadius: 9, flexShrink: 0,
                       background: isActive ? '#FADBD8' : surfaceBg,
@@ -217,32 +212,26 @@ export default function Layout({ children, onOpenSearch }) {
             ))}
           </div>
 
-          {/* ── PERSONAL SECTION ── */}
-          <div style={{
-            background: cardBg,
-            borderRadius: 14,
-            border: `1px solid ${borderCol}`,
-            padding: '6px',
-            marginBottom: 8,
-          }}>
-            <p style={{ margin: '6px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: textMut, textTransform: 'uppercase', letterSpacing: 0.8 }}>Personal</p>
+          {/* faint divider */}
+          <div style={{ height: 1, background: dividerCol, margin: '4px 4px 8px' }} />
+
+          {/* ── PERSONAL SECTION — flat, no card ── */}
+          <div style={{ marginBottom: 4 }}>
+            <p style={{ margin: '4px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: textMut, textTransform: 'uppercase', letterSpacing: 0.8 }}>Personal</p>
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Settings size={16} color={textSec} />}          label="Profile Settings" onClick={() => { onClose?.(); navigate('/profile') }} />
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Bookmark  size={16} color={BLUE} fill={BLUE} />} label="Saved Posts"      onClick={() => { onClose?.(); setShowSaved(true) }} />
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Heart     size={16} color={RED}  fill={RED}  />} label="Liked Posts"      onClick={() => { onClose?.(); setShowLiked(true) }} />
           </div>
 
-          {/* ── PREFERENCES ── */}
-          <div style={{
-            background: cardBg,
-            borderRadius: 14,
-            border: `1px solid ${borderCol}`,
-            padding: '6px',
-            marginBottom: 8,
-          }}>
-            <p style={{ margin: '6px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: textMut, textTransform: 'uppercase', letterSpacing: 0.8 }}>Preferences</p>
+          {/* faint divider */}
+          <div style={{ height: 1, background: dividerCol, margin: '4px 4px 8px' }} />
+
+          {/* ── PREFERENCES — flat, no card ── */}
+          <div style={{ marginBottom: 4 }}>
+            <p style={{ margin: '4px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: textMut, textTransform: 'uppercase', letterSpacing: 0.8 }}>Preferences</p>
 
             {/* Dark mode row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 10, marginBottom: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '8px 10px', borderRadius: 10, marginBottom: 2 }}>
               <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: surfaceBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {dark ? <Sun size={16} color="#F4C430" /> : <Moon size={16} color={textSec} />}
               </div>
@@ -257,8 +246,11 @@ export default function Layout({ children, onOpenSearch }) {
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Info size={16} color="#0D7377" />} label="About CSB" onClick={() => { onClose?.(); setShowAbout(true) }} />
           </div>
 
-          {/* ── LOG OUT ── */}
-          <div style={{ background: cardBg, borderRadius: 14, border: `1px solid ${borderCol}`, padding: '6px', marginBottom: 8 }}>
+          {/* faint divider */}
+          <div style={{ height: 1, background: dividerCol, margin: '4px 4px 8px' }} />
+
+          {/* ── LOG OUT — flat, no card ── */}
+          <div style={{ marginBottom: 8 }}>
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<LogOut size={16} color={RED} />} label="Log Out" onClick={handleSignOut} danger />
           </div>
 
@@ -354,7 +346,8 @@ export default function Layout({ children, onOpenSearch }) {
         <div style={{ display: 'flex', flex: 1, width: '100%', maxWidth: 1400, margin: '0 auto' }}>
 
           {/* LEFT SIDEBAR */}
-          <aside style={{ width: 280, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: pageBg, overflowY: 'auto' }}>
+          <aside style={{ width: 280, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: pageBg, overflowY: 'auto' }}
+            className="csb-sidebar-scroll">
             <LeftSidebar />
           </aside>
 
@@ -366,10 +359,11 @@ export default function Layout({ children, onOpenSearch }) {
           </main>
 
           {/* RIGHT SIDEBAR — no card, floats on gray bg */}
-          <aside style={{ width: 280, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: pageBg, overflowY: 'auto', paddingTop: 12 }}>
+          <aside style={{ width: 280, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: pageBg, overflowY: 'auto', paddingTop: 12 }}
+            className="csb-sidebar-scroll">
             <div style={{ padding: '0 10px' }}>
 
-              {/* Online header — just a label, no card */}
+              {/* Online header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 4px 10px' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 2px rgba(34,197,94,0.25)', flexShrink: 0 }} />
                 <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: textSec, textTransform: 'uppercase', letterSpacing: 0.6 }}>
@@ -380,7 +374,7 @@ export default function Layout({ children, onOpenSearch }) {
                 </span>
               </div>
 
-              {/* Self row — floating, no card */}
+              {/* Self row */}
               <OnlineRow
                 avatar={profile?.avatar_url || dicebearUrl(profile?.display_name)}
                 name={profile?.display_name}
@@ -499,12 +493,19 @@ export default function Layout({ children, onOpenSearch }) {
         @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
         @keyframes slideDown      { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }
         @keyframes slideDownSheet { from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)} }
+
+        /* Minimal grey scrollbar — sidebar and drawer */
+        .csb-sidebar-scroll::-webkit-scrollbar        { width: 4px; }
+        .csb-sidebar-scroll::-webkit-scrollbar-track  { background: transparent; }
+        .csb-sidebar-scroll::-webkit-scrollbar-thumb  { background: #C8CAD0; border-radius: 4px; }
+        .csb-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #B0B3B8; }
+        .csb-sidebar-scroll { scrollbar-width: thin; scrollbar-color: #C8CAD0 transparent; }
       `}</style>
     </div>
   )
 }
 
-// ── Online row — no card, floats on bg ────────────────────────
+// ── Online row ────────────────────────────────────────────────
 function OnlineRow({ avatar, name, sublabel, sublabelColor, dotColor, isSelf, dark, textPri, textMut, surfaceBg, pageBg, rightSlot }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -526,7 +527,7 @@ function OnlineRow({ avatar, name, sublabel, sublabelColor, dotColor, isSelf, da
   )
 }
 
-// ── DM button shown on hover ──────────────────────────────────
+// ── DM button ─────────────────────────────────────────────────
 function DMBtn({ onClick, surfaceBg }) {
   const [hovered, setHovered] = useState(false)
   return (
@@ -544,8 +545,8 @@ function SidebarBtn({ icon, label, onClick, danger, dark, surfaceBg, textPri }) 
   const RED = '#C0392B'
   return (
     <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? (dark ? '#3A1A1A' : '#FFF5F5') : surfaceBg) : 'transparent', color: danger ? RED : textPri, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, borderRadius: 10, transition: 'background 0.12s', marginBottom: 2 }}>
-      <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: hovered ? (danger ? (dark ? '#4A2020' : '#FADBD8') : (dark ? '#4A4B4C' : '#E4E6EB')) : surfaceBg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}>
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '8px 10px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? (dark ? '#3A1A1A' : '#FFF5F5') : 'rgba(0,0,0,0.05)') : 'transparent', color: danger ? RED : textPri, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, borderRadius: 10, transition: 'background 0.12s', marginBottom: 2 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: hovered ? (danger ? (dark ? '#4A2020' : '#FADBD8') : (dark ? '#4A4B4C' : '#D8DADF')) : surfaceBg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}>
         {icon}
       </div>
       {label}
