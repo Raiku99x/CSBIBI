@@ -28,13 +28,13 @@ const BLUE = '#1A5276'
 const DESKTOP_BP = 1024
 
 function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BP)
+  const [v, setV] = useState(() => window.innerWidth >= DESKTOP_BP)
   useEffect(() => {
-    const fn = () => setIsDesktop(window.innerWidth >= DESKTOP_BP)
+    const fn = () => setV(window.innerWidth >= DESKTOP_BP)
     window.addEventListener('resize', fn)
     return () => window.removeEventListener('resize', fn)
   }, [])
-  return isDesktop
+  return v
 }
 
 function getNavItems(dmUnread) {
@@ -66,16 +66,14 @@ export default function Layout({ children, onOpenSearch }) {
 
   const { onlineUsers } = usePresence(profile?.id, profile, appearOffline)
 
-  const [showDrawer,    setShowDrawer]    = useState(false)
-  const [showUserMenu,  setShowUserMenu]  = useState(false)
-  const [showNotifs,    setShowNotifs]    = useState(false)
-  const [dmUnread,      setDmUnread]      = useState(0)
-  const [showSaved,     setShowSaved]     = useState(false)
-  const [showLiked,     setShowLiked]     = useState(false)
-  const [showAbout,     setShowAbout]     = useState(false)
-  const [selfMenuOpen,  setSelfMenuOpen]  = useState(false)
+  const [showDrawer,   setShowDrawer]   = useState(false)
+  const [showNotifs,   setShowNotifs]   = useState(false)
+  const [dmUnread,     setDmUnread]     = useState(0)
+  const [showSaved,    setShowSaved]    = useState(false)
+  const [showLiked,    setShowLiked]    = useState(false)
+  const [showAbout,    setShowAbout]    = useState(false)
+  const [selfMenuOpen, setSelfMenuOpen] = useState(false)
 
-  const menuRef     = useRef(null)
   const notifRef    = useRef(null)
   const selfMenuRef = useRef(null)
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
@@ -83,7 +81,6 @@ export default function Layout({ children, onOpenSearch }) {
 
   useEffect(() => {
     function h(e) {
-      if (menuRef.current     && !menuRef.current.contains(e.target))     setShowUserMenu(false)
       if (notifRef.current    && !notifRef.current.contains(e.target))    setShowNotifs(false)
       if (selfMenuRef.current && !selfMenuRef.current.contains(e.target)) setSelfMenuOpen(false)
     }
@@ -119,16 +116,17 @@ export default function Layout({ children, onOpenSearch }) {
     navigate('/auth')
   }
 
-  // ── Shared sidebar nav/content ──────────────────────────────
-  function SidebarContent({ onClose }) {
+  // ── Personal sidebar content (no nav links) ──────────────
+  function PersonalSidebar({ onClose }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
         {/* Profile card */}
         <div style={{
           background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`,
           padding: isDesktop ? '20px 16px 16px' : '48px 20px 22px',
           position: 'relative', flexShrink: 0,
+          borderRadius: isDesktop ? '0 0 16px 16px' : 0,
+          margin: isDesktop ? '0 8px' : 0,
         }}>
           {!isDesktop && (
             <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -136,7 +134,7 @@ export default function Layout({ children, onOpenSearch }) {
             </button>
           )}
           <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar"
-            style={{ width: isDesktop ? 46 : 62, height: isDesktop ? 46 : 62, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.55)', boxShadow: '0 2px 12px rgba(0,0,0,0.2)', marginBottom: 10, display: 'block' }} />
+            style={{ width: isDesktop ? 52 : 62, height: isDesktop ? 52 : 62, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.55)', boxShadow: '0 2px 12px rgba(0,0,0,0.2)', marginBottom: 10, display: 'block' }} />
           <p style={{ margin: '0 0 2px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: isDesktop ? 15 : 17, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {profile?.display_name}
           </p>
@@ -145,76 +143,37 @@ export default function Layout({ children, onOpenSearch }) {
           </p>
         </div>
 
-        <div style={{ height: 1, background: dark ? '#3A3B3C' : '#F0F2F5', flexShrink: 0 }} />
-
-        {/* Scrollable section */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
-
-          {/* Navigation */}
-          <SectionLabel dark={dark} label="Navigation" />
-          {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
-            <NavLink key={to} to={to} end={exact} style={{ textDecoration: 'none' }}
-              onClick={() => !isDesktop && onClose?.()}>
-              {({ isActive }) => (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '9px 12px', borderRadius: 10, marginBottom: 2, cursor: 'pointer',
-                  background: isActive ? (dark ? '#3A1A1A' : '#FFF0EF') : 'transparent',
-                  transition: 'background 0.12s',
-                }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: isActive ? '#FADBD8' : (dark ? '#3A3B3C' : '#F0F2F5'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon size={17} color={isActive ? RED : (dark ? '#B0B3B8' : '#65676B')} strokeWidth={isActive ? 2.5 : 2} />
-                  </div>
-                  <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 600, fontSize: 14, color: isActive ? RED : (dark ? '#E4E6EB' : '#1c1e21') }}>
-                    {label}
-                  </span>
-                  {badge > 0 && (
-                    <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: RED, color: 'white', fontSize: 10, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
-                      {badge > 9 ? '9+' : badge}
-                    </span>
-                  )}
-                </div>
-              )}
-            </NavLink>
-          ))}
-
-          <Divider dark={dark} />
-
-          {/* Personal */}
+        {/* Scrollable personal items */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px' }}>
           <SectionLabel dark={dark} label="Personal" />
-          <SidebarBtn dark={dark} icon={<Settings size={17} color="#65676B" />}         label="Profile Settings" onClick={() => { onClose?.(); navigate('/profile') }} />
-          <SidebarBtn dark={dark} icon={<Bookmark size={17} color={BLUE} fill={BLUE} />} label="Saved Posts"      onClick={() => { onClose?.(); setShowSaved(true) }} />
-          <SidebarBtn dark={dark} icon={<Heart    size={17} color={RED}  fill={RED}  />} label="Liked Posts"      onClick={() => { onClose?.(); setShowLiked(true) }} />
+          <SidebarBtn dark={dark} icon={<Settings size={17} color="#65676B" />}          label="Profile Settings" onClick={() => { onClose?.(); navigate('/profile') }} />
+          <SidebarBtn dark={dark} icon={<Bookmark  size={17} color={BLUE} fill={BLUE} />} label="Saved Posts"      onClick={() => { onClose?.(); setShowSaved(true) }} />
+          <SidebarBtn dark={dark} icon={<Heart     size={17} color={RED}  fill={RED}  />} label="Liked Posts"      onClick={() => { onClose?.(); setShowLiked(true) }} />
 
           <Divider dark={dark} />
-
-          {/* Preferences */}
           <SectionLabel dark={dark} label="Preferences" />
 
-          {/* Dark mode toggle */}
+          {/* Dark mode */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', borderRadius: 10, marginBottom: 2 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: dark ? '#3A3B3C' : '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: dark ? '#3A3B3C' : '#E9EBEE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {dark ? <Sun size={17} color="#F4C430" /> : <Moon size={17} color="#65676B" />}
             </div>
             <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: dark ? '#E4E6EB' : '#1c1e21' }}>
               {dark ? 'Light Mode' : 'Dark Mode'}
             </span>
-            <button onClick={toggleDark} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', background: dark ? RED : '#E4E6EB', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <button onClick={toggleDark} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', background: dark ? RED : '#CED0D4', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: dark ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', transition: 'left 0.2s' }} />
             </button>
           </div>
 
           <Divider dark={dark} />
-
-          <SidebarBtn dark={dark} icon={<Info size={17} color="#0D7377" />} label="About CSB" onClick={() => { onClose?.(); setShowAbout(true) }} />
-
+          <SidebarBtn dark={dark} icon={<Info   size={17} color="#0D7377" />} label="About CSB" onClick={() => { onClose?.(); setShowAbout(true) }} />
           <Divider dark={dark} />
-
-          <SidebarBtn dark={dark} icon={<LogOut size={17} color={RED} />} label="Log Out" onClick={handleSignOut} danger />
+          <SidebarBtn dark={dark} icon={<LogOut size={17} color={RED}     />} label="Log Out"   onClick={handleSignOut} danger />
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '10px 16px 14px', borderTop: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}`, flexShrink: 0 }}>
+        <div style={{ padding: '10px 16px 14px', flexShrink: 0 }}>
           <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: dark ? '#6A6D70' : '#BCC0C4', textAlign: 'center' }}>
             CSB · v2.3.1 · BSCS '29
           </p>
@@ -223,10 +182,16 @@ export default function Layout({ children, onOpenSearch }) {
     )
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: dark ? '#18191A' : '#E9EBEE', display: 'flex', flexDirection: 'column' }}>
+  // ── BG colors ────────────────────────────────────────────
+  const pageBg   = dark ? '#18191A' : '#E9EBEE'
+  const sidebarBg = dark ? '#18191A' : '#E9EBEE'   // blends with center bg
+  const headerBg  = dark ? '#242526' : 'white'
+  const borderCol = dark ? '#3A3B3C' : '#E4E6EB'
 
-      {/* Mobile backdrops */}
+  return (
+    <div style={{ minHeight: '100vh', background: pageBg, display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── MOBILE BACKDROPS ── */}
       {!isDesktop && showDrawer && (
         <div onClick={() => setShowDrawer(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,0.5)', animation: 'fadeIn 0.2s ease' }} />
       )}
@@ -234,19 +199,21 @@ export default function Layout({ children, onOpenSearch }) {
         <div onClick={() => setShowNotifs(false)} style={{ position: 'fixed', inset: 0, zIndex: 98, background: 'rgba(0,0,0,0.45)', animation: 'fadeIn 0.2s ease' }} />
       )}
 
-      {/* Mobile drawer */}
+      {/* ── MOBILE DRAWER (personal only) ── */}
       {!isDesktop && (
         <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 290, zIndex: 90, background: dark ? '#242526' : 'white', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', transform: showDrawer ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' }}>
-          <SidebarContent onClose={() => setShowDrawer(false)} />
+          <PersonalSidebar onClose={() => setShowDrawer(false)} />
         </div>
       )}
 
-      {/* Header */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 40, background: dark ? '#242526' : 'white', borderBottom: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-        <div style={{ maxWidth: isDesktop ? 'none' : 680, margin: '0 auto', height: 52, padding: isDesktop ? '0 24px' : '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* ── HEADER ── */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 40, background: headerBg, borderBottom: `1px solid ${borderCol}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <div style={{ height: 52, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, maxWidth: isDesktop ? 'none' : 680, margin: '0 auto' }}>
+
+          {/* LEFT — Logo (+ hamburger on mobile) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {!isDesktop && (
-              <button onClick={() => setShowDrawer(true)} style={{ width: 36, height: 36, borderRadius: 9, background: dark ? '#3A3B3C' : '#F4F6F8', border: `1.5px solid ${dark ? '#4A4B4C' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <button onClick={() => setShowDrawer(true)} style={{ width: 36, height: 36, borderRadius: 9, background: dark ? '#3A3B3C' : '#F4F6F8', border: `1.5px solid ${borderCol}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Menu size={17} color={dark ? '#B0B3B8' : '#65676B'} />
               </button>
             )}
@@ -258,14 +225,53 @@ export default function Layout({ children, onOpenSearch }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={onOpenSearch} style={{ width: 36, height: 36, borderRadius: 9, background: dark ? '#3A3B3C' : '#F4F6F8', border: `1.5px solid ${dark ? '#4A4B4C' : '#E4E6EB'}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* CENTER — Nav links on desktop only */}
+          {isDesktop && (
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
+                <NavLink key={to} to={to} end={exact} style={{ textDecoration: 'none', position: 'relative' }}>
+                  {({ isActive }) => (
+                    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 18px', borderRadius: 10, cursor: 'pointer',
+                        background: isActive ? (dark ? '#3A1A1A' : '#FFF0EF') : 'transparent',
+                        transition: 'background 0.12s',
+                      }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = dark ? '#2A2B2C' : '#F0F2F5' }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <Icon size={17} color={isActive ? RED : (dark ? '#B0B3B8' : '#65676B')} strokeWidth={isActive ? 2.5 : 2} />
+                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 600, fontSize: 13.5, color: isActive ? RED : (dark ? '#B0B3B8' : '#65676B'), whiteSpace: 'nowrap' }}>
+                          {label}
+                        </span>
+                        {badge > 0 && (
+                          <span style={{ minWidth: 17, height: 17, borderRadius: 9, background: RED, color: 'white', fontSize: 9.5, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                            {badge > 9 ? '9+' : badge}
+                          </span>
+                        )}
+                      </div>
+                      {/* Active underline */}
+                      {isActive && (
+                        <div style={{ position: 'absolute', bottom: -1, left: '50%', transform: 'translateX(-50%)', width: 24, height: 2.5, borderRadius: 2, background: RED }} />
+                      )}
+                    </div>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
+          )}
+
+          {/* RIGHT — Search, notif, avatar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button onClick={onOpenSearch} style={{ width: 36, height: 36, borderRadius: 9, background: dark ? '#3A3B3C' : '#F4F6F8', border: `1.5px solid ${borderCol}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Search size={17} color={dark ? '#B0B3B8' : '#65676B'} />
             </button>
 
+            {/* Bell */}
             <div ref={notifRef} style={{ position: 'relative' }}>
-              <button onClick={() => { setShowNotifs(v => !v); setShowUserMenu(false) }}
-                style={{ width: 36, height: 36, borderRadius: 9, background: showNotifs ? '#FADBD8' : (dark ? '#3A3B3C' : '#F4F6F8'), border: `1.5px solid ${showNotifs ? '#F5B7B1' : (dark ? '#4A4B4C' : '#E4E6EB')}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'all 0.15s' }}>
+              <button onClick={() => setShowNotifs(v => !v)}
+                style={{ width: 36, height: 36, borderRadius: 9, background: showNotifs ? '#FADBD8' : (dark ? '#3A3B3C' : '#F4F6F8'), border: `1.5px solid ${showNotifs ? '#F5B7B1' : borderCol}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'all 0.15s' }}>
                 <CalendarClock size={17} color={showNotifs ? RED : (dark ? '#B0B3B8' : '#65676B')} strokeWidth={showNotifs ? 2.5 : 2} />
                 {unreadCount > 0 && (
                   <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 9, background: RED, color: 'white', fontSize: 9.5, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid white' }}>
@@ -280,137 +286,158 @@ export default function Layout({ children, onOpenSearch }) {
               )}
             </div>
 
+            {/* Avatar — clicking opens drawer on mobile, does nothing extra on desktop (sidebar is always visible) */}
             {!isDesktop && (
-              <div ref={menuRef} style={{ position: 'relative' }}>
-                <button onClick={() => { setShowUserMenu(v => !v); setShowNotifs(false) }} style={{ width: 36, height: 36, borderRadius: 9, border: `1.5px solid ${showUserMenu ? '#F5B7B1' : (dark ? '#4A4B4C' : '#E4E6EB')}`, background: 'transparent', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0 }}>
-                  <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                </button>
-                {showUserMenu && (
-                  <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 200, background: dark ? '#242526' : 'white', borderRadius: 13, border: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, boxShadow: '0 8px 28px rgba(0,0,0,0.18)', overflow: 'hidden', zIndex: 100, animation: 'slideDown 0.18s ease' }}>
-                    <div style={{ padding: '10px 12px', borderBottom: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}` }}>
-                      <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: dark ? '#E4E6EB' : '#1c1e21', fontFamily: '"Instrument Sans", system-ui' }}>{profile?.display_name}</p>
-                      <p style={{ margin: '1px 0 0', fontSize: 11, color: dark ? '#B0B3B8' : '#65676B', fontFamily: '"Instrument Sans", system-ui' }}>{profile?.email}</p>
-                    </div>
-                    <div style={{ padding: 5 }}>
-                      <MiniMenuBtn dark={dark} icon={<Settings size={13} />} label="Settings"  onClick={() => { navigate('/profile'); setShowUserMenu(false) }} />
-                      <MiniMenuBtn dark={dark} icon={<LogOut    size={13} />} label="Log Out"   onClick={handleSignOut} danger />
-                    </div>
-                  </div>
-                )}
+              <button onClick={() => setShowDrawer(true)} style={{ width: 36, height: 36, borderRadius: 9, border: `1.5px solid ${borderCol}`, background: 'transparent', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0 }}>
+                <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </button>
+            )}
+
+            {/* On desktop, show avatar as a static chip — no dropdown needed since sidebar is always visible */}
+            {isDesktop && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px 4px 4px', borderRadius: 22, background: dark ? '#3A3B3C' : '#F4F6F8', border: `1.5px solid ${borderCol}` }}>
+                <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', display: 'block', flexShrink: 0 }} />
+                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: dark ? '#E4E6EB' : '#050505', whiteSpace: 'nowrap', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {profile?.display_name}
+                </span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Mobile notif sheet */}
+        {showNotifs && !isDesktop && (
+          <div style={{ position: 'fixed', left: 0, right: 0, top: 52, zIndex: 99, animation: 'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
+            <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={() => setShowNotifs(false)} navigate={navigate} dark={dark} mobile />
+          </div>
+        )}
       </header>
 
-      {/* Mobile notif sheet */}
-      {showNotifs && !isDesktop && (
-        <div style={{ position: 'fixed', left: 0, right: 0, top: 52, zIndex: 99, animation: 'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
-          <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={() => setShowNotifs(false)} navigate={navigate} dark={dark} mobile />
-        </div>
-      )}
-
-      {/* ── DESKTOP 3-COLUMN ── */}
+      {/* ── DESKTOP 3-COLUMN (Facebook-style blended) ── */}
       {isDesktop ? (
-        <div style={{ display: 'flex', flex: 1, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+        <div style={{ display: 'flex', flex: 1, width: '100%', maxWidth: 1400, margin: '0 auto' }}>
 
-          {/* Left sidebar */}
-          <aside style={{ width: 260, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: dark ? '#242526' : 'white', borderRight: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, overflowY: 'auto' }}>
-            <SidebarContent />
+          {/* LEFT — personal sidebar, blends with bg */}
+          <aside style={{
+            width: 280, flexShrink: 0,
+            position: 'sticky', top: 52,
+            height: 'calc(100vh - 52px)',
+            background: sidebarBg,    // same as page bg — blends
+            overflowY: 'auto',
+            paddingTop: 12,
+          }}>
+            <PersonalSidebar />
           </aside>
 
-          {/* Center */}
-          <main style={{ flex: 1, minWidth: 0, background: dark ? '#18191A' : '#E9EBEE' }}>
-            <div style={{ maxWidth: 680, margin: '0 auto', paddingBottom: 32 }}>
+          {/* CENTER FEED */}
+          <main style={{ flex: 1, minWidth: 0, background: pageBg, paddingBottom: 32 }}>
+            <div style={{ maxWidth: 680, margin: '0 auto' }}>
               {children}
             </div>
           </main>
 
-          {/* Right sidebar — Online users */}
-          <aside style={{ width: 260, flexShrink: 0, position: 'sticky', top: 52, height: 'calc(100vh - 52px)', background: dark ? '#242526' : 'white', borderLeft: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, display: 'flex', flexDirection: 'column' }}>
-
-            {/* Header */}
-            <div style={{ padding: '16px 16px 10px', borderBottom: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 2px rgba(34,197,94,0.25)', flexShrink: 0 }} />
-              <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: dark ? '#E4E6EB' : '#050505' }}>Online</span>
-              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: dark ? '#6A6D70' : '#BCC0C4' }}>
-                {onlineUsers.length + (appearOffline ? 0 : 1)}
-              </span>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
-
-              {/* Self row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, marginBottom: 4, background: dark ? '#2A2B2C' : '#F7F8FA' }}>
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover', display: 'block' }} alt="" />
-                  <div style={{ position: 'absolute', bottom: -1, right: -1, width: 11, height: 11, borderRadius: '50%', background: appearOffline ? '#8A8D91' : '#22C55E', border: `2px solid ${dark ? '#2A2B2C' : '#F7F8FA'}` }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: dark ? '#E4E6EB' : '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {profile?.display_name}
-                    <span style={{ fontWeight: 500, fontSize: 10.5, color: dark ? '#6A6D70' : '#BCC0C4', marginLeft: 5 }}>You</span>
-                  </p>
-                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 600, color: appearOffline ? '#8A8D91' : '#22C55E' }}>
-                    {appearOffline ? 'Appearing offline' : 'Online'}
-                  </p>
-                </div>
-
-                {/* 3-dot for self */}
-                <div ref={selfMenuRef} style={{ position: 'relative' }}>
-                  <button onClick={() => setSelfMenuOpen(v => !v)}
-                    style={{ width: 28, height: 28, borderRadius: 7, background: selfMenuOpen ? (dark ? '#3A3B3C' : '#E4E6EB') : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = dark ? '#3A3B3C' : '#E4E6EB'}
-                    onMouseLeave={e => { if (!selfMenuOpen) e.currentTarget.style.background = 'transparent' }}>
-                    <MoreHorizontal size={15} color={dark ? '#B0B3B8' : '#65676B'} />
-                  </button>
-                  {selfMenuOpen && (
-                    <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', width: 195, background: dark ? '#2E2F30' : 'white', borderRadius: 10, border: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, boxShadow: '0 6px 20px rgba(0,0,0,0.15)', overflow: 'hidden', zIndex: 50, animation: 'slideDown 0.15s ease' }}>
-                      <button
-                        onClick={() => { toggleAppearOffline(); setSelfMenuOpen(false) }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: dark ? '#E4E6EB' : '#1c1e21', textAlign: 'left', transition: 'background 0.1s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = dark ? '#3A3B3C' : '#F7F8FA'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        {appearOffline
-                          ? <><Eye     size={14} color="#22C55E" /> Show as online</>
-                          : <><EyeOff  size={14} color="#8A8D91" /> Appear offline</>
-                        }
-                      </button>
-                    </div>
-                  )}
-                </div>
+          {/* RIGHT — Online users, blends with bg */}
+          <aside style={{
+            width: 280, flexShrink: 0,
+            position: 'sticky', top: 52,
+            height: 'calc(100vh - 52px)',
+            background: sidebarBg,
+            overflowY: 'auto',
+            paddingTop: 12,
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Online panel card */}
+            <div style={{
+              margin: '0 8px',
+              background: dark ? '#242526' : 'white',
+              borderRadius: 12,
+              border: `1px solid ${borderCol}`,
+              overflow: 'hidden',
+              flex: 1,
+              display: 'flex', flexDirection: 'column',
+            }}>
+              {/* Header */}
+              <div style={{ padding: '12px 14px 10px', borderBottom: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 0 2px rgba(34,197,94,0.25)', flexShrink: 0 }} />
+                <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: dark ? '#E4E6EB' : '#050505', flex: 1 }}>Online</span>
+                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: dark ? '#6A6D70' : '#BCC0C4' }}>
+                  {onlineUsers.length + (appearOffline ? 0 : 1)}
+                </span>
               </div>
 
-              {onlineUsers.length > 0 && <div style={{ height: 1, background: dark ? '#3A3B3C' : '#F0F2F5', margin: '4px 4px 8px' }} />}
-
-              {onlineUsers.length === 0 ? (
-                <div style={{ padding: '20px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 26, marginBottom: 6 }}>👥</div>
-                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12.5, color: dark ? '#6A6D70' : '#BCC0C4' }}>No one else online</p>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
+                {/* Self row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px', borderRadius: 10, marginBottom: 4, background: dark ? '#2A2B2C' : '#F7F8FA' }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover', display: 'block' }} alt="" />
+                    <div style={{ position: 'absolute', bottom: -1, right: -1, width: 11, height: 11, borderRadius: '50%', background: appearOffline ? '#8A8D91' : '#22C55E', border: `2px solid ${dark ? '#2A2B2C' : '#F7F8FA'}` }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: dark ? '#E4E6EB' : '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {profile?.display_name}
+                      <span style={{ fontWeight: 500, fontSize: 10.5, color: dark ? '#6A6D70' : '#BCC0C4', marginLeft: 5 }}>You</span>
+                    </p>
+                    <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 600, color: appearOffline ? '#8A8D91' : '#22C55E' }}>
+                      {appearOffline ? 'Appearing offline' : 'Online'}
+                    </p>
+                  </div>
+                  {/* 3-dot */}
+                  <div ref={selfMenuRef} style={{ position: 'relative' }}>
+                    <button onClick={() => setSelfMenuOpen(v => !v)}
+                      style={{ width: 28, height: 28, borderRadius: 7, background: selfMenuOpen ? (dark ? '#3A3B3C' : '#E4E6EB') : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = dark ? '#3A3B3C' : '#E4E6EB'}
+                      onMouseLeave={e => { if (!selfMenuOpen) e.currentTarget.style.background = 'transparent' }}>
+                      <MoreHorizontal size={15} color={dark ? '#B0B3B8' : '#65676B'} />
+                    </button>
+                    {selfMenuOpen && (
+                      <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', width: 195, background: dark ? '#2E2F30' : 'white', borderRadius: 10, border: `1px solid ${borderCol}`, boxShadow: '0 6px 20px rgba(0,0,0,0.15)', overflow: 'hidden', zIndex: 50, animation: 'slideDown 0.15s ease' }}>
+                        <button
+                          onClick={() => { toggleAppearOffline(); setSelfMenuOpen(false) }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: dark ? '#E4E6EB' : '#1c1e21', textAlign: 'left' }}
+                          onMouseEnter={e => e.currentTarget.style.background = dark ? '#3A3B3C' : '#F7F8FA'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          {appearOffline
+                            ? <><Eye    size={14} color="#22C55E" /> Show as online</>
+                            : <><EyeOff size={14} color="#8A8D91" /> Appear offline</>
+                          }
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                onlineUsers.map(u => (
-                  <OnlineUserRow key={u.id} user={u} dark={dark} onDM={() => navigate('/messages', { state: { openDM: u.id } })} />
-                ))
-              )}
-            </div>
 
-            <div style={{ padding: '10px 14px', borderTop: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}`, flexShrink: 0 }}>
-              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: dark ? '#6A6D70' : '#BCC0C4', textAlign: 'center' }}>Only active users shown</p>
+                {onlineUsers.length > 0 && <div style={{ height: 1, background: dark ? '#3A3B3C' : '#F0F2F5', margin: '4px 4px 8px' }} />}
+
+                {onlineUsers.length === 0 ? (
+                  <div style={{ padding: '20px 12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 26, marginBottom: 6 }}>👥</div>
+                    <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12.5, color: dark ? '#6A6D70' : '#BCC0C4' }}>No one else online</p>
+                  </div>
+                ) : (
+                  onlineUsers.map(u => (
+                    <OnlineUserRow key={u.id} user={u} dark={dark}
+                      onDM={() => navigate('/messages', { state: { openDM: u.id } })} />
+                  ))
+                )}
+              </div>
+
+              <div style={{ padding: '10px 14px', borderTop: `1px solid ${dark ? '#3A3B3C' : '#F0F2F5'}`, flexShrink: 0 }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: dark ? '#6A6D70' : '#BCC0C4', textAlign: 'center' }}>Only active users shown</p>
+              </div>
             </div>
           </aside>
         </div>
       ) : (
-        /* Mobile */
+        /* ── MOBILE ── */
         <main style={{ flex: 1, maxWidth: 680, margin: '0 auto', width: '100%', paddingBottom: 64 }}>
           {children}
         </main>
       )}
 
-      {/* Mobile bottom nav */}
+      {/* ── MOBILE BOTTOM NAV ── */}
       {!isDesktop && (
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40, background: dark ? 'rgba(36,37,38,0.97)' : 'rgba(255,255,255,0.97)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`, boxShadow: '0 -1px 8px rgba(0,0,0,0.06)' }}>
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40, background: dark ? 'rgba(36,37,38,0.97)' : 'rgba(255,255,255,0.97)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${borderCol}`, boxShadow: '0 -1px 8px rgba(0,0,0,0.06)' }}>
           <div style={{ maxWidth: 680, margin: '0 auto', height: 52, display: 'flex', alignItems: 'center', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
               <NavLink key={to} to={to} end={exact} style={{ flex: 1, textDecoration: 'none' }}>
@@ -441,19 +468,19 @@ export default function Layout({ children, onOpenSearch }) {
       {showAbout && <AboutModal     onClose={() => setShowAbout(false)} />}
 
       <style>{`
-        @keyframes fadeIn         { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideDown      { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes slideUp        { from { opacity: 0; transform: translateY(6px)  } to { opacity: 1; transform: translateY(0) } }
-        @keyframes slideDownSheet { from { opacity: 0; transform: translateY(-100%) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
+        @keyframes slideDown      { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }
+        @keyframes slideDownSheet { from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)} }
       `}</style>
     </div>
   )
 }
 
+// ── Online user row ───────────────────────────────────────────
 function OnlineUserRow({ user, dark, onDM }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, marginBottom: 2, background: hovered ? (dark ? '#2E2F30' : '#F7F8FA') : 'transparent', transition: 'background 0.12s' }}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px', borderRadius: 10, marginBottom: 2, background: hovered ? (dark ? '#2E2F30' : '#F7F8FA') : 'transparent', transition: 'background 0.12s' }}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <img src={user.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.display_name||'U')}&backgroundColor=0D7377&textColor=ffffff`}
@@ -480,8 +507,8 @@ function SidebarBtn({ icon, label, onClick, danger, dark }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? (dark ? '#3A1A1A' : '#FFF5F5') : (dark ? '#3A3B3C' : '#F7F8FA')) : 'transparent', color: danger ? RED : (dark ? '#E4E6EB' : '#1c1e21'), fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, borderRadius: 10, transition: 'background 0.12s', marginBottom: 2 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: hovered ? (danger ? (dark ? '#4A2020' : '#FADBD8') : (dark ? '#4A4B4C' : '#EAECEF')) : (dark ? '#3A3B3C' : '#F0F2F5'), display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}>
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? (dark ? '#3A1A1A' : '#FFF5F5') : (dark ? '#3A3B3C' : '#E4E6EB')) : 'transparent', color: danger ? RED : (dark ? '#E4E6EB' : '#1c1e21'), fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, borderRadius: 10, transition: 'background 0.12s', marginBottom: 2 }}>
+      <div style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0, background: hovered ? (danger ? (dark ? '#4A2020' : '#FADBD8') : (dark ? '#4A4B4C' : '#CED0D4')) : (dark ? '#3A3B3C' : '#E4E6EB'), display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.12s' }}>
         {icon}
       </div>
       {label}
@@ -489,26 +516,12 @@ function SidebarBtn({ icon, label, onClick, danger, dark }) {
   )
 }
 
-function MiniMenuBtn({ icon, label, onClick, danger, dark }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', border: 'none', cursor: 'pointer', textAlign: 'left', background: hovered ? (danger ? '#FFF5F5' : (dark ? '#3A3B3C' : '#F7F8FA')) : 'transparent', color: danger ? RED : (dark ? '#E4E6EB' : '#1c1e21'), fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, borderRadius: 7, transition: 'background 0.12s' }}>
-      {icon} {label}
-    </button>
-  )
-}
-
 function SectionLabel({ label, dark }) {
-  return (
-    <p style={{ margin: '8px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: dark ? '#6A6D70' : '#BCC0C4', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-      {label}
-    </p>
-  )
+  return <p style={{ margin: '8px 10px 4px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10, fontWeight: 700, color: dark ? '#6A6D70' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.8 }}>{label}</p>
 }
 
 function Divider({ dark }) {
-  return <div style={{ height: 1, background: dark ? '#3A3B3C' : '#F0F2F5', margin: '8px 4px' }} />
+  return <div style={{ height: 1, background: dark ? '#3A3B3C' : '#D4D6DA', margin: '8px 4px' }} />
 }
 
 function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose, navigate, dark, mobile }) {
