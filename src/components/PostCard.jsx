@@ -1,3 +1,4 @@
+import { useSavedPosts } from '../contexts/SavedPostsContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import {
@@ -338,7 +339,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
   const [liking, setLiking] = useState(false)
   const [commentCount, setCommentCount] = useState(0)
   const [showComments, setShowComments] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const { isSaved, toggleSaved } = useSavedPosts()
+  const saved = isSaved(post.id)
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
@@ -539,7 +541,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile }
                   </>
                 ) : (
                   <button
-                    onClick={() => { setSaved(s => !s); setShowMenu(false) }}
+                    onClick={() => { toggleSaved(postData.id); setShowMenu(false) }}
                     style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'10px 14px', border:'none', cursor:'pointer', background:'transparent', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color: saved ? '#1A5276' : '#050505', textAlign:'left', transition:'background 0.1s' }}
                     onMouseEnter={e=>e.currentTarget.style.background='#F7F8FA'}
                     onMouseLeave={e=>e.currentTarget.style.background='transparent'}
