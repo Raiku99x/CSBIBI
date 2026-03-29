@@ -86,15 +86,22 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
   }, [])
 
   // ── Paste-only: block all keyboard except Ctrl+V / Cmd+V ──
-  function handlePasteAreaKeyDown(e) {
-    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
-    const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
-    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
-    if (!isPaste && !isSelectAll && !isCopy &&
-        !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
-      e.preventDefault()
-    }
+function handlePasteAreaKeyDown(e) {
+  const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
+  const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
+  const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
+  if (!isPaste && !isSelectAll && !isCopy &&
+      !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault()
   }
+}
+
+function handlePasteAreaBeforeInput(e) {
+  // Block all direct text input — only allow paste (inputType === 'insertFromPaste')
+  if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') {
+    e.preventDefault()
+  }
+}
 
   // ── Paste button: read from clipboard ────────────────────
   async function handlePasteButton() {
@@ -401,6 +408,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                     value={form.quoted_message}
                     onChange={e => set('quoted_message', e.target.value)}
                     onKeyDown={handlePasteAreaKeyDown}
+                    onBeforeInput={handlePasteAreaBeforeInput}
                     placeholder="Paste the exact message here…"
                     rows={3}
                     style={{
