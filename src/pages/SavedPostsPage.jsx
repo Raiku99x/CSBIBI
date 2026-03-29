@@ -5,6 +5,7 @@ import { useSavedPosts } from '../contexts/SavedPostsContext'
 import PostCard from '../components/PostCard'
 import { PostSkeleton } from '../components/Skeletons'
 import { X, Bookmark } from 'lucide-react'
+import UserProfilePage from './UserProfilePage'
 
 const RED = '#C0392B'
 
@@ -13,6 +14,7 @@ export default function SavedPostsPage({ onClose }) {
   const { savedIds } = useSavedPosts()
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [viewingUserId, setViewingUserId] = useState(null)
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -95,11 +97,23 @@ export default function SavedPostsPage({ onClose }) {
           />
         ) : (
           posts.map(post => (
-            <PostCard key={post.id} post={post} currentUserId={user?.id} />
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUserId={user?.id}
+              onUserClick={(p) => setViewingUserId(p?.id)}
+            />
           ))
         )}
       </div>
 
+      {viewingUserId && (
+        <UserProfilePage
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+        />
+      )}
+      
       <style>{`
         @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
