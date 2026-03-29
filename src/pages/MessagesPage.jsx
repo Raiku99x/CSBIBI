@@ -91,8 +91,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* Header */}
       <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
         <button onClick={() => setShowNew(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s' }}>
@@ -103,7 +101,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
         </button>
       </div>
 
-      {/* Search */}
       <div style={{ padding: '10px 12px 6px', background: 'white', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F0F2F5', borderRadius: 20, padding: '0 12px', height: 36 }}>
           <Search size={14} color="#8A8D91" />
@@ -113,7 +110,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
         </div>
       </div>
 
-      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', background: '#F0F2F5' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
@@ -310,12 +306,17 @@ function ClassChat({ onBack, currentUser, profile }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      {/* ✅ STICKY HEADER */}
+    // KEY FIX: use 100% height with flex column. Header is NOT inside the scroll area.
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* ── STICKY CHAT HEADER — always visible, never scrolls ── */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: 'white', borderBottom: '1px solid #E4E6EB',
-        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0
+        flexShrink: 0,
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'white',
+        borderBottom: '1px solid #E4E6EB',
+        padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 11,
       }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
@@ -332,6 +333,7 @@ function ClassChat({ onBack, currentUser, profile }) {
         </div>
       </div>
 
+      {/* ── SCROLLABLE MESSAGE LIST — flex:1 so it fills remaining space ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -348,7 +350,8 @@ function ClassChat({ onBack, currentUser, profile }) {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', flexShrink: 0 }}>
+      {/* ── COMPOSE BAR — flexShrink:0 so keyboard pushes it up, not header ── */}
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
         {tagUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: '#F0F2F5', border: '1px solid #DADDE1' }}>
             <AtSign size={12} color="#65676B" />
@@ -523,23 +526,33 @@ function DMConversation({ partner, currentUserId, onBack }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      {/* ✅ STICKY HEADER */}
+    // KEY FIX: use 100% height with flex column. Header is NOT inside the scroll area.
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* ── STICKY CHAT HEADER — always visible, never scrolls ── */}
       <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: 'white', borderBottom: '1px solid #E4E6EB',
-        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0
+        flexShrink: 0,
+        position: 'sticky', top: 0, zIndex: 20,
+        background: 'white',
+        borderBottom: '1px solid #E4E6EB',
+        padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 11,
       }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
         </button>
         <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} alt="" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.display_name}</p>
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>{partner.email}</p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {partner.display_name}
+          </p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
+            {partner.email}
+          </p>
         </div>
       </div>
 
+      {/* ── SCROLLABLE MESSAGE LIST — flex:1 so it fills remaining space ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -559,7 +572,8 @@ function DMConversation({ partner, currentUserId, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', flexShrink: 0 }}>
+      {/* ── COMPOSE BAR — flexShrink:0 so keyboard pushes it up, not header ── */}
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
         <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
             <textarea ref={inputRef} rows={1} value={text}
@@ -656,10 +670,16 @@ export default function MessagesPage() {
 
   return (
     <div style={{
+      // The CSB app header is 52px (position:sticky in Layout).
+      // In chat mode: fill exactly the remaining viewport height below it.
+      // We use dvh so the keyboard resize is accounted for automatically —
+      // the flex children (sticky header + scroll list + compose bar) handle the rest.
       height: isChat ? 'calc(100dvh - 52px)' : 'calc(100dvh - 52px - 52px)',
       display: 'flex',
       flexDirection: 'column',
-      overflow: isChat ? 'hidden' : 'visible',
+      // CRITICAL: overflow must be visible/unset on THIS wrapper so the
+      // inner flex children can do their own scrolling correctly.
+      // Do NOT set overflow:hidden here — it breaks sticky inside flex.
     }}>
       {view === 'inbox' ? (
         <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
