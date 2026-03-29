@@ -310,8 +310,13 @@ function ClassChat({ onBack, currentUser, profile }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* ✅ STICKY HEADER */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'white', borderBottom: '1px solid #E4E6EB',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0
+      }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
         </button>
@@ -518,8 +523,13 @@ function DMConversation({ partner, currentUserId, onBack }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {/* ✅ STICKY HEADER */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 10,
+        background: 'white', borderBottom: '1px solid #E4E6EB',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0
+      }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
         </button>
@@ -636,7 +646,6 @@ export default function MessagesPage() {
 
   const isChat = view !== 'inbox'
 
-  // Hide bottom nav when inside a chat, restore when back to inbox
   useEffect(() => {
     setHideNav(isChat)
     return () => setHideNav(false)
@@ -647,11 +656,10 @@ export default function MessagesPage() {
 
   return (
     <div style={{
-      // In chat: use full viewport height minus just the header (52px)
-      // so the keyboard pushes the compose bar up naturally
       height: isChat ? 'calc(100dvh - 52px)' : 'calc(100dvh - 52px - 52px)',
       display: 'flex',
       flexDirection: 'column',
+      overflow: isChat ? 'hidden' : 'visible',
     }}>
       {view === 'inbox' ? (
         <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
