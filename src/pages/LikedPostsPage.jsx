@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import PostCard from '../components/PostCard'
+import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
 import { X, Heart } from 'lucide-react'
 
@@ -11,6 +12,7 @@ export default function LikedPostsPage({ onClose }) {
   const { user } = useAuth()
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [viewingUserId, setViewingUserId] = useState(null)
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -19,7 +21,6 @@ export default function LikedPostsPage({ onClose }) {
 
   useEffect(() => {
     async function load() {
-      // Get post IDs the user liked
       const { data: likes } = await supabase
         .from('likes')
         .select('post_id')
@@ -52,11 +53,7 @@ export default function LikedPostsPage({ onClose }) {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: '#FADBD8',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FADBD8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Heart size={17} color={RED} fill={RED} />
           </div>
           <div>
@@ -70,8 +67,7 @@ export default function LikedPostsPage({ onClose }) {
             )}
           </div>
         </div>
-        <button
-          onClick={onClose}
+        <button onClick={onClose}
           style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--surface, #E4E6EB)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
           onMouseLeave={e => e.currentTarget.style.background = 'var(--surface, #E4E6EB)'}
@@ -92,10 +88,22 @@ export default function LikedPostsPage({ onClose }) {
           </div>
         ) : (
           posts.map(post => (
-            <PostCard key={post.id} post={post} currentUserId={user?.id} />
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUserId={user?.id}
+              onUserClick={(p) => setViewingUserId(p?.id)}
+            />
           ))
         )}
       </div>
+
+      {viewingUserId && (
+        <UserProfilePage
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+        />
+      )}
 
       <style>{`
         @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
