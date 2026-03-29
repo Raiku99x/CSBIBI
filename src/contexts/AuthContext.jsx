@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
-// Letter-based avatar color — muted, jade-aligned
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','5C4A7A','6B5B8A','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','4A3A7A','3E3068']
 function avatarHex(name = '') {
   const c = (name.trim()[0] || 'A').toUpperCase()
@@ -14,7 +13,7 @@ function dicebearUrl(name = '') {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser]       = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -37,7 +36,7 @@ export function AuthProvider({ children }) {
   async function fetchProfile(userId) {
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -74,15 +73,27 @@ export function AuthProvider({ children }) {
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select()
+      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at')
       .single()
     if (error) throw error
     setProfile(data)
     return data
   }
 
+  // Call this to manually refresh profile (e.g. after role change notification)
+  async function refreshProfile() {
+    if (!user) return
+    await fetchProfile(user.id)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile, fetchProfile: () => fetchProfile(user?.id) }}>
+    <AuthContext.Provider value={{
+      user, profile, loading,
+      signUp, signIn, signOut,
+      updateProfile,
+      fetchProfile: () => fetchProfile(user?.id),
+      refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   )
