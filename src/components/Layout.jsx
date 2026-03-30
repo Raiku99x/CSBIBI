@@ -43,6 +43,49 @@ function useIsDesktop() {
   return v
 }
 
+// ── Force logout hook ─────────────────────────────────────────
+// Subscribes to realtime changes on the current user's profile row.
+// If force_logout_at is set to a time AFTER the current session was
+// created, the user is signed out immediately.
+function useForceLogout(profile, signOut, navigate) {
+  useEffect(() => {
+    if (!profile?.id) return
+
+    // Get the session creation time so we don't log out for old flags
+    let sessionCreatedAt = null
+    supabase.auth.getSession().then(({ data }) => {
+      sessionCreatedAt = data?.session?.created_at
+        ? new Date(data.session.created_at)
+        : new Date(0)
+    })
+
+    const channel = supabase
+      .channel('force-logout-' + profile.id)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`,
+        },
+        async (payload) => {
+          const flaggedAt = payload.new?.force_logout_at
+          if (!flaggedAt) return
+          const flagTime = new Date(flaggedAt)
+          // Only act if the flag was set AFTER this session started
+          if (sessionCreatedAt && flagTime > sessionCreatedAt) {
+            await supabase.auth.signOut()
+            navigate('/auth')
+          }
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [profile?.id])
+}
+
 function getNavItems(dmUnread) {
   return [
     { to: '/',              icon: Home,          label: 'Feed',      exact: true },
@@ -96,19 +139,22 @@ export default function Layout({ children, onOpenSearch }) {
 
   const { onlineUsers } = usePresence(profile?.id, profile, appearOffline)
 
-  const [showDrawer,   setShowDrawer]   = useState(false)
-  const [showNotifs,   setShowNotifs]   = useState(false)
-  const [dmUnread,     setDmUnread]     = useState(0)
-  const [showSaved,    setShowSaved]    = useState(false)
-  const [showLiked,    setShowLiked]    = useState(false)
-  const [showAbout,    setShowAbout]    = useState(false)
+  const [showDrawer,    setShowDrawer]    = useState(false)
+  const [showNotifs,    setShowNotifs]    = useState(false)
+  const [dmUnread,      setDmUnread]      = useState(0)
+  const [showSaved,     setShowSaved]     = useState(false)
+  const [showLiked,     setShowLiked]     = useState(false)
+  const [showAbout,     setShowAbout]     = useState(false)
   const [showDashboard, setShowDashboard] = useState(false)
-  const [selfMenuOpen, setSelfMenuOpen] = useState(false)
+  const [selfMenuOpen,  setSelfMenuOpen]  = useState(false)
 
   const notifRef    = useRef(null)
   const selfMenuRef = useRef(null)
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
   const navItems = getNavItems(dmUnread)
+
+  // ── Wire up force logout ──────────────────────────────────────
+  useForceLogout(profile, signOut, navigate)
 
   useEffect(() => {
     function h(e) {
@@ -244,7 +290,6 @@ export default function Layout({ children, onOpenSearch }) {
                 <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>
                   {isSuperadmin ? 'Admin' : 'Moderator'}
                 </p>
-                {/* Mod mode toggle row */}
                 <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2 }}>
                   <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:modMode?(isSuperadmin?'#FEF9C3':'#EBF5FB'):surfaceBg,display:'flex',alignItems:'center',justifyContent:'center' }}>
                     {isSuperadmin
@@ -337,7 +382,6 @@ export default function Layout({ children, onOpenSearch }) {
                 </div>
                 <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:19,color:RED,letterSpacing:'-0.5px',lineHeight:1 }}>CSB</span>
               </div>
-              {/* Mod chip shown in header when active */}
               {modMode && <ModChip isSuperadmin={isSuperadmin} />}
             </div>
 
@@ -466,9 +510,9 @@ export default function Layout({ children, onOpenSearch }) {
           </nav>
         )}
 
-        {showSaved && <SavedPostsPage onClose={() => setShowSaved(false)}/>}
-        {showLiked && <LikedPostsPage onClose={() => setShowLiked(false)}/>}
-        {showAbout && <AboutModal     onClose={() => setShowAbout(false)}/>}
+        {showSaved     && <SavedPostsPage onClose={() => setShowSaved(false)}/>}
+        {showLiked     && <LikedPostsPage onClose={() => setShowLiked(false)}/>}
+        {showAbout     && <AboutModal     onClose={() => setShowAbout(false)}/>}
         {showDashboard && <AdminDashboard onClose={() => setShowDashboard(false)}/>}
 
         <style>{`
@@ -559,7 +603,7 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
 function NotifItem({ notif, onRead, onClose, navigate, cardBg, textPri, textSec, surfaceBg }) {
   const [hovered, setHovered] = useState(false)
   const RED = '#C0392B'
-  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬' }
+  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨' }
   function handleClick() { onRead(notif.id); onClose(); if (notif.post_id) navigate(`/?post=${notif.post_id}`) }
   return (
     <button onClick={handleClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
