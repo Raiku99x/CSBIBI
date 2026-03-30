@@ -8,7 +8,7 @@ import { PostSkeleton } from '../components/Skeletons'
 import {
   X, Shield, Crown, Ban, VolumeX, Volume2,
   UserX, UserCheck, ChevronDown, Loader2,
-  Heart, MessageSquare, Calendar
+  Heart, MessageSquare, Calendar, LogOut
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -48,11 +48,12 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
   const [loading, setLoading]   = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Mute modal
-  const [showMuteModal, setShowMuteModal]   = useState(false)
-  const [showBanModal, setShowBanModal]     = useState(false)
-  const [banReason, setBanReason]           = useState('')
-  const [muteHours, setMuteHours]           = useState('24')
+  // Modals
+  const [showMuteModal, setShowMuteModal]           = useState(false)
+  const [showBanModal, setShowBanModal]             = useState(false)
+  const [showForceLogoutModal, setShowForceLogoutModal] = useState(false)
+  const [banReason, setBanReason]                   = useState('')
+  const [muteHours, setMuteHours]                   = useState('24')
 
   const canModerate = (isModerator || isSuperadmin) && modMode
   const isOwnProfile = userId === currentUser?.id
@@ -76,7 +77,6 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
       if (profileData) setProfile(profileData)
       if (postsData) {
         setPosts(postsData)
-        // Count likes received
         const postIds = postsData.map(p => p.id)
         if (postIds.length > 0) {
           const { count } = await supabase.from('likes').select('id', { count: 'exact', head: true }).in('post_id', postIds)
@@ -104,7 +104,6 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
         target_id: profile.id,
         metadata: { hours, muted_until: mutedUntil },
       })
-      // System notification to user
       await supabase.from('notifications').insert({
         user_id: profile.id,
         type: 'announcement',
@@ -237,6 +236,47 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
     finally { setActionLoading(false) }
   }
 
+  // ── Force Logout ────────────────────────────────────────────
+  // Strategy: set a `force_logout_at` timestamp on the profile.
+  // The app's auth listener (or a useEffect in Layout/App) checks this value
+  // against the user's session start time and signs them out if stale.
+  async function handleForceLogout() {
+    if (!profile) return
+    setActionLoading(true)
+    try {
+      const now = new Date().toISOString()
+
+      // 1. Stamp the profile so the target user's client detects it
+      await supabase.from('profiles')
+        .update({ force_logout_at: now })
+        .eq('id', profile.id)
+
+      // 2. Audit log
+      await supabase.from('audit_logs').insert({
+        actor_id: currentUser.id,
+        action: 'force_logout',
+        target_type: 'profile',
+        target_id: profile.id,
+        metadata: { force_logout_at: now },
+      })
+
+      // 3. Notify the user (they'll see it when they log back in)
+      await supabase.from('notifications').insert({
+        user_id: profile.id,
+        type: 'announcement',
+        message: `🔐 You have been signed out by an administrator.`,
+        is_read: false,
+      })
+
+      setShowForceLogoutModal(false)
+      toast.success(`${profile.display_name} will be signed out immediately`)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   return (
     <>
       {/* Backdrop */}
@@ -353,6 +393,10 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
                         {profile.role === 'moderator' && (
                           <ActionButton label="Remove Mod" icon={<Shield size={13}/>} color="#65676B" bg="#F0F2F5" onClick={handleDemote} loading={actionLoading}/>
                         )}
+                        {/* Force Logout — superadmin only, not on other superadmins */}
+                        {profile.role !== 'superadmin' && (
+                          <ActionButton label="Force Logout" icon={<LogOut size={13}/>} color="#7C3AED" bg="#F5F3FF" onClick={() => setShowForceLogoutModal(true)} loading={actionLoading}/>
+                        )}
                       </>
                     )}
                   </div>
@@ -420,6 +464,32 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
             {actionLoading && <Loader2 size={15} style={{ animation:'spin 0.8s linear infinite' }}/>}
             Ban User
           </button>
+        </SimpleModal>
+      )}
+
+      {/* Force Logout modal */}
+      {showForceLogoutModal && (
+        <SimpleModal title="Force Logout" onClose={() => setShowForceLogoutModal(false)}>
+          <div style={{ background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,alignItems:'flex-start' }}>
+            <LogOut size={15} color="#7C3AED" style={{ flexShrink:0,marginTop:1 }}/>
+            <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#5B21B6',lineHeight:1.5 }}>
+              This will immediately invalidate <strong>{profile?.display_name}</strong>'s session. They will be signed out on all devices and must log in again.
+            </p>
+          </div>
+          <p style={{ margin:'0 0 16px',fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:'#1c1e21' }}>
+            Are you sure you want to force logout <strong>{profile?.display_name}</strong>?
+          </p>
+          <div style={{ display:'flex',gap:8 }}>
+            <button onClick={() => setShowForceLogoutModal(false)}
+              style={{ flex:1,padding:'11px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:'#65676B',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14 }}>
+              Cancel
+            </button>
+            <button onClick={handleForceLogout} disabled={actionLoading}
+              style={{ flex:1,padding:'11px',borderRadius:10,border:'none',background:'#7C3AED',color:'white',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8 }}>
+              {actionLoading && <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }}/>}
+              Force Logout
+            </button>
+          </div>
         </SimpleModal>
       )}
 
