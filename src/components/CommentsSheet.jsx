@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useMuteGate } from '../hooks/useMuteGate'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Send, Loader2, Trash2 } from 'lucide-react'
+import { X, Send, Loader2, Trash2, MicOff } from 'lucide-react'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -15,6 +16,7 @@ const RED = '#C0392B'
 
 export default function CommentsSheet({ postId, onClose, onCommentCountChange }) {
   const { user, profile } = useAuth()
+  const { isMuted, muteMessage } = useMuteGate()
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -34,7 +36,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   useEffect(() => {
     fetchComments()
-    // Realtime for new comments
     const ch = supabase.channel('comments-' + postId)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'comments',
@@ -63,7 +64,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [comments])
 
-  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -71,7 +71,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   async function handleSend(e) {
     e.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() || isMuted) return
     setSending(true)
     const content = text.trim()
     setText('')
@@ -97,7 +97,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -107,7 +106,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         }}
       />
 
-      {/* Sheet */}
       <div style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 680, zIndex: 61,
@@ -119,12 +117,10 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         animation: 'slideUp 0.25s cubic-bezier(0.16,1,0.3,1)',
       }}>
 
-        {/* Drag handle */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E4E6EB' }} />
         </div>
 
-        {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '4px 16px 12px', borderBottom: '1px solid #F0F2F5',
@@ -140,7 +136,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           </button>
         </div>
 
-        {/* Comments list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
@@ -166,62 +161,92 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
+        {/* Input area — replaced with mute banner if muted */}
         <div style={{
-          padding: '10px 12px',
           borderTop: '1px solid #F0F2F5',
           paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
           background: 'white',
         }}>
-          <form onSubmit={handleSend} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-            <img
-              src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-              style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
-              alt=""
-            />
+          {isMuted ? (
             <div style={{
-              flex: 1, background: '#F0F2F5', borderRadius: 20, padding: '8px 14px',
-              display: 'flex', alignItems: 'center',
+              margin: '10px 12px',
+              padding: '12px 14px',
+              background: '#FFF3E0',
+              border: '1px solid #FFB74D',
+              borderRadius: 12,
+              display: 'flex', alignItems: 'center', gap: 10,
             }}>
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={text}
-                onChange={e => {
-                  setText(e.target.value)
-                  e.target.style.height = 'auto'
-                  e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'
-                }}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
-                placeholder="Write a comment…"
-                style={{
-                  flex: 1, border: 'none', background: 'transparent', outline: 'none',
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505',
-                  resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block',
-                  width: '100%',
-                }}
-              />
+              <MicOff size={18} color="#E65100" style={{ flexShrink: 0 }} />
+              <div>
+                <p style={{
+                  margin: 0,
+                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13,
+                  color: '#E65100',
+                }}>
+                  You are muted
+                </p>
+                <p style={{
+                  margin: '2px 0 0',
+                  fontFamily: '"Instrument Sans", system-ui', fontSize: 12,
+                  color: '#BF360C',
+                }}>
+                  {muteMessage}
+                </p>
+              </div>
             </div>
-            <button
-              type="submit"
-              disabled={sending || !text.trim()}
-              style={{
-                width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                background: text.trim() ? RED : '#E4E6EB',
-                border: 'none', cursor: text.trim() ? 'pointer' : 'default',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'background 0.15s, transform 0.1s',
-                boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none',
-              }}
-              onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
-              onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              {sending
-                ? <Loader2 size={16} color="white" style={{ animation: 'spin 0.8s linear infinite' }} />
-                : <Send size={15} color={text.trim() ? 'white' : '#BCC0C4'} />
-              }
-            </button>
-          </form>
+          ) : (
+            <div style={{ padding: '10px 12px' }}>
+              <form onSubmit={handleSend} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                <img
+                  src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
+                  style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                  alt=""
+                />
+                <div style={{
+                  flex: 1, background: '#F0F2F5', borderRadius: 20, padding: '8px 14px',
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  <textarea
+                    ref={inputRef}
+                    rows={1}
+                    value={text}
+                    onChange={e => {
+                      setText(e.target.value)
+                      e.target.style.height = 'auto'
+                      e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
+                    placeholder="Write a comment…"
+                    style={{
+                      flex: 1, border: 'none', background: 'transparent', outline: 'none',
+                      fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505',
+                      resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block',
+                      width: '100%',
+                    }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={sending || !text.trim()}
+                  style={{
+                    width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                    background: text.trim() ? RED : '#E4E6EB',
+                    border: 'none', cursor: text.trim() ? 'pointer' : 'default',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s, transform 0.1s',
+                    boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none',
+                  }}
+                  onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
+                  onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  {sending
+                    ? <Loader2 size={16} color="white" style={{ animation: 'spin 0.8s linear infinite' }} />
+                    : <Send size={15} color={text.trim() ? 'white' : '#BCC0C4'} />
+                  }
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       </div>
 
