@@ -6,7 +6,7 @@ import PostCard from '../components/PostCard'
 import CreatePostModal from '../components/CreatePostModal'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
-import { Image, Megaphone, Paperclip, VolumeX } from 'lucide-react'
+import { Image, Megaphone, Paperclip, VolumeX, Clock } from 'lucide-react'
 import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -19,6 +19,17 @@ function dicebearUrl(name = '') {
 }
 
 const RED = '#C0392B'
+
+/** Returns true if the post is scheduled and the publish time is still in the future */
+function isScheduledFuture(post) {
+  if (!post.scheduled_at) return false
+  return new Date(post.scheduled_at) > new Date()
+}
+
+/** Returns true if the current user is superadmin */
+function isSuperAdmin(profile) {
+  return profile?.role === 'superadmin'
+}
 
 export default function FeedPage() {
   const { user, profile } = useAuth()
@@ -53,6 +64,18 @@ export default function FeedPage() {
       }).subscribe()
     return () => supabase.removeChannel(channel)
   }, [fetchPosts])
+
+  /**
+   * Filter logic for scheduled posts:
+   * - If scheduled_at is in the future → only visible to the author and superadmins
+   * - Everyone else sees it hidden until publish time
+   */
+  const visiblePosts = posts.filter(post => {
+    if (!isScheduledFuture(post)) return true               // already published or no schedule
+    if (post.author_id === user?.id) return true            // author always sees their own
+    if (isSuperAdmin(profile)) return true                  // superadmin sees all
+    return false                                            // hide from everyone else
+  })
 
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
@@ -131,23 +154,28 @@ export default function FeedPage() {
       {/* ── Feed ── */}
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i}/>)}</div>
-      ) : posts.length === 0 ? (
+      ) : visiblePosts.length === 0 ? (
         <EmptyFeed onPost={() => tryOpenCreate('status', '')}/>
       ) : (
         <div>
-          {posts.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              currentUserId={user?.id}
-              subjects={subjects}
-              profile={profile}
-              onUserClick={handleUserClick}
-            />
+          {visiblePosts.map(post => (
+            <div key={post.id} style={{ position: 'relative' }}>
+              {/* Scheduled badge — only for author / superadmin */}
+              {isScheduledFuture(post) && (post.author_id === user?.id || isSuperAdmin(profile)) && (
+                <ScheduledBadge scheduledAt={post.scheduled_at} />
+              )}
+              <PostCard
+                post={post}
+                currentUserId={user?.id}
+                subjects={subjects}
+                profile={profile}
+                onUserClick={handleUserClick}
+              />
+            </div>
           ))}
           <div style={{ padding:'16px 0 8px', textAlign:'center' }}>
             <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>
-              · {posts.length} posts · You're all caught up ·
+              · {visiblePosts.length} posts · You're all caught up ·
             </span>
           </div>
         </div>
@@ -156,7 +184,7 @@ export default function FeedPage() {
       {showCreate && (
         <CreatePostModal
           onClose={handleModalClose}
-          onCreated={() => {}}
+          onCreated={fetchPosts}
           subjects={subjects}
           defaultType={createType}
           defaultSubType={createSubType}
@@ -172,6 +200,30 @@ export default function FeedPage() {
           onSendDM={handleSendDM}
         />
       )}
+    </div>
+  )
+}
+
+/** Purple "Scheduled" badge shown above a post card */
+function ScheduledBadge({ scheduledAt }) {
+  const dt = new Date(scheduledAt)
+  const label = dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '5px 12px',
+      background: '#F5F3FF',
+      borderTop: '1px solid #DDD6FE',
+      borderLeft: '3px solid #7C3AED',
+    }}>
+      <Clock size={12} color="#7C3AED" />
+      <span style={{
+        fontFamily: '"Instrument Sans", system-ui',
+        fontWeight: 700, fontSize: 11.5,
+        color: '#7C3AED',
+      }}>
+        🕐 Scheduled · Publishes {label}
+      </span>
     </div>
   )
 }
