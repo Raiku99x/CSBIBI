@@ -10,7 +10,9 @@ function dicebearUrl(name = '') {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
 
-// ── Derive accent color from selected post type ──────────────
+// Fallback in case DB fetch fails
+const FALLBACK_TYPES = ['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting']
+
 function getQuoteAccent(postType, subType) {
   if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
   if (subType === 'reminder')      return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
@@ -56,6 +58,7 @@ function QuotedMessagePreview({ from, message, accent }) {
 export default function EditPostModal({ post, profile, subjects, onClose, onUpdated }) {
   const isAnnouncement = post.post_type === 'announcement'
   const existingQuoted = parseQuoted(post.quoted_message)
+  const [announcementTypes, setAnnouncementTypes] = useState(FALLBACK_TYPES)
 
   const [form, setForm] = useState({
     caption: post.caption || '',
@@ -74,6 +77,20 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
   const [pastingMsg, setPastingMsg] = useState(false)
   const pasteAreaRef = useRef()
 
+  // Fetch announcement types from DB
+  useEffect(() => {
+    supabase
+      .from('announcement_types')
+      .select('label')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setAnnouncementTypes(data.map(t => t.label))
+        }
+      })
+  }, [])
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const formIsAnnouncement = form.post_type === 'announcement'
   const formIsDeadline = formIsAnnouncement && form.sub_type === 'deadline'
@@ -85,25 +102,22 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  // ── Paste-only: block all keyboard except Ctrl+V / Cmd+V ──
-function handlePasteAreaKeyDown(e) {
-  const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
-  const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
-  const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
-  if (!isPaste && !isSelectAll && !isCopy &&
-      !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
-    e.preventDefault()
+  function handlePasteAreaKeyDown(e) {
+    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
+    const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
+    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
+    if (!isPaste && !isSelectAll && !isCopy &&
+        !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+      e.preventDefault()
+    }
   }
-}
 
-function handlePasteAreaBeforeInput(e) {
-  // Block all direct text input — only allow paste (inputType === 'insertFromPaste')
-  if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') {
-    e.preventDefault()
+  function handlePasteAreaBeforeInput(e) {
+    if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') {
+      e.preventDefault()
+    }
   }
-}
 
-  // ── Paste button: read from clipboard ────────────────────
   async function handlePasteButton() {
     setPastingMsg(true)
     try {
@@ -255,14 +269,14 @@ function handlePasteAreaBeforeInput(e) {
           ))}
         </div>
 
-        {/* Announcement type dropdown */}
+        {/* Announcement type dropdown — now from DB */}
         {formIsAnnouncement && form.sub_type && (
           <div style={{ position: 'relative', marginBottom: 14 }}>
             <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
               style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: form.announcement_type ? '#E6F4F4' : '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.announcement_type ? '#0D7377' : '#8A8D91', fontWeight: form.announcement_type ? 700 : 400, cursor: 'pointer', outline: 'none' }}
             >
               <option value="">Type (optional)</option>
-              {['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting'].map(t => (
+              {announcementTypes.map(t => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
@@ -289,7 +303,6 @@ function handlePasteAreaBeforeInput(e) {
 
         {/* ── QUOTED MESSAGE SECTION ── */}
         <div style={{ marginTop: 12 }}>
-          {/* Toggle button — color matches post type */}
           <button
             type="button"
             onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
@@ -313,7 +326,7 @@ function handlePasteAreaBeforeInput(e) {
           {showQuoteSection && (
             <div style={{
               marginTop: 8,
-              padding: '10px 8px',          /* ← reduced L/R padding */
+              padding: '10px 8px',
               background: '#FAFAFA', borderRadius: 10,
               border: `1px solid ${accent.border}`,
               animation: 'expandIn 0.18s ease',
@@ -327,7 +340,6 @@ function handlePasteAreaBeforeInput(e) {
               </p>
 
               <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-                {/* From field */}
                 <div style={{ width: 86, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                   <label style={{
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
@@ -349,9 +361,7 @@ function handlePasteAreaBeforeInput(e) {
                   />
                 </div>
 
-                {/* Paste-only message box */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Label row with Paste + Clear buttons */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                     <label style={{
                       fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
@@ -360,7 +370,6 @@ function handlePasteAreaBeforeInput(e) {
                       Paste message
                     </label>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {/* Paste button */}
                       <button
                         type="button"
                         onClick={handlePasteButton}
@@ -379,7 +388,6 @@ function handlePasteAreaBeforeInput(e) {
                         <ClipboardPaste size={11} />
                         Paste
                       </button>
-                      {/* Clear button — only visible when there's text */}
                       {form.quoted_message && (
                         <button
                           type="button"
@@ -422,7 +430,6 @@ function handlePasteAreaBeforeInput(e) {
                     onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'}
                   />
 
-                  {/* Paste-only hint */}
                   <p style={{
                     margin: '4px 0 0',
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5,
