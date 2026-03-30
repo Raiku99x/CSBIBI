@@ -1,0 +1,415 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+import { useRole } from '../hooks/useRole'
+import { useModMode } from '../hooks/useModMode'
+import UserProfilePage from './UserProfilePage'
+import {
+  X, Shield, Crown, Users, FileText, Heart,
+  MessageSquare, Megaphone, Trash2, Plus,
+  BarChart2, Clock, VolumeX, Ban, ChevronRight,
+  Loader2, Send
+} from 'lucide-react'
+import { formatDistanceToNow, format } from 'date-fns'
+import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
+
+const RED  = '#C0392B'
+const BLUE = '#1A5276'
+
+const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
+function dicebearUrl(name = '') {
+  const c = (name.trim()[0] || 'A').toUpperCase()
+  const hex = AVATAR_HEX[Math.max(0, c.charCodeAt(0) - 65) % AVATAR_HEX.length]
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
+}
+
+export default function AdminDashboard({ onClose }) {
+  const { user } = useAuth()
+  const { isSuperadmin, isModerator } = useRole()
+  const { modMode } = useModMode()
+  const navigate = useNavigate()
+
+  const [tab, setTab]             = useState('overview')
+  const [stats, setStats]         = useState(null)
+  const [users, setUsers]         = useState([])
+  const [auditLogs, setAuditLogs] = useState([])
+  const [banners, setBanners]     = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [viewingUserId, setViewingUserId] = useState(null)
+
+  // Banner creation
+  const [newBanner, setNewBanner]     = useState('')
+  const [bannerHours, setBannerHours] = useState('24')
+  const [postingBanner, setPostingBanner] = useState(false)
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => { loadAll() }, [tab])
+
+  async function loadAll() {
+    setLoading(true)
+    try {
+      const [
+        { count: postCount },
+        { count: userCount },
+        { count: likeCount },
+        { count: commentCount },
+        { data: usersData },
+        { data: logsData },
+        { data: bannersData },
+      ] = await Promise.all([
+        supabase.from('posts').select('id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('likes').select('id', { count: 'exact', head: true }),
+        supabase.from('comments').select('id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('audit_logs').select('*, actor:profiles!audit_logs_actor_id_fkey(display_name, avatar_url)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('system_notifications').select('*').order('created_at', { ascending: false }),
+      ])
+      setStats({ postCount, userCount, likeCount, commentCount })
+      setUsers(usersData || [])
+      setAuditLogs(logsData || [])
+      setBanners(bannersData || [])
+    } catch (err) {
+      toast.error('Failed to load dashboard data')
+    }
+    setLoading(false)
+  }
+
+  async function postBanner() {
+    if (!newBanner.trim()) { toast.error('Enter a message'); return }
+    setPostingBanner(true)
+    try {
+      const hours = parseInt(bannerHours) || 24
+      const expiresAt = bannerHours === 'never'
+        ? null
+        : new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+      await supabase.from('system_notifications').insert({
+        message: newBanner.trim(),
+        is_active: true,
+        created_by: user.id,
+        expires_at: expiresAt,
+      })
+      setNewBanner('')
+      toast.success('Banner posted!')
+      loadAll()
+    } catch (err) { toast.error(err.message) }
+    setPostingBanner(false)
+  }
+
+  async function deleteBanner(id) {
+    await supabase.from('system_notifications').update({ is_active: false }).eq('id', id)
+    toast.success('Banner removed')
+    loadAll()
+  }
+
+  const tabs = [
+    { key: 'overview', label: 'Overview', icon: BarChart2 },
+    { key: 'users',    label: 'Users',    icon: Users },
+    { key: 'banners',  label: 'Banners',  icon: Megaphone },
+    ...(isSuperadmin ? [{ key: 'audit', label: 'Audit Log', icon: Clock }] : []),
+  ]
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.55)' }}/>
+      <div style={{ position:'fixed',inset:0,zIndex:61,background:'#F0F2F5',display:'flex',flexDirection:'column',animation:'slideInUp 0.25s cubic-bezier(0.16,1,0.3,1)' }}>
+
+        {/* Header */}
+        <div style={{ background:'white',borderBottom:'1px solid #E4E6EB',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0 }}>
+          <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+            <div style={{ width:36,height:36,borderRadius:10,background:isSuperadmin?'#FEF9C3':'#EBF5FB',display:'flex',alignItems:'center',justifyContent:'center' }}>
+              {isSuperadmin ? <Crown size={18} color="#92400E"/> : <Shield size={18} color={BLUE}/>}
+            </div>
+            <div>
+              <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:18,color:'#050505' }}>
+                {isSuperadmin ? 'Admin Dashboard' : 'Mod Dashboard'}
+              </span>
+              <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#65676B' }}>
+                {isSuperadmin ? 'Full admin access' : 'Moderator view'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ width:36,height:36,borderRadius:'50%',background:'#F0F2F5',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+            <X size={18} color="#65676B"/>
+          </button>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ background:'white',borderBottom:'1px solid #E4E6EB',display:'flex',padding:'0 16px',flexShrink:0,overflowX:'auto' }}>
+          {tabs.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)}
+              style={{ display:'flex',alignItems:'center',gap:6,padding:'12px 14px',border:'none',cursor:'pointer',background:'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:tab===key?RED:'#65676B',borderBottom:`2px solid ${tab===key?RED:'transparent'}`,whiteSpace:'nowrap',transition:'color 0.15s,border-color 0.15s',flexShrink:0 }}>
+              <Icon size={14}/> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex:1,overflowY:'auto',padding:'12px 16px' }}>
+          {loading ? (
+            <div style={{ display:'flex',justifyContent:'center',padding:48 }}>
+              <Loader2 size={28} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
+            </div>
+          ) : (
+            <>
+              {tab === 'overview' && <OverviewTab stats={stats} users={users}/>}
+              {tab === 'users'    && <UsersTab users={users} currentUserId={user.id} isSuperadmin={isSuperadmin} onViewUser={setViewingUserId}/>}
+              {tab === 'banners'  && <BannersTab banners={banners} newBanner={newBanner} setNewBanner={setNewBanner} bannerHours={bannerHours} setBannerHours={setBannerHours} onPost={postBanner} onDelete={deleteBanner} posting={postingBanner}/>}
+              {tab === 'audit'    && <AuditTab logs={auditLogs}/>}
+            </>
+          )}
+        </div>
+      </div>
+
+      {viewingUserId && (
+        <UserProfilePage
+          userId={viewingUserId}
+          onClose={() => { setViewingUserId(null); loadAll() }}
+        />
+      )}
+
+      <style>{`
+        @keyframes slideInUp { from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)} }
+        @keyframes spin { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
+      `}</style>
+    </>
+  )
+}
+
+// ── Overview ──────────────────────────────────────────────────
+function OverviewTab({ stats, users }) {
+  if (!stats) return null
+  const muted  = users.filter(u => u.is_muted).length
+  const banned = users.filter(u => u.is_banned).length
+  const mods   = users.filter(u => u.role === 'moderator').length
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
+        <StatCard icon={<FileText size={18} color={BLUE}/>}    bg="#EBF5FB" label="Total Posts"    value={stats.postCount}    />
+        <StatCard icon={<Users size={18} color="#16a34a"/>}     bg="#F0FDF4" label="Total Users"    value={stats.userCount}    />
+        <StatCard icon={<Heart size={18} color={RED}/>}         bg="#FFF5F5" label="Total Likes"    value={stats.likeCount}    />
+        <StatCard icon={<MessageSquare size={18} color="#8B5CF6"/>} bg="#F5F3FF" label="Comments"  value={stats.commentCount} />
+      </div>
+
+      <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px' }}>
+        <p style={{ margin:'0 0 12px',fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>User Status</p>
+        <div style={{ display:'flex',gap:16,flexWrap:'wrap' }}>
+          <StatusPill icon={<Shield size={12}/>}   color={BLUE}     label={`${mods} Moderator${mods!==1?'s':''}`}/>
+          <StatusPill icon={<VolumeX size={12}/>}  color="#C2410C"  label={`${muted} Muted`}/>
+          <StatusPill icon={<Ban size={12}/>}       color={RED}      label={`${banned} Banned`}/>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ icon, bg, label, value }) {
+  return (
+    <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px',display:'flex',alignItems:'center',gap:12 }}>
+      <div style={{ width:40,height:40,borderRadius:11,background:bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>{icon}</div>
+      <div>
+        <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:22,color:'#050505' }}>{value ?? '—'}</p>
+        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#65676B' }}>{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function StatusPill({ icon, color, label }) {
+  return (
+    <div style={{ display:'inline-flex',alignItems:'center',gap:5,padding:'5px 10px',borderRadius:20,background:`${color}15`,border:`1px solid ${color}40` }}>
+      <span style={{ color }}>{icon}</span>
+      <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12,color }}>{label}</span>
+    </div>
+  )
+}
+
+// ── Users ─────────────────────────────────────────────────────
+function UsersTab({ users, currentUserId, isSuperadmin, onViewUser }) {
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  const filtered = users.filter(u => {
+    const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+    if (!matchSearch) return false
+    if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
+    if (filter === 'muted')  return u.is_muted
+    if (filter === 'banned') return u.is_banned
+    return true
+  })
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+      {/* Search + filter */}
+      <div style={{ display:'flex',gap:8 }}>
+        <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'0 12px',height:38 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search users…"
+            style={{ flex:1,border:'none',outline:'none',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
+        </div>
+      </div>
+      <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+        {['all','mods','muted','banned'].map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ padding:'5px 12px',borderRadius:20,border:`1.5px solid ${filter===f?RED:'#E4E6EB'}`,background:filter===f?'#FADBD8':'white',color:filter===f?RED:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:filter===f?700:500,fontSize:12,cursor:'pointer' }}>
+            {f.charAt(0).toUpperCase()+f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <p style={{ margin:'4px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91' }}>{filtered.length} user{filtered.length!==1?'s':''}</p>
+
+      {filtered.map(u => (
+        <div key={u.id} onClick={() => onViewUser(u.id)}
+          style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'12px 14px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',transition:'background 0.12s' }}
+          onMouseEnter={e => e.currentTarget.style.background='#F7F8FA'}
+          onMouseLeave={e => e.currentTarget.style.background='white'}>
+          <img src={u.avatar_url||dicebearUrl(u.display_name)} style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0 }} alt=""/>
+          <div style={{ flex:1,minWidth:0 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' }}>
+              <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,color:'#050505' }}>{u.display_name}</span>
+              {u.id === currentUserId && <span style={{ fontSize:10,fontWeight:600,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>You</span>}
+              {u.role === 'superadmin' && <span style={{ fontSize:10,fontWeight:700,color:'#92400E',background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Admin</span>}
+              {u.role === 'moderator'  && <span style={{ fontSize:10,fontWeight:700,color:BLUE,background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Mod</span>}
+              {u.is_banned && <span style={{ fontSize:10,fontWeight:700,color:RED,background:'#FEE2E2',border:'1px solid #FECACA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Banned</span>}
+              {u.is_muted  && <span style={{ fontSize:10,fontWeight:700,color:'#C2410C',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Muted</span>}
+            </div>
+            <p style={{ margin:'1px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
+          </div>
+          <ChevronRight size={16} color="#BCC0C4"/>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Banners ───────────────────────────────────────────────────
+function BannersTab({ banners, newBanner, setNewBanner, bannerHours, setBannerHours, onPost, onDelete, posting }) {
+  const active   = banners.filter(b => b.is_active)
+  const inactive = banners.filter(b => !b.is_active)
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+      {/* Create banner */}
+      <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px' }}>
+        <p style={{ margin:'0 0 10px',fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>
+          Post System Banner
+        </p>
+        <textarea value={newBanner} onChange={e => setNewBanner(e.target.value)} rows={3}
+          placeholder="Type your announcement to all users…"
+          style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}/>
+        <div style={{ display:'flex',gap:8,alignItems:'center' }}>
+          <div style={{ position:'relative',flex:1 }}>
+            <select value={bannerHours} onChange={e => setBannerHours(e.target.value)}
+              style={{ width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid #E4E6EB',background:'#F7F8FA',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',appearance:'none',outline:'none' }}>
+              <option value="1">Expires in 1 hour</option>
+              <option value="6">Expires in 6 hours</option>
+              <option value="24">Expires in 24 hours</option>
+              <option value="72">Expires in 3 days</option>
+              <option value="never">Never expires</option>
+            </select>
+          </div>
+          <button onClick={onPost} disabled={posting||!newBanner.trim()}
+            style={{ display:'flex',alignItems:'center',gap:6,padding:'9px 16px',borderRadius:10,border:'none',background:newBanner.trim()?RED:'#E4E6EB',color:newBanner.trim()?'white':'#BCC0C4',cursor:newBanner.trim()?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,flexShrink:0,transition:'background 0.12s' }}>
+            {posting ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }}/> : <Send size={14}/>}
+            Post
+          </button>
+        </div>
+      </div>
+
+      {/* Active banners */}
+      {active.length > 0 && (
+        <div>
+          <p style={{ margin:'4px 0 6px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>Active · {active.length}</p>
+          {active.map(b => <BannerRow key={b.id} banner={b} onDelete={() => onDelete(b.id)} active/>)}
+        </div>
+      )}
+
+      {/* Past banners */}
+      {inactive.length > 0 && (
+        <div>
+          <p style={{ margin:'4px 0 6px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#BCC0C4',textTransform:'uppercase',letterSpacing:0.5 }}>Past · {inactive.length}</p>
+          {inactive.map(b => <BannerRow key={b.id} banner={b} active={false}/>)}
+        </div>
+      )}
+
+      {banners.length === 0 && (
+        <div style={{ textAlign:'center',padding:'40px 24px' }}>
+          <div style={{ fontSize:36,marginBottom:8 }}>📢</div>
+          <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:'#65676B' }}>No banners yet</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BannerRow({ banner, onDelete, active }) {
+  return (
+    <div style={{ background:'white',borderRadius:10,border:`1px solid ${active?'#FED7AA':'#E4E6EB'}`,padding:'11px 14px',marginBottom:6,display:'flex',alignItems:'flex-start',gap:10 }}>
+      <div style={{ flex:1,minWidth:0 }}>
+        <p style={{ margin:'0 0 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:13.5,color:'#050505',lineHeight:1.4 }}>{banner.message}</p>
+        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91' }}>
+          {format(new Date(banner.created_at),'MMM d, yyyy · h:mm a')}
+          {banner.expires_at && ` · expires ${formatDistanceToNow(new Date(banner.expires_at),{addSuffix:true})}`}
+        </p>
+      </div>
+      {active && onDelete && (
+        <button onClick={onDelete} style={{ background:'none',border:'none',cursor:'pointer',color:'#BCC0C4',display:'flex',padding:4,flexShrink:0,transition:'color 0.12s' }}
+          onMouseEnter={e=>e.currentTarget.style.color=RED} onMouseLeave={e=>e.currentTarget.style.color='#BCC0C4'}>
+          <Trash2 size={14}/>
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Audit Log ─────────────────────────────────────────────────
+const ACTION_LABELS = {
+  delete_post:             { label:'Deleted post',         color:RED    },
+  pin_post:                { label:'Pinned post',          color:'#F59E0B'},
+  unpin_post:              { label:'Unpinned post',        color:'#8A8D91'},
+  lock_post:               { label:'Locked comments',      color:'#64748B'},
+  unlock_post:             { label:'Unlocked comments',    color:'#64748B'},
+  mute_user:               { label:'Muted user',           color:'#C2410C'},
+  unmute_user:             { label:'Unmuted user',         color:'#16a34a'},
+  ban_user:                { label:'Banned user',          color:RED    },
+  unban_user:              { label:'Unbanned user',        color:'#16a34a'},
+  promote_to_moderator:    { label:'Promoted to Mod',      color:BLUE   },
+  demote_from_moderator:   { label:'Demoted from Mod',     color:'#8A8D91'},
+}
+
+function AuditTab({ logs }) {
+  if (logs.length === 0) return (
+    <div style={{ textAlign:'center',padding:'48px 24px' }}>
+      <div style={{ fontSize:36,marginBottom:8 }}>📋</div>
+      <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:'#65676B' }}>No audit logs yet</p>
+    </div>
+  )
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
+      {logs.map(log => {
+        const meta = ACTION_LABELS[log.action] || { label: log.action, color:'#65676B' }
+        return (
+          <div key={log.id} style={{ background:'white',borderRadius:10,border:'1px solid #DADDE1',padding:'11px 14px',display:'flex',alignItems:'center',gap:10 }}>
+            <img src={log.actor?.avatar_url||dicebearUrl(log.actor?.display_name)} style={{ width:32,height:32,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=""/>
+            <div style={{ flex:1,minWidth:0 }}>
+              <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' }}>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{log.actor?.display_name||'Unknown'}</span>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12,color:meta.color,background:`${meta.color}15`,padding:'2px 8px',borderRadius:10 }}>{meta.label}</span>
+              </div>
+              <p style={{ margin:'2px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91' }}>
+                {formatDistanceToNow(new Date(log.created_at),{addSuffix:true})}
+              </p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
