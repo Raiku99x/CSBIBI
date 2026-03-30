@@ -32,7 +32,9 @@ const FILE_ACCEPT = [
   'application/x-zip-compressed',
 ].join(',')
 
-// ── Derive accent color from selected post type ──────────────
+// Fallback in case DB fetch fails
+const FALLBACK_TYPES = ['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting']
+
 function getQuoteAccent(postType, subType) {
   if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
   if (subType === 'reminder')      return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
@@ -42,7 +44,6 @@ function getQuoteAccent(postType, subType) {
   return                                  { color: '#65676B', bg: '#F7F8FA', light: '#E4E6EB', border: '#DADDE1' }
 }
 
-// ── Quoted Message Block (preview inside modal) ───────────────
 function QuotedMessagePreview({ from, message, accent }) {
   if (!from && !message) return null
   return (
@@ -87,6 +88,7 @@ export default function CreatePostModal({
   autoOpenFile = false,
 }) {
   const { user, profile } = useAuth()
+  const [announcementTypes, setAnnouncementTypes] = useState(FALLBACK_TYPES)
   const [form, setForm] = useState({
     caption: '',
     subject_id: '',
@@ -113,7 +115,20 @@ export default function CreatePostModal({
   const uploadCounter = useRef(0)
   const pasteAreaRef = useRef()
 
-  // Lock body scroll
+  // Fetch announcement types from DB
+  useEffect(() => {
+    supabase
+      .from('announcement_types')
+      .select('label')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setAnnouncementTypes(data.map(t => t.label))
+        }
+      })
+  }, [])
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -137,25 +152,22 @@ export default function CreatePostModal({
   const hasQuote = showQuoteSection && (form.quoted_from.trim() || form.quoted_message.trim())
   const accent = getQuoteAccent(form.post_type, form.sub_type)
 
-  // ── Paste-only: block all keyboard except Ctrl+V / Cmd+V ──
-function handlePasteAreaKeyDown(e) {
-  const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
-  const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
-  const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
-  if (!isPaste && !isSelectAll && !isCopy &&
-      !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
-    e.preventDefault()
+  function handlePasteAreaKeyDown(e) {
+    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
+    const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
+    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
+    if (!isPaste && !isSelectAll && !isCopy &&
+        !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+      e.preventDefault()
+    }
   }
-}
 
-function handlePasteAreaBeforeInput(e) {
-  // Block all direct text input — only allow paste (inputType === 'insertFromPaste')
-  if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') {
-    e.preventDefault()
+  function handlePasteAreaBeforeInput(e) {
+    if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') {
+      e.preventDefault()
+    }
   }
-}
 
-  // ── Paste button: read from clipboard ────────────────────
   async function handlePasteButton() {
     setPastingMsg(true)
     try {
@@ -167,7 +179,6 @@ function handlePasteAreaBeforeInput(e) {
         toast.error('Clipboard is empty')
       }
     } catch {
-      // Fallback: focus the area so the user can Ctrl+V manually
       pasteAreaRef.current?.focus()
       toast('Press Ctrl+V / Cmd+V to paste', { icon: '📋' })
     } finally {
@@ -430,7 +441,7 @@ function handlePasteAreaBeforeInput(e) {
           ))}
         </div>
 
-        {/* Announcement type dropdown */}
+        {/* Announcement type dropdown — now from DB */}
         {isAnnouncement && form.sub_type && (
           <div style={{ position: 'relative', marginBottom: 14 }}>
             <select
@@ -444,7 +455,7 @@ function handlePasteAreaBeforeInput(e) {
               }}
             >
               <option value="">Type (optional)</option>
-              {['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting'].map(type => (
+              {announcementTypes.map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
@@ -489,7 +500,6 @@ function handlePasteAreaBeforeInput(e) {
 
         {/* ── QUOTED MESSAGE SECTION ── */}
         <div style={{ marginTop: 12 }}>
-          {/* Toggle button — color matches post type */}
           <button
             type="button"
             onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
@@ -510,11 +520,10 @@ function handlePasteAreaBeforeInput(e) {
             {showQuoteSection ? <X size={14} /> : <ChevronDown size={14} />}
           </button>
 
-          {/* Quote fields */}
           {showQuoteSection && (
             <div style={{
               marginTop: 8,
-              padding: '10px 8px',          /* ← reduced L/R padding */
+              padding: '10px 8px',
               background: '#FAFAFA', borderRadius: 10,
               border: `1px solid ${accent.border}`,
               animation: 'expandIn 0.18s ease',
@@ -527,10 +536,7 @@ function handlePasteAreaBeforeInput(e) {
                 Quoted message
               </p>
 
-              {/* Row: From + Message box */}
               <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-
-                {/* From field */}
                 <div style={{ width: 86, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
                   <label style={{
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
@@ -556,9 +562,7 @@ function handlePasteAreaBeforeInput(e) {
                   />
                 </div>
 
-                {/* Paste-only message box */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Label row with Paste + Clear buttons */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                     <label style={{
                       fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
@@ -567,7 +571,6 @@ function handlePasteAreaBeforeInput(e) {
                       Paste message
                     </label>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {/* Paste button */}
                       <button
                         type="button"
                         onClick={handlePasteButton}
@@ -586,7 +589,6 @@ function handlePasteAreaBeforeInput(e) {
                         <ClipboardPaste size={11} />
                         Paste
                       </button>
-                      {/* Clear button — only visible when there's text */}
                       {form.quoted_message && (
                         <button
                           type="button"
@@ -631,7 +633,6 @@ function handlePasteAreaBeforeInput(e) {
                     onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'}
                   />
 
-                  {/* Paste-only hint */}
                   <p style={{
                     margin: '4px 0 0',
                     fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5,
@@ -642,7 +643,6 @@ function handlePasteAreaBeforeInput(e) {
                 </div>
               </div>
 
-              {/* Preview toggle */}
               {(form.quoted_from || form.quoted_message) && (
                 <button
                   type="button"
@@ -659,7 +659,6 @@ function handlePasteAreaBeforeInput(e) {
                 </button>
               )}
 
-              {/* Preview */}
               {showQuotePreview && (
                 <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} accent={accent} />
               )}
@@ -789,13 +788,11 @@ function handlePasteAreaBeforeInput(e) {
         <div style={{ height: 16 }} />
       </div>
 
-      {/* Hidden inputs */}
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
       <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
-        {/* Add to post bar */}
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>
             Add to your post
@@ -814,7 +811,6 @@ function handlePasteAreaBeforeInput(e) {
           </p>
         )}
 
-        {/* Submit */}
         <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
           <button
             onClick={handleSubmit} disabled={loading}
