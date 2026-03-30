@@ -17,6 +17,7 @@ import { formatDistanceToNow } from 'date-fns'
 import SavedPostsPage from '../pages/SavedPostsPage'
 import LikedPostsPage from '../pages/LikedPostsPage'
 import AboutModal from './AboutModal'
+import AdminDashboard from '../pages/AdminDashboard'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -101,6 +102,7 @@ export default function Layout({ children, onOpenSearch }) {
   const [showSaved,    setShowSaved]    = useState(false)
   const [showLiked,    setShowLiked]    = useState(false)
   const [showAbout,    setShowAbout]    = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
   const [selfMenuOpen, setSelfMenuOpen] = useState(false)
 
   const notifRef    = useRef(null)
@@ -261,6 +263,13 @@ export default function Layout({ children, onOpenSearch }) {
                   <p style={{ margin:'0 10px 6px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:isSuperadmin?'#92400E':BLUE,lineHeight:1.4 }}>
                     {isSuperadmin ? '👑 Admin controls active' : '🛡️ Mod controls active'}
                   </p>
+                )}
+                {modMode && (
+                  <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri}
+                    icon={isSuperadmin ? <Crown size={16} color="#92400E"/> : <Shield size={16} color={BLUE}/>}
+                    label={isSuperadmin ? 'Admin Dashboard' : 'Mod Dashboard'}
+                    onClick={() => { onClose?.(); setShowDashboard(true) }}
+                  />
                 )}
               </div>
               <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }} />
@@ -460,6 +469,7 @@ export default function Layout({ children, onOpenSearch }) {
         {showSaved && <SavedPostsPage onClose={() => setShowSaved(false)}/>}
         {showLiked && <LikedPostsPage onClose={() => setShowLiked(false)}/>}
         {showAbout && <AboutModal     onClose={() => setShowAbout(false)}/>}
+        {showDashboard && <AdminDashboard onClose={() => setShowDashboard(false)}/>}
 
         <style>{`
           @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
