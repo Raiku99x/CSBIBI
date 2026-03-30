@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
 import UserProfilePage from './UserProfilePage'
-import EditPostModal from '../components/EditPostModal'
 import {
   X, Shield, Crown, Users, FileText, Heart,
   MessageSquare, Megaphone, Trash2, Plus,
@@ -13,8 +12,7 @@ import {
   ChevronUp, ChevronDown, Pencil, Check, Archive,
   Star, AlertTriangle, GripVertical, Settings,
   Download, ToggleLeft, ToggleRight, WrenchIcon,
-  Wrench, Mail, Radio, Search, CheckSquare, Square,
-  SquareCheck, Edit3
+  Wrench
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -42,7 +40,6 @@ export default function AdminDashboard({ onClose }) {
   const [banners, setBanners]     = useState([])
   const [loading, setLoading]     = useState(true)
   const [viewingUserId, setViewingUserId] = useState(null)
-  const [editingPost, setEditingPost]     = useState(null)
 
   // Banner creation
   const [newBanner, setNewBanner]       = useState('')
@@ -118,11 +115,9 @@ export default function AdminDashboard({ onClose }) {
     { key: 'users',     label: 'Users',     icon: Users      },
     { key: 'banners',   label: 'Banners',   icon: Megaphone  },
     ...(isSuperadmin ? [
-      { key: 'posts',    label: 'Posts',      icon: FileText  },
       { key: 'types',    label: 'Post Types', icon: Tag      },
       { key: 'subjects', label: 'Subjects',   icon: BookOpen },
       { key: 'controls', label: 'System',     icon: Wrench   },
-      { key: 'dms',      label: 'System DM',  icon: Mail     },
       { key: 'audit',    label: 'Audit Log',  icon: Clock    },
     ] : []),
   ]
@@ -173,11 +168,9 @@ export default function AdminDashboard({ onClose }) {
               {tab === 'overview'  && <OverviewTab stats={stats} users={users}/>}
               {tab === 'users'     && <UsersTab users={users} currentUserId={user.id} isSuperadmin={isSuperadmin} onViewUser={setViewingUserId}/>}
               {tab === 'banners'   && <BannersTab banners={banners} newBanner={newBanner} setNewBanner={setNewBanner} bannerHours={bannerHours} setBannerHours={setBannerHours} onPost={postBanner} onDelete={deleteBanner} posting={postingBanner}/>}
-              {tab === 'posts'     && <PostsTab currentUserId={user.id} isSuperadmin={isSuperadmin} onEditPost={setEditingPost}/>}
               {tab === 'types'     && <AnnouncementTypesTab/>}
               {tab === 'subjects'  && <SubjectsTab/>}
               {tab === 'controls'  && <SystemControlsTab users={users} currentUserId={user.id}/>}
-              {tab === 'dms'       && <SystemDMTab users={users} currentUserId={user.id}/>}
               {tab === 'audit'     && <AuditTab logs={auditLogs}/>}
             </>
           )}
@@ -188,16 +181,6 @@ export default function AdminDashboard({ onClose }) {
         <UserProfilePage
           userId={viewingUserId}
           onClose={() => { setViewingUserId(null); loadAll() }}
-        />
-      )}
-
-      {editingPost && (
-        <EditPostModal
-          post={editingPost}
-          profile={users.find(u => u.id === editingPost.user_id) || {}}
-          subjects={[]}
-          onClose={() => setEditingPost(null)}
-          onUpdated={() => { setEditingPost(null); toast.success('Post updated!') }}
         />
       )}
 
@@ -964,374 +947,7 @@ function SystemControlsTab({ users, currentUserId }) {
   )
 }
 
-// ── Posts Manager Tab ─────────────────────────────────────────
-function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
-  const [posts, setPosts]         = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
-  const [filter, setFilter]       = useState('all')
-  const [selected, setSelected]   = useState(new Set())
-  const [deleting, setDeleting]   = useState(false)
-  const [page, setPage]           = useState(0)
-  const PAGE_SIZE = 30
-
-  useEffect(() => { fetchPosts() }, [])
-
-  async function fetchPosts() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('posts')
-      .select('id, caption, post_type, sub_type, created_at, user_id, is_deleted, profiles(display_name, avatar_url), subjects(name)')
-      .order('created_at', { ascending: false })
-      .limit(500)
-    if (!error) setPosts(data || [])
-    setLoading(false)
-  }
-
-  const filtered = posts.filter(p => {
-    const q = search.toLowerCase()
-    const matchSearch = !q ||
-      p.caption?.toLowerCase().includes(q) ||
-      p.profiles?.display_name?.toLowerCase().includes(q) ||
-      p.subjects?.name?.toLowerCase().includes(q)
-    if (!matchSearch) return false
-    if (filter === 'announcements') return p.post_type === 'announcement'
-    if (filter === 'status')        return p.post_type === 'status'
-    if (filter === 'deleted')       return p.is_deleted
-    return !p.is_deleted
-  })
-
-  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-
-  function toggleSelect(id) {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  function toggleSelectAll() {
-    if (selected.size === paginated.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(paginated.map(p => p.id)))
-    }
-  }
-
-  async function bulkDelete() {
-    if (selected.size === 0) return
-    if (!window.confirm(`Permanently delete ${selected.size} post${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
-    setDeleting(true)
-    const ids = [...selected]
-    const { error } = await supabase.from('posts').delete().in('id', ids)
-    if (error) { toast.error(error.message); setDeleting(false); return }
-    toast.success(`Deleted ${ids.length} post${ids.length !== 1 ? 's' : ''}`)
-    setSelected(new Set())
-    fetchPosts()
-    setDeleting(false)
-  }
-
-  async function deleteSingle(post) {
-    if (!window.confirm(`Delete this post by ${post.profiles?.display_name}?`)) return
-    const { error } = await supabase.from('posts').delete().eq('id', post.id)
-    if (error) { toast.error(error.message); return }
-    toast.success('Post deleted')
-    fetchPosts()
-  }
-
-  if (loading) return (
-    <div style={{ display:'flex',justifyContent:'center',padding:48 }}>
-      <Loader2 size={24} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
-    </div>
-  )
-
-  const allPageSelected = paginated.length > 0 && paginated.every(p => selected.has(p.id))
-
-  return (
-    <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
-
-      {/* Search + filters */}
-      <div style={{ display:'flex',gap:8 }}>
-        <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'0 12px',height:38 }}>
-          <Search size={14} color=\"#BCC0C4\"/>
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} placeholder=\"Search posts, authors…\"
-            style={{ flex:1,border:'none',outline:'none',fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
-        </div>
-      </div>
-
-      <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
-        {['all','announcements','status','deleted'].map(f => (
-          <button key={f} onClick={() => { setFilter(f); setPage(0); setSelected(new Set()) }}
-            style={{ padding:'5px 12px',borderRadius:20,border:`1.5px solid ${filter===f?RED:'#E4E6EB'}`,background:filter===f?'#FADBD8':'white',color:filter===f?RED:'#65676B',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:filter===f?700:500,fontSize:12,cursor:'pointer' }}>
-            {f.charAt(0).toUpperCase()+f.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Bulk actions bar */}
-      <div style={{ display:'flex',alignItems:'center',gap:8,justifyContent:'space-between' }}>
-        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-          <button onClick={toggleSelectAll}
-            style={{ display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontSize:12,fontWeight:600,color:'#65676B',padding:'4px 0' }}>
-            {allPageSelected
-              ? <CheckSquare size={15} color={RED}/>
-              : <Square size={15} color=\"#BCC0C4\"/>}
-            {allPageSelected ? 'Deselect all' : 'Select all'}
-          </button>
-          {selected.size > 0 && (
-            <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:12,color:'#65676B' }}>
-              {selected.size} selected
-            </span>
-          )}
-        </div>
-        {selected.size > 0 && (
-          <button onClick={bulkDelete} disabled={deleting}
-            style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:10,border:'none',background:RED,color:'white',cursor:'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:700,fontSize:13,opacity:deleting?0.7:1,transition:'opacity 0.12s' }}>
-            {deleting ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Trash2 size={13}/>}
-            Delete {selected.size}
-          </button>
-        )}
-      </div>
-
-      <p style={{ margin:'0 0 2px',fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#8A8D91' }}>
-        {filtered.length} post{filtered.length!==1?'s':''}
-        {totalPages > 1 && ` · Page ${page+1} of ${totalPages}`}
-      </p>
-
-      {/* Posts list */}
-      {paginated.length === 0 ? (
-        <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'40px 0',textAlign:'center' }}>
-          <div style={{ fontSize:36,marginBottom:8 }}>📭</div>
-          <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#65676B' }}>No posts found</p>
-        </div>
-      ) : (
-        paginated.map(post => (
-          <div key={post.id}
-            style={{ background:'white',borderRadius:12,border:`1px solid ${selected.has(post.id)?RED+'60':'#DADDE1'}`,padding:'11px 14px',display:'flex',alignItems:'flex-start',gap:10,transition:'border-color 0.12s' }}>
-
-            {/* Checkbox */}
-            <button onClick={() => toggleSelect(post.id)}
-              style={{ background:'none',border:'none',cursor:'pointer',padding:'2px 0',flexShrink:0,marginTop:1 }}>
-              {selected.has(post.id)
-                ? <CheckSquare size={16} color={RED}/>
-                : <Square size={16} color=\"#BCC0C4\"/>}
-            </button>
-
-            {/* Avatar */}
-            <img src={post.profiles?.avatar_url||dicebearUrl(post.profiles?.display_name)} style={{ width:34,height:34,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=\"\"/>
-
-            {/* Content */}
-            <div style={{ flex:1,minWidth:0 }}>
-              <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2 }}>
-                <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{post.profiles?.display_name||'Unknown'}</span>
-                <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#BCC0C4',fontWeight:500 }}>·</span>
-                <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:post.post_type==='announcement'?'#0D7377':'#65676B',fontWeight:600,background:post.post_type==='announcement'?'#E6F4F4':'#F0F2F5',padding:'1px 6px',borderRadius:6 }}>
-                  {post.sub_type||post.post_type}
-                </span>
-                {post.subjects?.name && (
-                  <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#8A8D91' }}>· {post.subjects.name}</span>
-                )}
-                {post.is_deleted && (
-                  <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,fontWeight:700,color:RED,background:'#FEE2E2',padding:'1px 6px',borderRadius:6 }}>Deleted</span>
-                )}
-              </div>
-              <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#050505',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'100%' }}>
-                {post.caption||<span style={{ color:'#BCC0C4',fontStyle:'italic' }}>No caption</span>}
-              </p>
-              <p style={{ margin:'3px 0 0',fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#BCC0C4' }}>
-                {formatDistanceToNow(new Date(post.created_at),{addSuffix:true})}
-              </p>
-            </div>
-
-            {/* Action buttons */}
-            <div style={{ display:'flex',gap:4,flexShrink:0 }}>
-              {isSuperadmin && !post.is_deleted && (
-                <ActionBtn icon={<Edit3 size={13}/>} color=\"#0D7377\" title=\"Edit post\" onClick={() => onEditPost(post)}/>
-              )}
-              <ActionBtn icon={<Trash2 size={13}/>} color={RED} title=\"Delete post\" onClick={() => deleteSingle(post)}/>
-            </div>
-          </div>
-        ))
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display:'flex',gap:8,justifyContent:'center',paddingTop:4 }}>
-          <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page===0}
-            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===0?'#BCC0C4':'#050505',cursor:page===0?'default':'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:600,fontSize:13 }}>
-            ← Prev
-          </button>
-          <button onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page===totalPages-1}
-            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===totalPages-1?'#BCC0C4':'#050505',cursor:page===totalPages-1?'default':'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:600,fontSize:13 }}>
-            Next →
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── System DM Tab ─────────────────────────────────────────────
-function SystemDMTab({ users, currentUserId }) {
-  const [mode, setMode]           = useState('single') // 'single' | 'broadcast'
-  const [recipientId, setRecipientId] = useState('')
-  const [message, setMessage]     = useState('')
-  const [sending, setSending]     = useState(false)
-  const [search, setSearch]       = useState('')
-  const [sent, setSent]           = useState([])
-
-  const filteredUsers = users.filter(u =>
-    u.id !== currentUserId &&
-    (u.display_name?.toLowerCase().includes(search.toLowerCase()) ||
-     u.email?.toLowerCase().includes(search.toLowerCase()))
-  )
-
-  async function sendDM() {
-    if (!message.trim()) { toast.error('Enter a message'); return }
-    if (mode === 'single' && !recipientId) { toast.error('Select a recipient'); return }
-    setSending(true)
-    try {
-      if (mode === 'broadcast') {
-        // Insert a notification for every user (batched)
-        const targets = users.filter(u => u.id !== currentUserId)
-        const inserts = targets.map(u => ({
-          user_id: u.id,
-          type: 'system_dm',
-          message: message.trim(),
-          is_read: false,
-          created_at: new Date().toISOString(),
-        }))
-        // Supabase can handle batch inserts in chunks
-        const CHUNK = 50
-        for (let i = 0; i < inserts.length; i += CHUNK) {
-          await supabase.from('notifications').insert(inserts.slice(i, i + CHUNK))
-        }
-        toast.success(`📡 Broadcast sent to ${targets.length} users`)
-        setSent(prev => [{ mode:'broadcast', message:message.trim(), count:targets.length, time: new Date() }, ...prev])
-      } else {
-        await supabase.from('notifications').insert({
-          user_id: recipientId,
-          type: 'system_dm',
-          message: message.trim(),
-          is_read: false,
-          created_at: new Date().toISOString(),
-        })
-        const recipient = users.find(u => u.id === recipientId)
-        toast.success(`✉️ Sent to ${recipient?.display_name || 'user'}`)
-        setSent(prev => [{ mode:'single', message:message.trim(), recipient:recipient?.display_name, time: new Date() }, ...prev])
-      }
-      setMessage('')
-      setRecipientId('')
-      setSearch('')
-    } catch (err) {
-      toast.error(err.message)
-    }
-    setSending(false)
-  }
-
-  return (
-    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
-
-      {/* Info */}
-      <div style={{ background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:10,padding:'10px 14px',display:'flex',gap:8 }}>
-        <Mail size={15} color={BLUE} style={{ flexShrink:0,marginTop:1 }}/>
-        <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:12,color:BLUE,lineHeight:1.5 }}>
-          System DMs are delivered as in-app notifications. Recipients see them as a message from the system.
-        </p>
-      </div>
-
-      {/* Mode toggle */}
-      <div style={{ display:'flex',gap:6,padding:4,background:'#F0F2F5',borderRadius:10 }}>
-        {[
-          { key:'single',    label:'Single User',  icon:<Mail size={14}/> },
-          { key:'broadcast', label:'Broadcast All', icon:<Radio size={14}/> },
-        ].map(({ key, label, icon }) => (
-          <button key={key} onClick={() => { setMode(key); setRecipientId(''); setSearch('') }}
-            style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px 0',borderRadius:8,border:'none',cursor:'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:600,fontSize:13,background:mode===key?(key==='broadcast'?'#C0392B':'white'):'transparent',color:mode===key?(key==='broadcast'?'white':'#050505'):'#65676B',boxShadow:mode===key&&key==='single'?'0 1px 4px rgba(0,0,0,0.1)':'none',transition:'all 0.15s' }}>
-            {icon} {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Recipient selector — single mode only */}
-      {mode === 'single' && (
-        <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',overflow:'hidden' }}>
-          <div style={{ padding:'10px 14px',borderBottom:'1px solid #F0F2F5',display:'flex',alignItems:'center',gap:8 }}>
-            <Search size={14} color=\"#BCC0C4\"/>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder=\"Search users…\"
-              style={{ flex:1,border:'none',outline:'none',fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
-          </div>
-          <div style={{ maxHeight:200,overflowY:'auto' }}>
-            {filteredUsers.slice(0,20).map(u => (
-              <div key={u.id} onClick={() => { setRecipientId(u.id); setSearch(u.display_name||'') }}
-                style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',background:recipientId===u.id?'#E6F4F4':'white',borderBottom:'1px solid #F0F2F5',transition:'background 0.1s' }}
-                onMouseEnter={e => { if(recipientId!==u.id) e.currentTarget.style.background='#F7F8FA' }}
-                onMouseLeave={e => { if(recipientId!==u.id) e.currentTarget.style.background='white' }}>
-                <img src={u.avatar_url||dicebearUrl(u.display_name)} style={{ width:32,height:32,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=\"\"/>
-                <div style={{ flex:1,minWidth:0 }}>
-                  <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{u.display_name}</p>
-                  <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
-                </div>
-                {recipientId===u.id && <Check size={15} color=\"#0D7377\"/>}
-              </div>
-            ))}
-            {filteredUsers.length === 0 && (
-              <p style={{ textAlign:'center',padding:'20px 0',fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#8A8D91',margin:0 }}>No users found</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Broadcast warning */}
-      {mode === 'broadcast' && (
-        <div style={{ background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 14px',display:'flex',gap:8 }}>
-          <AlertTriangle size={15} color=\"#92400E\" style={{ flexShrink:0,marginTop:1 }}/>
-          <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:12,color:'#92400E',lineHeight:1.5 }}>
-            This will send a notification to all {users.length - 1} users. Use sparingly.
-          </p>
-        </div>
-      )}
-
-      {/* Message box */}
-      <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px' }}>
-        <label style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5,display:'block',marginBottom:8 }}>
-          {mode === 'broadcast' ? '📡 Broadcast Message' : '✉️ Message'}
-        </label>
-        <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
-          placeholder={mode === 'broadcast' ? 'Type a message to send to everyone…' : 'Type your message…'}
-          style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'\"Instrument Sans\",system-ui',fontSize:14,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}/>
-        <button onClick={sendDM} disabled={sending||!message.trim()||(mode==='single'&&!recipientId)}
-          style={{ display:'flex',alignItems:'center',gap:6,padding:'10px 18px',borderRadius:10,border:'none',background:(!message.trim()||(mode==='single'&&!recipientId))?'#E4E6EB':(mode==='broadcast'?'#C0392B':'#0D7377'),color:(!message.trim()||(mode==='single'&&!recipientId))?'#BCC0C4':'white',cursor:(!message.trim()||(mode==='single'&&!recipientId))?'default':'pointer',fontFamily:'\"Instrument Sans\",system-ui',fontWeight:700,fontSize:14,transition:'all 0.12s',opacity:sending?0.7:1 }}>
-          {sending ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }}/> : <Send size={14}/>}
-          {mode === 'broadcast' ? 'Broadcast' : 'Send'}
-        </button>
-      </div>
-
-      {/* Send history (local session) */}
-      {sent.length > 0 && (
-        <div>
-          <p style={{ margin:'4px 0 6px',fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>Sent this session</p>
-          {sent.map((s, i) => (
-            <div key={i} style={{ background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'10px 14px',marginBottom:6 }}>
-              <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:4 }}>
-                {s.mode === 'broadcast'
-                  ? <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,fontWeight:700,color:'#C0392B',background:'#FADBD8',padding:'1px 7px',borderRadius:8 }}>📡 Broadcast · {s.count} users</span>
-                  : <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,fontWeight:700,color:'#0D7377',background:'#E6F4F4',padding:'1px 7px',borderRadius:8 }}>✉️ To {s.recipient}</span>
-                }
-                <span style={{ fontFamily:'\"Instrument Sans\",system-ui',fontSize:11,color:'#BCC0C4' }}>{formatDistanceToNow(s.time,{addSuffix:true})}</span>
-              </div>
-              <p style={{ margin:0,fontFamily:'\"Instrument Sans\",system-ui',fontSize:13,color:'#050505',lineHeight:1.4 }}>{s.message}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-
+// ── Shared small action button ────────────────────────────────
 function ActionBtn({ icon, color, title, onClick, loading: isLoading }) {
   const [hovered, setHovered] = useState(false)
   return (
