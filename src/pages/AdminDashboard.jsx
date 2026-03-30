@@ -10,7 +10,9 @@ import {
   BarChart2, Clock, VolumeX, Ban, ChevronRight,
   Loader2, Send, Tag, BookOpen, Eye, EyeOff,
   ChevronUp, ChevronDown, Pencil, Check, Archive,
-  Star, AlertTriangle, GripVertical
+  Star, AlertTriangle, GripVertical, Settings,
+  Download, ToggleLeft, ToggleRight, WrenchIcon,
+  Wrench
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -115,6 +117,7 @@ export default function AdminDashboard({ onClose }) {
     ...(isSuperadmin ? [
       { key: 'types',    label: 'Post Types', icon: Tag      },
       { key: 'subjects', label: 'Subjects',   icon: BookOpen },
+      { key: 'controls', label: 'System',     icon: Wrench   },
       { key: 'audit',    label: 'Audit Log',  icon: Clock    },
     ] : []),
   ]
@@ -167,6 +170,7 @@ export default function AdminDashboard({ onClose }) {
               {tab === 'banners'   && <BannersTab banners={banners} newBanner={newBanner} setNewBanner={setNewBanner} bannerHours={bannerHours} setBannerHours={setBannerHours} onPost={postBanner} onDelete={deleteBanner} posting={postingBanner}/>}
               {tab === 'types'     && <AnnouncementTypesTab/>}
               {tab === 'subjects'  && <SubjectsTab/>}
+              {tab === 'controls'  && <SystemControlsTab users={users} currentUserId={user.id}/>}
               {tab === 'audit'     && <AuditTab logs={auditLogs}/>}
             </>
           )}
@@ -759,6 +763,190 @@ function SubjectsTab() {
   )
 }
 
+// ── System Controls Tab ───────────────────────────────────────
+function SystemControlsTab({ users, currentUserId }) {
+  const [maintenanceOn, setMaintenanceOn] = useState(false)
+  const [maintenanceMsg, setMaintenanceMsg] = useState('')
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true)
+  const [savingMaintenance, setSavingMaintenance] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
+
+  useEffect(() => { fetchMaintenance() }, [])
+
+  async function fetchMaintenance() {
+    setLoadingMaintenance(true)
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'maintenance_mode')
+      .single()
+    if (data?.value) {
+      try {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+        setMaintenanceOn(parsed.enabled ?? false)
+        setMaintenanceMsg(parsed.message ?? '')
+      } catch { /* malformed value, ignore */ }
+    }
+    setLoadingMaintenance(false)
+  }
+
+  async function saveMaintenance(enabled) {
+    setSavingMaintenance(true)
+    try {
+      const value = JSON.stringify({
+        enabled,
+        message: maintenanceMsg.trim() || 'The app is undergoing maintenance. Please check back shortly.',
+        updated_at: new Date().toISOString(),
+      })
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({ key: 'maintenance_mode', value }, { onConflict: 'key' })
+      if (error) throw error
+      setMaintenanceOn(enabled)
+      toast.success(enabled ? '🔧 Maintenance mode enabled' : '✅ Maintenance mode disabled')
+    } catch (err) {
+      toast.error(err.message)
+    }
+    setSavingMaintenance(false)
+  }
+
+  function exportCsv() {
+    setExportingCsv(true)
+    try {
+      const headers = ['Name', 'Email', 'Role', 'Join Date', 'Muted', 'Mute Expires', 'Banned', 'Ban Reason']
+      const rows = users
+        .filter(u => u.id !== currentUserId) // optionally keep or remove this
+        .map(u => [
+          u.display_name ?? '',
+          u.email ?? '',
+          u.role ?? 'user',
+          u.created_at ? format(new Date(u.created_at), 'yyyy-MM-dd') : '',
+          u.is_muted ? 'Yes' : 'No',
+          u.muted_until ? format(new Date(u.muted_until), 'yyyy-MM-dd HH:mm') : '',
+          u.is_banned ? 'Yes' : 'No',
+          u.banned_reason ?? '',
+        ])
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n')
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `users_export_${format(new Date(), 'yyyy-MM-dd')}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast.success(`Exported ${rows.length} users`)
+    } catch (err) {
+      toast.error('Export failed')
+    }
+    setExportingCsv(false)
+  }
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
+
+      {/* Section header */}
+      <div style={{ background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 14px',display:'flex',gap:8,alignItems:'flex-start' }}>
+        <AlertTriangle size={15} color="#92400E" style={{ flexShrink:0,marginTop:1 }}/>
+        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#92400E',lineHeight:1.5 }}>
+          These are superadmin-only controls that affect all users. Use with caution.
+        </p>
+      </div>
+
+      {/* Maintenance Mode */}
+      <div style={{ background:'white',borderRadius:12,border:`1px solid ${maintenanceOn?'#FED7AA':'#DADDE1'}`,padding:'16px' }}>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
+          <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+            <div style={{ width:36,height:36,borderRadius:10,background:maintenanceOn?'#FFF7ED':'#F0F2F5',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Wrench size={17} color={maintenanceOn?'#C2410C':'#65676B'}/>
+            </div>
+            <div>
+              <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,color:'#050505' }}>Maintenance Mode</p>
+              <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#65676B' }}>
+                {maintenanceOn ? 'Active — users see maintenance screen' : 'Inactive — app is running normally'}
+              </p>
+            </div>
+          </div>
+
+          {/* Toggle */}
+          {loadingMaintenance ? (
+            <Loader2 size={20} color="#BCC0C4" style={{ animation:'spin 0.8s linear infinite',flexShrink:0 }}/>
+          ) : (
+            <button
+              onClick={() => saveMaintenance(!maintenanceOn)}
+              disabled={savingMaintenance}
+              style={{ background:'none',border:'none',cursor:'pointer',padding:0,flexShrink:0,opacity:savingMaintenance?0.6:1,transition:'opacity 0.12s' }}>
+              {maintenanceOn
+                ? <ToggleRight size={36} color="#C2410C"/>
+                : <ToggleLeft size={36} color="#BCC0C4"/>
+              }
+            </button>
+          )}
+        </div>
+
+        {/* Custom message */}
+        <div>
+          <label style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5,display:'block',marginBottom:6 }}>
+            Maintenance Message
+          </label>
+          <textarea
+            value={maintenanceMsg}
+            onChange={e => setMaintenanceMsg(e.target.value)}
+            rows={2}
+            placeholder="The app is undergoing maintenance. Please check back shortly."
+            style={{ width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}
+          />
+          <button
+            onClick={() => saveMaintenance(maintenanceOn)}
+            disabled={savingMaintenance}
+            style={{ display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:10,border:'none',background:'#0D7377',color:'white',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,transition:'opacity 0.12s',opacity:savingMaintenance?0.7:1 }}>
+            {savingMaintenance ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Check size={13}/>}
+            Save Message
+          </button>
+        </div>
+      </div>
+
+      {/* Export Users CSV */}
+      <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'16px' }}>
+        <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:12 }}>
+          <div style={{ width:36,height:36,borderRadius:10,background:'#F0FDF4',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            <Download size={17} color={GREEN}/>
+          </div>
+          <div>
+            <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,color:'#050505' }}>Export User List</p>
+            <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#65676B' }}>
+              Download all {users.length} users as a CSV file
+            </p>
+          </div>
+        </div>
+
+        {/* Fields preview */}
+        <div style={{ display:'flex',gap:6,flexWrap:'wrap',marginBottom:12 }}>
+          {['Name', 'Email', 'Role', 'Join Date', 'Muted', 'Banned'].map(field => (
+            <span key={field} style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#65676B',background:'#F0F2F5',borderRadius:6,padding:'3px 8px' }}>
+              {field}
+            </span>
+          ))}
+        </div>
+
+        <button
+          onClick={exportCsv}
+          disabled={exportingCsv || users.length === 0}
+          style={{ display:'flex',alignItems:'center',gap:6,padding:'9px 16px',borderRadius:10,border:'none',background:users.length>0?GREEN:'#E4E6EB',color:users.length>0?'white':'#BCC0C4',cursor:users.length>0?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,transition:'opacity 0.12s',opacity:exportingCsv?0.7:1 }}>
+          {exportingCsv ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Download size={13}/>}
+          Export CSV
+        </button>
+      </div>
+
+    </div>
+  )
+}
+
 // ── Shared small action button ────────────────────────────────
 function ActionBtn({ icon, color, title, onClick, loading: isLoading }) {
   const [hovered, setHovered] = useState(false)
@@ -788,6 +976,7 @@ const ACTION_LABELS = {
   unban_user:            { label:'Unbanned user',      color:GREEN   },
   promote_to_moderator:  { label:'Promoted to Mod',    color:BLUE    },
   demote_from_moderator: { label:'Demoted from Mod',   color:'#8A8D91'},
+  force_logout:          { label:'Force logged out',   color:'#7C3AED'},
 }
 
 function AuditTab({ logs }) {
