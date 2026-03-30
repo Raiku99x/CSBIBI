@@ -12,7 +12,7 @@ function dicebearUrl(name = '') {
 import {
   X, Image, Paperclip, ChevronDown, Loader2,
   Megaphone, FileText, Plus, Globe, MessageSquareQuote, Eye, EyeOff,
-  ClipboardPaste, Trash2
+  ClipboardPaste, Trash2, Clock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -99,6 +99,8 @@ export default function CreatePostModal({
     announcement_type: '',
     quoted_from: '',
     quoted_message: '',
+    scheduled_date: '',
+    scheduled_time: '',
   })
   const [photoFiles, setPhotoFiles] = useState([])
   const [photoPreviews, setPhotoPreviews] = useState([])
@@ -109,6 +111,7 @@ export default function CreatePostModal({
   const [showQuoteSection, setShowQuoteSection] = useState(false)
   const [showQuotePreview, setShowQuotePreview] = useState(false)
   const [pastingMsg, setPastingMsg] = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
 
   const photoRef = useRef()
   const fileRef = useRef()
@@ -151,6 +154,17 @@ export default function CreatePostModal({
   const isMaterial = form.sub_type === 'material'
   const hasQuote = showQuoteSection && (form.quoted_from.trim() || form.quoted_message.trim())
   const accent = getQuoteAccent(form.post_type, form.sub_type)
+
+  // Build the scheduled_at ISO string from date + time inputs
+  function buildScheduledAt() {
+    if (!showSchedule || !form.scheduled_date) return null
+    const time = form.scheduled_time || '00:00'
+    return new Date(`${form.scheduled_date}T${time}:00`).toISOString()
+  }
+
+  // Is the scheduled time actually in the future?
+  const scheduledAt = buildScheduledAt()
+  const isScheduledFuture = scheduledAt && new Date(scheduledAt) > new Date()
 
   function handlePasteAreaKeyDown(e) {
     const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
@@ -243,6 +257,17 @@ export default function CreatePostModal({
       toast.error('Please enter who sent this message')
       return
     }
+    // Validate schedule: if schedule toggle is on, date must be set and must be in the future
+    if (showSchedule) {
+      if (!form.scheduled_date) {
+        toast.error('Please set a scheduled date')
+        return
+      }
+      if (!isScheduledFuture) {
+        toast.error('Scheduled time must be in the future')
+        return
+      }
+    }
 
     setLoading(true)
     try {
@@ -287,13 +312,15 @@ export default function CreatePostModal({
           due_date: form.due_date || null,
           due_time: form.due_time || null,
           quoted_message: quoted_data,
+          scheduled_at: scheduledAt,
         })
         .select('*, profiles(*), subjects(*)')
         .single()
 
       if (error) throw error
 
-      if (form.post_type === 'announcement' && form.subject_id) {
+      // Only notify if NOT scheduled (or scheduled time has already passed)
+      if (!isScheduledFuture && form.post_type === 'announcement' && form.subject_id) {
         const { data: enrolled } = await supabase
           .from('user_subjects').select('user_id')
           .eq('subject_id', form.subject_id).neq('user_id', user.id)
@@ -308,13 +335,17 @@ export default function CreatePostModal({
         }
       }
 
-      toast.success(
-        isDeadline ? '📅 Deadline posted!'
-        : form.sub_type === 'reminder' ? '🔔 Reminder posted!'
-        : isAnnouncement ? '📢 Announcement posted!'
-        : isMaterial ? '📁 Material shared!'
-        : 'Posted!'
-      )
+      if (isScheduledFuture) {
+        toast.success('🕐 Post scheduled!', { duration: 3500 })
+      } else {
+        toast.success(
+          isDeadline ? '📅 Deadline posted!'
+          : form.sub_type === 'reminder' ? '🔔 Reminder posted!'
+          : isAnnouncement ? '📢 Announcement posted!'
+          : isMaterial ? '📁 Material shared!'
+          : 'Posted!'
+        )
+      }
       onCreated(post)
       onClose()
     } catch (err) {
@@ -323,6 +354,14 @@ export default function CreatePostModal({
       setLoading(false)
       setUploadProgress('')
     }
+  }
+
+  // Format the scheduled datetime for display
+  function formatScheduledPreview() {
+    if (!form.scheduled_date) return null
+    const time = form.scheduled_time || '00:00'
+    const dt = new Date(`${form.scheduled_date}T${time}:00`)
+    return dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   }
 
   return (
@@ -441,7 +480,7 @@ export default function CreatePostModal({
           ))}
         </div>
 
-        {/* Announcement type dropdown — now from DB */}
+        {/* Announcement type dropdown — from DB */}
         {isAnnouncement && form.sub_type && (
           <div style={{ position: 'relative', marginBottom: 14 }}>
             <select
@@ -716,6 +755,109 @@ export default function CreatePostModal({
           </div>
         )}
 
+        {/* ── SCHEDULE POST SECTION ── */}
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowSchedule(v => !v)
+              if (showSchedule) { set('scheduled_date', ''); set('scheduled_time', '') }
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              width: '100%', padding: '10px 14px', borderRadius: 10,
+              border: `1.5px solid ${showSchedule ? '#7C3AED' : '#E4E6EB'}`,
+              background: showSchedule ? '#F5F3FF' : '#F7F8FA',
+              cursor: 'pointer', transition: 'all 0.15s',
+              fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5,
+              color: showSchedule ? '#7C3AED' : '#65676B',
+            }}
+          >
+            <Clock size={16} color={showSchedule ? '#7C3AED' : '#8A8D91'} />
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {showSchedule
+                ? isScheduledFuture
+                  ? `Scheduled for ${formatScheduledPreview()}`
+                  : 'Schedule this post'
+                : 'Schedule this post'}
+            </span>
+            {showSchedule ? <X size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {showSchedule && (
+            <div style={{
+              marginTop: 8, padding: '12px 14px',
+              background: '#F5F3FF', borderRadius: 10,
+              border: '1.5px solid #DDD6FE',
+              animation: 'expandIn 0.18s ease',
+            }}>
+              <p style={{
+                margin: '0 0 10px',
+                fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700,
+                color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.5,
+              }}>
+                Publish date &amp; time
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="date"
+                  value={form.scheduled_date}
+                  onChange={e => set('scheduled_date', e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{
+                    flex: 3, padding: '10px 12px', borderRadius: 10,
+                    border: `1.5px solid ${form.scheduled_date ? '#7C3AED' : '#DDD6FE'}`,
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505',
+                    background: 'white', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                <input
+                  type="time"
+                  value={form.scheduled_time}
+                  onChange={e => set('scheduled_time', e.target.value)}
+                  disabled={!form.scheduled_date}
+                  style={{
+                    flex: 2, padding: '10px 12px', borderRadius: 10,
+                    border: `1.5px solid ${form.scheduled_time ? '#7C3AED' : '#DDD6FE'}`,
+                    fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
+                    color: form.scheduled_date ? '#050505' : '#BCC0C4',
+                    background: form.scheduled_date ? 'white' : '#EDE9FE',
+                    outline: 'none', boxSizing: 'border-box',
+                    opacity: form.scheduled_date ? 1 : 0.5,
+                    cursor: form.scheduled_date ? 'text' : 'not-allowed',
+                  }}
+                />
+              </div>
+
+              {/* Validation feedback */}
+              {form.scheduled_date && !isScheduledFuture && (
+                <p style={{
+                  margin: '8px 0 0',
+                  fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600,
+                  color: '#C0392B', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  ⚠️ Pick a future date and time
+                </p>
+              )}
+              {isScheduledFuture && (
+                <p style={{
+                  margin: '8px 0 0',
+                  fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600,
+                  color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  ✓ Will publish {formatScheduledPreview()}
+                </p>
+              )}
+              <p style={{
+                margin: '8px 0 0',
+                fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#A78BFA',
+              }}>
+                💡 Only you and admins can see this post until it's published.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Photo previews */}
         {photoPreviews.length > 0 && (
           <div style={{ marginTop: 14 }}>
@@ -816,7 +958,11 @@ export default function CreatePostModal({
             onClick={handleSubmit} disabled={loading}
             style={{
               width: '100%', padding: '13px 0', borderRadius: 12, border: 'none',
-              background: loading ? '#7EC8C8' : '#0D7377',
+              background: loading
+                ? '#7EC8C8'
+                : isScheduledFuture
+                  ? '#7C3AED'
+                  : '#0D7377',
               color: 'white', cursor: loading ? 'not-allowed' : 'pointer',
               fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -826,7 +972,11 @@ export default function CreatePostModal({
             onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
           >
             {loading && <Loader2 size={17} style={{ animation: 'spin 0.8s linear infinite' }} />}
-            {loading ? (uploadProgress || 'Posting…') : 'Post'}
+            {loading
+              ? (uploadProgress || 'Posting…')
+              : isScheduledFuture
+                ? '🕐 Schedule Post'
+                : 'Post'}
           </button>
         </div>
       </div>
