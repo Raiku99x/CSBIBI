@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useMuteGate } from '../hooks/useMuteGate'
 import PostCard from '../components/PostCard'
 import CreatePostModal from '../components/CreatePostModal'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
-import { Image, Megaphone, Paperclip } from 'lucide-react'
+import { Image, Megaphone, Paperclip, VolumeX } from 'lucide-react'
+import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -20,16 +23,16 @@ const RED = '#C0392B'
 export default function FeedPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
-  const [posts, setPosts]         = useState([])
-  const [subjects, setSubjects]   = useState([])
-  const [loading, setLoading]     = useState(true)
+  const { effectivelyMuted, getMuteMessage } = useMuteGate()
+
+  const [posts, setPosts]               = useState([])
+  const [subjects, setSubjects]         = useState([])
+  const [loading, setLoading]           = useState(true)
   const [showCreate, setShowCreate]     = useState(false)
   const [createType, setCreateType]     = useState('status')
   const [createSubType, setCreateSubType] = useState('')
   const [autoOpenPhoto, setAutoOpenPhoto] = useState(false)
   const [autoOpenFile, setAutoOpenFile]   = useState(false)
-
-  // User profile panel
   const [viewingUserId, setViewingUserId] = useState(null)
 
   const fetchPosts = useCallback(async () => {
@@ -51,14 +54,19 @@ export default function FeedPage() {
     return () => supabase.removeChannel(channel)
   }, [fetchPosts])
 
-  function openCreate(type = 'status', subType = '') {
+  function tryOpenCreate(type = 'status', subType = '') {
+    if (effectivelyMuted) {
+      toast.error(getMuteMessage(), { icon: '🔇', duration: 4000 })
+      return
+    }
     setCreateType(type)
     setCreateSubType(subType)
     setShowCreate(true)
   }
-  function handlePhotoClick()   { setAutoOpenPhoto(true); setAutoOpenFile(false); openCreate('status', '') }
-  function handleFileClick()    { setAutoOpenFile(true); setAutoOpenPhoto(false); openCreate('status', '') }
-  function handleModalClose()   { setShowCreate(false); setAutoOpenPhoto(false); setAutoOpenFile(false) }
+
+  function handlePhotoClick()  { setAutoOpenPhoto(true); setAutoOpenFile(false); tryOpenCreate('status', '') }
+  function handleFileClick()   { setAutoOpenFile(true); setAutoOpenPhoto(false); tryOpenCreate('status', '') }
+  function handleModalClose()  { setShowCreate(false); setAutoOpenPhoto(false); setAutoOpenFile(false) }
 
   function handleUserClick(profileData) {
     if (!profileData?.id) return
@@ -74,6 +82,24 @@ export default function FeedPage() {
   return (
     <div style={{ paddingTop: 6 }}>
 
+      {/* ── System banner ── */}
+      <SystemBanner/>
+
+      {/* ── Mute banner ── */}
+      {effectivelyMuted && (
+        <div style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderLeft:'4px solid #C2410C', borderRadius:10, margin:'0 0 8px', padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:30, height:30, borderRadius:'50%', background:'#C2410C', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <VolumeX size={14} color="white"/>
+          </div>
+          <div>
+            <p style={{ margin:0, fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:13, color:'#9A3412' }}>You are muted</p>
+            <p style={{ margin:'1px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#C2410C' }}>
+              {getMuteMessage()} You can still read and like posts.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Compose Card ── */}
       <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6 }}>
         <div style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:8 }}>
@@ -84,21 +110,21 @@ export default function FeedPage() {
             style={{ width:38, height:38, borderRadius:10, objectFit:'cover', flexShrink:0, border:'1.5px solid #F0F2F5', cursor:'pointer' }}
           />
           <button
-            onClick={() => openCreate('status', '')}
-            style={{ flex:1, height:38, background:'#F0F2F5', border:'none', borderRadius:20, padding:'0 14px', textAlign:'left', cursor:'pointer', fontSize:14, color:'#8A8D91', fontFamily:'"Instrument Sans",system-ui', fontWeight:500, transition:'background 0.12s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#E4E6EB'}
-            onMouseLeave={e => e.currentTarget.style.background = '#F0F2F5'}
+            onClick={() => tryOpenCreate('status', '')}
+            style={{ flex:1, height:38, background:effectivelyMuted?'#F7F8FA':'#F0F2F5', border:effectivelyMuted?'1.5px solid #E4E6EB':'none', borderRadius:20, padding:'0 14px', textAlign:'left', cursor:effectivelyMuted?'not-allowed':'pointer', fontSize:14, color:effectivelyMuted?'#BCC0C4':'#8A8D91', fontFamily:'"Instrument Sans",system-ui', fontWeight:500, transition:'background 0.12s' }}
+            onMouseEnter={e => { if (!effectivelyMuted) e.currentTarget.style.background = '#E4E6EB' }}
+            onMouseLeave={e => { if (!effectivelyMuted) e.currentTarget.style.background = '#F0F2F5' }}
           >
-            What's on your mind, {firstName}?
+            {effectivelyMuted ? '🔇 You are muted and cannot post' : `What's on your mind, ${firstName}?`}
           </button>
         </div>
 
         <div style={{ height:1, background:'#F0F2F5', margin:'0 12px' }}/>
 
         <div style={{ display:'flex', padding:'4px 6px 6px' }}>
-          <ComposeBtn icon={<Paperclip size={18}/>} color="#1877F2" bg="#EBF5FD" label="File"     onClick={handleFileClick}/>
-          <ComposeBtn icon={<Image size={18}/>}     color="#16A34A" bg="#DCFCE7" label="Photo"    onClick={handlePhotoClick}/>
-          <ComposeBtn icon={<Megaphone size={18}/>} color={RED}     bg="#FADBD8" label="Announce" onClick={() => openCreate('announcement', '')}/>
+          <ComposeBtn icon={<Paperclip size={18}/>} color="#1877F2" bg="#EBF5FD" label="File"     onClick={handleFileClick}                         disabled={effectivelyMuted}/>
+          <ComposeBtn icon={<Image size={18}/>}     color="#16A34A" bg="#DCFCE7" label="Photo"    onClick={handlePhotoClick}                        disabled={effectivelyMuted}/>
+          <ComposeBtn icon={<Megaphone size={18}/>} color={RED}     bg="#FADBD8" label="Announce" onClick={() => tryOpenCreate('announcement', '')} disabled={effectivelyMuted}/>
         </div>
       </div>
 
@@ -106,7 +132,7 @@ export default function FeedPage() {
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i}/>)}</div>
       ) : posts.length === 0 ? (
-        <EmptyFeed onPost={() => openCreate('status', '')}/>
+        <EmptyFeed onPost={() => tryOpenCreate('status', '')}/>
       ) : (
         <div>
           {posts.map(post => (
@@ -139,7 +165,6 @@ export default function FeedPage() {
         />
       )}
 
-      {/* User profile panel */}
       {viewingUserId && (
         <UserProfilePage
           userId={viewingUserId}
@@ -151,12 +176,13 @@ export default function FeedPage() {
   )
 }
 
-function ComposeBtn({ icon, color, bg, label, onClick }) {
+function ComposeBtn({ icon, color, bg, label, onClick, disabled }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 4px', border:'none', cursor:'pointer', background:hovered?bg:'transparent', borderRadius:7, transition:'background 0.15s', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:hovered?color:'#65676B' }}>
-      <span style={{ color:hovered?color:'#8A8D91', transition:'color 0.15s' }}>{icon}</span>
+    <button onClick={onClick} disabled={disabled}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 4px', border:'none', cursor:disabled?'not-allowed':'pointer', background:hovered&&!disabled?bg:'transparent', borderRadius:7, transition:'background 0.15s', fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:disabled?'#BCC0C4':hovered?color:'#65676B', opacity:disabled?0.5:1 }}>
+      <span style={{ color:disabled?'#BCC0C4':hovered?color:'#8A8D91', transition:'color 0.15s' }}>{icon}</span>
       {label}
     </button>
   )
