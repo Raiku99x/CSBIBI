@@ -84,7 +84,7 @@ export default function AboutModal({ onClose }) {
             fontSize: 11.5, color: 'var(--text-muted, #BCC0C4)',
             lineHeight: 1.6,
           }}>
-            Bug? Nah its a Feature
+            Bug? Nah it's a Feature
             <br />All rights reserved © {APP_YEAR} Yaru
           </p>
         </div>
