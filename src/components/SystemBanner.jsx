@@ -24,8 +24,10 @@ export default function SystemBanner() {
     }
     load()
 
-    // Realtime — new banners appear instantly
-    const ch = supabase.channel('system-banners')
+    // FIX #12: use a unique channel name per mount so remounts don't stack subscriptions.
+    // Static name 'system-banners' caused duplicate channels when the component remounted.
+    const channelName = 'system-banners-' + Date.now()
+    const ch = supabase.channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_notifications' }, load)
       .subscribe()
     return () => supabase.removeChannel(ch)
@@ -66,7 +68,6 @@ function BannerItem({ banner, onDismiss }) {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Subtle dot pattern overlay */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
