@@ -1,3 +1,4 @@
+import { APP_VERSION, APP_COHORT } from '../version'
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -346,9 +347,11 @@ export default function Layout({ children, onOpenSearch }) {
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<LogOut size={16} color={RED}/>} label="Log Out" onClick={handleSignOut} danger />
           </div>
 
-          <p style={{ margin:'4px 0 12px',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:textMut,textAlign:'center' }}>
-            CSB · v2.3.1 · BSCS '29
-          </p>
+         <p style={{ margin:'4px 0 12px', fontFamily:'"Instrument Sans",system-ui',
+                     fontSize:10.5, color:textMut, textAlign:'center' }}>
+           CSB · {APP_VERSION} · {APP_COHORT}
+         </p>
+
         </div>
       </div>
     )
