@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMuteGate } from '../hooks/useMuteGate'
+import { useSearchParams } from 'react-router-dom'
 import PostCard from '../components/PostCard'
 import CreatePostModal from '../components/CreatePostModal'
 import UserProfilePage from './UserProfilePage'
@@ -9,6 +10,7 @@ import { PostSkeleton } from '../components/Skeletons'
 import { Image, Megaphone, Paperclip, VolumeX, Clock } from 'lucide-react'
 import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
+import { useRole } from '../hooks/useRole'
 import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
@@ -20,21 +22,21 @@ function dicebearUrl(name = '') {
 
 const RED = '#C0392B'
 
-/** Returns true if the post is scheduled and the publish time is still in the future */
 function isScheduledFuture(post) {
   if (!post.scheduled_at) return false
   return new Date(post.scheduled_at) > new Date()
 }
 
-/** Returns true if the current user is superadmin */
-function isSuperAdmin(profile) {
-  return profile?.role === 'superadmin'
-}
-
 export default function FeedPage() {
   const { user, profile } = useAuth()
+  const { isSuperadmin } = useRole()
   const navigate = useNavigate()
   const { effectivelyMuted, getMuteMessage } = useMuteGate()
+
+  // FIX #2: read the ?post= query param so notification clicks work
+  const [searchParams, setSearchParams] = useSearchParams()
+  const targetPostId = searchParams.get('post')
+  const highlightRef = useRef(null)
 
   const [posts, setPosts]               = useState([])
   const [subjects, setSubjects]         = useState([])
@@ -57,24 +59,49 @@ export default function FeedPage() {
   useEffect(() => {
     fetchPosts()
     supabase.from('subjects').select('*').order('name').then(({ data }) => { if (data) setSubjects(data) })
+
     const channel = supabase.channel('feed-posts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
-        const { data } = await supabase.from('posts').select('*, profiles(*), subjects(*)').eq('id', payload.new.id).single()
-        if (data) setPosts(prev => [data, ...prev])
+        const { data } = await supabase
+          .from('posts').select('*, profiles(*), subjects(*)')
+          .eq('id', payload.new.id).single()
+        if (data) {
+          // FIX #3: don't push future-scheduled posts for non-authors/non-admins
+          const isFuture = isScheduledFuture(data)
+          const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
+          if (canSee) setPosts(prev => [data, ...prev])
+        }
       }).subscribe()
     return () => supabase.removeChannel(channel)
-  }, [fetchPosts])
+  }, [fetchPosts, user?.id, isSuperadmin])
 
-  /**
-   * Filter logic for scheduled posts:
-   * - If scheduled_at is in the future → only visible to the author and superadmins
-   * - Everyone else sees it hidden until publish time
-   */
+  // FIX #2: scroll to and highlight the target post once posts have loaded
+  useEffect(() => {
+    if (!targetPostId || loading) return
+    // Small delay so the DOM has painted
+    const timer = setTimeout(() => {
+      const el = document.getElementById('post-' + targetPostId)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Flash highlight
+        el.style.outline = '2px solid ' + RED
+        el.style.outlineOffset = '-2px'
+        el.style.transition = 'outline 0.3s'
+        setTimeout(() => {
+          el.style.outline = 'none'
+          // Clean up the query param without navigating
+          setSearchParams({}, { replace: true })
+        }, 2000)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [targetPostId, loading, setSearchParams])
+
   const visiblePosts = posts.filter(post => {
-    if (!isScheduledFuture(post)) return true               // already published or no schedule
-    if (post.author_id === user?.id) return true            // author always sees their own
-    if (isSuperAdmin(profile)) return true                  // superadmin sees all
-    return false                                            // hide from everyone else
+    if (!isScheduledFuture(post)) return true
+    if (post.author_id === user?.id) return true
+    if (isSuperadmin) return true
+    return false
   })
 
   function tryOpenCreate(type = 'status', subType = '') {
@@ -104,11 +131,8 @@ export default function FeedPage() {
 
   return (
     <div style={{ paddingTop: 6 }}>
-
-      {/* ── System banner ── */}
       <SystemBanner/>
 
-      {/* ── Mute banner ── */}
       {effectivelyMuted && (
         <div style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderLeft:'4px solid #C2410C', borderRadius:10, margin:'0 0 8px', padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:30, height:30, borderRadius:'50%', background:'#C2410C', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -123,7 +147,7 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* ── Compose Card ── */}
+      {/* Compose Card */}
       <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6 }}>
         <div style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:8 }}>
           <img
@@ -151,7 +175,7 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* ── Feed ── */}
+      {/* Feed */}
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i}/>)}</div>
       ) : visiblePosts.length === 0 ? (
@@ -159,9 +183,9 @@ export default function FeedPage() {
       ) : (
         <div>
           {visiblePosts.map(post => (
-            <div key={post.id} style={{ position: 'relative' }}>
-              {/* Scheduled badge — only for author / superadmin */}
-              {isScheduledFuture(post) && (post.author_id === user?.id || isSuperAdmin(profile)) && (
+            // FIX #2: add id on the wrapper so scrollIntoView works
+            <div key={post.id} id={'post-' + post.id} style={{ position: 'relative' }}>
+              {isScheduledFuture(post) && (post.author_id === user?.id || isSuperadmin) && (
                 <ScheduledBadge scheduledAt={post.scheduled_at} />
               )}
               <PostCard
@@ -204,24 +228,13 @@ export default function FeedPage() {
   )
 }
 
-/** Purple "Scheduled" badge shown above a post card */
 function ScheduledBadge({ scheduledAt }) {
   const dt = new Date(scheduledAt)
   const label = dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      padding: '5px 12px',
-      background: '#F5F3FF',
-      borderTop: '1px solid #DDD6FE',
-      borderLeft: '3px solid #7C3AED',
-    }}>
+    <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:'#F5F3FF', borderTop:'1px solid #DDD6FE', borderLeft:'3px solid #7C3AED' }}>
       <Clock size={12} color="#7C3AED" />
-      <span style={{
-        fontFamily: '"Instrument Sans", system-ui',
-        fontWeight: 700, fontSize: 11.5,
-        color: '#7C3AED',
-      }}>
+      <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#7C3AED' }}>
         🕐 Scheduled · Publishes {label}
       </span>
     </div>
