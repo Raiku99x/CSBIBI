@@ -4,8 +4,15 @@ const SavedPostsContext = createContext(null)
 
 export function SavedPostsProvider({ children }) {
   const [savedIds, setSavedIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('csb_saved_posts') || '[]')) }
-    catch { return new Set() }
+    // FIX #8: validate parsed value is actually an array before wrapping in Set.
+    // Previously: new Set(JSON.parse(...)) — if storage was corrupted (object/null)
+    // this would silently create a broken Set.
+    try {
+      const raw = JSON.parse(localStorage.getItem('csb_saved_posts') || '[]')
+      return new Set(Array.isArray(raw) ? raw : [])
+    } catch {
+      return new Set()
+    }
   })
 
   const toggleSaved = useCallback((postId) => {
