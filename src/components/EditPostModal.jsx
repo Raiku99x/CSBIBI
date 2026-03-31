@@ -1,3 +1,4 @@
+import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { X, ChevronDown, Loader2, Megaphone, FileText, Globe, MessageSquareQuote, Eye, EyeOff, ClipboardPaste, Trash2 } from 'lucide-react'
@@ -9,9 +10,6 @@ function dicebearUrl(name = '') {
   const hex = AVATAR_HEX[Math.max(0, c.charCodeAt(0) - 65) % AVATAR_HEX.length]
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
-
-// Fallback in case DB fetch fails
-const FALLBACK_TYPES = ['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting']
 
 function getQuoteAccent(postType, subType) {
   if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
@@ -58,7 +56,6 @@ function QuotedMessagePreview({ from, message, accent }) {
 export default function EditPostModal({ post, profile, subjects, onClose, onUpdated }) {
   const isAnnouncement = post.post_type === 'announcement'
   const existingQuoted = parseQuoted(post.quoted_message)
-  const [announcementTypes, setAnnouncementTypes] = useState(FALLBACK_TYPES)
 
   const [form, setForm] = useState({
     caption: post.caption || '',
@@ -76,20 +73,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
   const [showQuotePreview, setShowQuotePreview] = useState(false)
   const [pastingMsg, setPastingMsg] = useState(false)
   const pasteAreaRef = useRef()
-
-  // Fetch announcement types from DB
-  useEffect(() => {
-    supabase
-      .from('announcement_types')
-      .select('label')
-      .eq('is_visible', true)
-      .order('sort_order', { ascending: true })
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setAnnouncementTypes(data.map(t => t.label))
-        }
-      })
-  }, [])
+  const announcementTypes = useAnnouncementTypes()
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const formIsAnnouncement = form.post_type === 'announcement'
