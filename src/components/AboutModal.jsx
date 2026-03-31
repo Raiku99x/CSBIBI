@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { APP_VERSION, APP_YEAR, APP_COHORT } from '../version'
 
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
@@ -6,7 +7,6 @@ const BLUE = '#1A5276'
 export default function AboutModal({ onClose }) {
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -16,7 +16,6 @@ export default function AboutModal({ onClose }) {
         }}
       />
 
-      {/* Modal */}
       <div style={{
         position: 'fixed', left: '50%', top: '50%',
         transform: 'translate(-50%, -50%)',
@@ -47,7 +46,6 @@ export default function AboutModal({ onClose }) {
             <X size={14} color="white" />
           </button>
 
-          {/* Logo */}
           <div style={{
             width: 72, height: 72, borderRadius: 18,
             overflow: 'hidden', margin: '0 auto 12px',
@@ -72,12 +70,12 @@ export default function AboutModal({ onClose }) {
 
         {/* Info rows */}
         <div style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-          <InfoRow label="Version" value="v2.3.1" accent />
-          <InfoRow label="Program" value="BSCS '29" />
+          {/* FIX #17: use shared constants instead of hardcoded strings */}
+          <InfoRow label="Version" value={APP_VERSION} accent />
+          <InfoRow label="Program" value={APP_COHORT} />
           <InfoRow label="Developer" value="Yaru" />
-          <InfoRow label="Year" value="2026" />
+          <InfoRow label="Year" value={APP_YEAR} />
 
-          {/* Divider */}
           <div style={{ height: 1, background: 'var(--border, #F0F2F5)', margin: '16px 0 14px' }} />
 
           <p style={{
@@ -87,13 +85,13 @@ export default function AboutModal({ onClose }) {
             lineHeight: 1.6,
           }}>
             Built with ❤️ for the CS community.
-            <br />All rights reserved © 2026 Yaru
+            <br />All rights reserved © {APP_YEAR} Yaru
           </p>
         </div>
       </div>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
         @keyframes scaleIn { from { opacity: 0; transform: translate(-50%,-50%) scale(0.9) } to { opacity: 1; transform: translate(-50%,-50%) scale(1) } }
       `}</style>
     </>
