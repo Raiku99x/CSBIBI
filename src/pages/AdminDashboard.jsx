@@ -193,7 +193,7 @@ export default function AdminDashboard({ onClose }) {
       {editingPost && (
         <EditPostModal
           post={editingPost}
-          profile={users.find(u => u.id === editingPost.user_id) || {}}
+          profile={users.find(u => u.id === editingPost.author_id) || {}}
           subjects={[]}
           onClose={() => setEditingPost(null)}
           onUpdated={() => { setEditingPost(null); toast.success('Post updated!') }}
@@ -1042,7 +1042,7 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
     setLoading(true)
     const { data, error } = await supabase
       .from('posts')
-      .select('id, caption, post_type, sub_type, created_at, user_id, is_deleted, profiles(display_name, avatar_url), subjects(name)')
+      .select('id, caption, post_type, sub_type, created_at, author_id, is_deleted, profiles(display_name, avatar_url), subjects(name)')
       .order('created_at', { ascending: false })
       .limit(500)
     if (!error) setPosts(data || [])
