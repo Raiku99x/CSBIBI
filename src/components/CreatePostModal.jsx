@@ -219,10 +219,15 @@ export default function CreatePostModal({
   function handleFile(e) {
     const chosen = Array.from(e.target.files || [])
     const remaining = MAX_FILES - attachFiles.length
-    if (remaining <= 0) { toast.error(`Max ${MAX_FILES} files`); return }
-    setAttachFiles(prev => [...prev, ...chosen.slice(0, remaining)])
+    if (remaining <= 0) { toast.error(`Max ${MAX_FILES} files`); e.target.value = ''; return }
+    const toAdd = chosen.slice(0, remaining)
+    if (chosen.length > remaining) {
+      toast(`Only ${remaining} file${remaining !== 1 ? 's' : ''} added — limit reached`, { icon: 'ℹ️' })
+    }
+    setAttachFiles(prev => [...prev, ...toAdd])
     e.target.value = ''
-  }
+ }
+ 
 
   function removeFile(idx) {
     setAttachFiles(prev => prev.filter((_, i) => i !== idx))
