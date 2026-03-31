@@ -1,3 +1,4 @@
+import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -31,9 +32,6 @@ const FILE_ACCEPT = [
   'application/zip',
   'application/x-zip-compressed',
 ].join(',')
-
-// Fallback in case DB fetch fails
-const FALLBACK_TYPES = ['Quiz','Activity','Output','Exam','Fees','Info','Learning Task','Project','Reporting']
 
 function getQuoteAccent(postType, subType) {
   if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
@@ -88,7 +86,6 @@ export default function CreatePostModal({
   autoOpenFile = false,
 }) {
   const { user, profile } = useAuth()
-  const [announcementTypes, setAnnouncementTypes] = useState(FALLBACK_TYPES)
   const [form, setForm] = useState({
     caption: '',
     subject_id: '',
@@ -117,20 +114,7 @@ export default function CreatePostModal({
   const fileRef = useRef()
   const uploadCounter = useRef(0)
   const pasteAreaRef = useRef()
-
-  // Fetch announcement types from DB
-  useEffect(() => {
-    supabase
-      .from('announcement_types')
-      .select('label')
-      .eq('is_visible', true)
-      .order('sort_order', { ascending: true })
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setAnnouncementTypes(data.map(t => t.label))
-        }
-      })
-  }, [])
+  const announcementTypes = useAnnouncementTypes()
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
