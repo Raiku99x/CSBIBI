@@ -243,6 +243,7 @@ function SubjectDetail({ subject, isEnrolled, userId, onBack, onToggle }) {
           apps={apps}
           userId={userId}
           color={color}
+          subject={subject}
           onUserClick={(p) => setViewingUserId(p?.id)}
         />
       )}
@@ -272,7 +273,7 @@ function ToggleBtn({ enrolled, onToggle }) {
 }
 
 // onUserClick passed down from SubjectDetail
-function TabContent({ activeTab, posts, filePosts, mediaPosts, apps, userId, color, onUserClick }) {
+function TabContent({ activeTab, posts, filePosts, mediaPosts, apps, userId, color, subject, onUserClick }) {
   if (activeTab === 'posts') {
     return posts.length === 0
       ? <EmptyCard emoji="📝" title="No posts yet" subtitle="Nothing shared in this subject yet"/>
@@ -282,6 +283,7 @@ function TabContent({ activeTab, posts, filePosts, mediaPosts, apps, userId, col
               key={p.id}
               post={p}
               currentUserId={userId}
+              subjects={[subject]}
               onUserClick={onUserClick}
             />
           ))}
