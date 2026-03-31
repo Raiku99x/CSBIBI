@@ -50,40 +50,44 @@ function useIsDesktop() {
 function useForceLogout(profile, signOut, navigate) {
   useEffect(() => {
     if (!profile?.id) return
-
-    // Get the session creation time so we don't log out for old flags
-    let sessionCreatedAt = null
+ 
+    let channel = null
+ 
+    // FIX #5: Fetch session FIRST, then subscribe so there is no race window
+    // where an event could arrive before sessionCreatedAt is populated.
     supabase.auth.getSession().then(({ data }) => {
-      sessionCreatedAt = data?.session?.created_at
+      const sessionCreatedAt = data?.session?.created_at
         ? new Date(data.session.created_at)
         : new Date(0)
-    })
-
-    const channel = supabase
-      .channel('force-logout-' + profile.id)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${profile.id}`,
-        },
-        async (payload) => {
-          const flaggedAt = payload.new?.force_logout_at
-          if (!flaggedAt) return
-          const flagTime = new Date(flaggedAt)
-          // Only act if the flag was set AFTER this session started
-          if (sessionCreatedAt && flagTime > sessionCreatedAt) {
-            await supabase.auth.signOut()
-            navigate('/auth')
+ 
+      channel = supabase
+        .channel('force-logout-' + profile.id)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${profile.id}`,
+          },
+          async (payload) => {
+            const flaggedAt = payload.new?.force_logout_at
+            if (!flaggedAt) return
+            const flagTime = new Date(flaggedAt)
+            // sessionCreatedAt is guaranteed to be set now (not null)
+            if (flagTime > sessionCreatedAt) {
+              await supabase.auth.signOut()
+              navigate('/auth')
+            }
           }
-        }
-      )
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }, [profile?.id])
+        )
+        .subscribe()
+    })
+ 
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
+  }, [profile?.id, signOut, navigate]) 
 }
 
 function getNavItems(dmUnread) {
