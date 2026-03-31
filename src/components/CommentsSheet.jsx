@@ -16,7 +16,8 @@ const RED = '#C0392B'
 
 export default function CommentsSheet({ postId, onClose, onCommentCountChange }) {
   const { user, profile } = useAuth()
-  const { isMuted, muteMessage } = useMuteGate()
+  // FIX #1: was { isMuted, muteMessage } — those names don't exist in useMuteGate
+  const { effectivelyMuted, getMuteMessage } = useMuteGate()
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -71,7 +72,8 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   async function handleSend(e) {
     e.preventDefault()
-    if (!text.trim() || isMuted) return
+    // FIX #1: was isMuted — now effectivelyMuted
+    if (!text.trim() || effectivelyMuted) return
     setSending(true)
     const content = text.trim()
     setText('')
@@ -167,7 +169,8 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
           background: 'white',
         }}>
-          {isMuted ? (
+          {/* FIX #1: was isMuted, muteMessage — now effectivelyMuted, getMuteMessage() */}
+          {effectivelyMuted ? (
             <div style={{
               margin: '10px 12px',
               padding: '12px 14px',
@@ -190,7 +193,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                   fontFamily: '"Instrument Sans", system-ui', fontSize: 12,
                   color: '#BF360C',
                 }}>
-                  {muteMessage}
+                  {getMuteMessage()}
                 </p>
               </div>
             </div>
@@ -305,7 +308,7 @@ function CommentRow({ comment, isOwn, onDelete }) {
             color: '#BCC0C4', padding: '4px', display: 'flex', flexShrink: 0,
             transition: 'color 0.12s',
           }}
-          onMouseEnter={e => e.currentTarget.style.color = RED}
+          onMouseEnter={e => e.currentTarget.style.color = '#C0392B'}
           onMouseLeave={e => e.currentTarget.style.color = '#BCC0C4'}
         >
           <Trash2 size={13} />
