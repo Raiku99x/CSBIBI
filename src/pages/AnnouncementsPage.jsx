@@ -21,11 +21,14 @@ function formatTime12(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
+// FIX #11: Parse "YYYY-MM-DD" as LOCAL date parts, not UTC.
+// new Date("2025-12-25") is midnight UTC which shifts the day in UTC+ timezones.
 function getDeadlineDate(due_date, due_time) {
-  const date = new Date(due_date)
+  const [y, m, d] = due_date.split('-').map(Number)
+  const date = new Date(y, m - 1, d) // local midnight — no TZ shift
   if (due_time) {
-    const [h, m] = due_time.split(':').map(Number)
-    date.setHours(h, m, 0, 0)
+    const [h, min] = due_time.split(':').map(Number)
+    date.setHours(h, min, 0, 0)
   } else {
     date.setHours(23, 59, 0, 0)
   }
@@ -58,7 +61,6 @@ function parseFiles(file_url, file_name) {
   } catch { return [{ url: file_url, name: file_name || 'Attachment' }] }
 }
 
-// ── Notification Alert Bar ────────────────────────────────────
 function NotifBar({ pastDueCount, dueSoonCount }) {
   const [hidePast, setHidePast] = useState(false)
   const [hideSoon, setHideSoon] = useState(false)
@@ -76,11 +78,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
           borderLeft: `4px solid ${RED}`,
           borderRadius: 10,
         }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%',
-            background: RED, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: RED, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertCircle size={14} color="white" />
           </div>
           <div style={{ flex: 1 }}>
@@ -88,10 +86,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
               {pastDueCount} task{pastDueCount !== 1 ? 's are' : ' is'} past due — act now
             </p>
           </div>
-          <button
-            onClick={() => setHidePast(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#A32D2D', opacity: 0.6, padding: 2 }}
-          >
+          <button onClick={() => setHidePast(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#A32D2D', opacity: 0.6, padding: 2 }}>
             <X size={14} />
           </button>
         </div>
@@ -105,11 +100,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
           borderLeft: `4px solid #EF9F27`,
           borderRadius: 10,
         }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%',
-            background: '#854F0B', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#854F0B', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertTriangle size={14} color="#FAEEDA" />
           </div>
           <div style={{ flex: 1 }}>
@@ -117,10 +108,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
               {dueSoonCount} task{dueSoonCount !== 1 ? 's are' : ' is'} due soon — don't miss them
             </p>
           </div>
-          <button
-            onClick={() => setHideSoon(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#854F0B', opacity: 0.6, padding: 2 }}
-          >
+          <button onClick={() => setHideSoon(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: '#854F0B', opacity: 0.6, padding: 2 }}>
             <X size={14} />
           </button>
         </div>
@@ -129,7 +117,6 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
   )
 }
 
-// ── Deadline Row ──────────────────────────────────────────────
 function DeadlineRow({ post, done, onToggleDone }) {
   const [expanded, setExpanded] = useState(false)
   const [animating, setAnimating] = useState(false)
@@ -172,17 +159,9 @@ function DeadlineRow({ post, done, onToggleDone }) {
       pointerEvents: animating || hiding ? 'none' : 'auto',
     }}>
       <div style={{ display: 'flex' }}>
-        {/* Left accent bar */}
-        <div style={{
-          width: 4, flexShrink: 0,
-          background: animating ? '#22C55E' : leftAccent,
-          transition: 'background 0.25s',
-        }} />
-
+        <div style={{ width: 4, flexShrink: 0, background: animating ? '#22C55E' : leftAccent, transition: 'background 0.25s' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ padding: '11px 12px 11px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-
-            {/* LEFT COLUMN: date card + done button */}
             <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
               <div style={{
                 width: 62, textAlign: 'center', padding: '5px 6px', borderRadius: 8,
@@ -190,39 +169,21 @@ function DeadlineRow({ post, done, onToggleDone }) {
                 border: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent ? '#F5B7B1' : '#AED6F1'}`,
                 transition: 'background 0.25s, border-color 0.25s',
               }}>
-                <div style={{
-                  fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17,
-                  color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color,
-                  lineHeight: 1, transition: 'color 0.25s',
-                }}>
-                  {format(new Date(post.due_date), 'd')}
+                <div style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: animating ? '#16a34a' : done ? '#9CA3AF' : status.color, lineHeight: 1, transition: 'color 0.25s' }}>
+                  {format(new Date(post.due_date + 'T00:00:00'), 'd')}
                 </div>
-                <div style={{
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10,
-                  color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
-                  opacity: 0.85, marginTop: 1, transition: 'color 0.25s',
-                }}>
-                  {format(new Date(post.due_date), 'MMM')}
+                <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10, color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color, opacity: 0.85, marginTop: 1, transition: 'color 0.25s' }}>
+                  {format(new Date(post.due_date + 'T00:00:00'), 'MMM')}
                 </div>
-                <div style={{
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 9,
-                  color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color,
-                  marginTop: 3, paddingTop: 2,
-                  borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`,
-                  letterSpacing: 0.1, whiteSpace: 'nowrap', transition: 'color 0.25s',
-                }}>
+                <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 9, color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color, marginTop: 3, paddingTop: 2, borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`, letterSpacing: 0.1, whiteSpace: 'nowrap', transition: 'color 0.25s' }}>
                   {animating ? '✓ Done' : done ? 'Done ✓' : status.label}
                 </div>
                 {post.due_time && (
-                  <div style={{
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 8,
-                    color: done ? '#BCC0C4' : status.color, opacity: 0.6, marginTop: 2,
-                  }}>
+                  <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 8, color: done ? '#BCC0C4' : status.color, opacity: 0.6, marginTop: 2 }}>
                     {formatTime12(post.due_time)}
                   </div>
                 )}
               </div>
-
               <button
                 onClick={handleToggle}
                 style={{
@@ -236,81 +197,36 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   transition: 'all 0.2s',
                   transform: animating ? 'scale(1.05)' : 'scale(1)',
                 }}
-                onMouseEnter={e => {
-                  if (!animating) {
-                    e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'
-                    e.currentTarget.style.color = done ? '#be123c' : '#16a34a'
-                    e.currentTarget.style.outline = `2px solid ${done ? '#FECDD3' : '#86EFAC'}`
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!animating) {
-                    e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'
-                    e.currentTarget.style.color = done ? '#e11d48' : '#4ade80'
-                    e.currentTarget.style.outline = `2px solid ${done ? '#FEE2E2' : '#D1FAE5'}`
-                  }
-                }}
+                onMouseEnter={e => { if (!animating) { e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'; e.currentTarget.style.color = done ? '#be123c' : '#16a34a' } }}
+                onMouseLeave={e => { if (!animating) { e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'; e.currentTarget.style.color = done ? '#e11d48' : '#4ade80' } }}
               >
-                {done
-                  ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
-                  : <><Check size={11} strokeWidth={2.5} /> Done</>
-                }
+                {done ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</> : <><Check size={11} strokeWidth={2.5} /> Done</>}
               </button>
             </div>
 
-            {/* RIGHT COLUMN */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
-                <span style={{
-                  background: post.subjects ? BLUE_BG : GREY_BG,
-                  color: post.subjects ? BLUE : GREY,
-                  border: `1px solid ${post.subjects ? '#AED6F1' : '#DADDE1'}`,
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
-                  padding: '2px 8px', borderRadius: 20,
-                  display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-                }}>
+                <span style={{ background: post.subjects ? BLUE_BG : GREY_BG, color: post.subjects ? BLUE : GREY, border: `1px solid ${post.subjects ? '#AED6F1' : '#DADDE1'}`, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11, padding: '2px 8px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                   <BookOpen size={9} />
                   {post.subjects?.name || 'General'}
                 </span>
                 {post.announcement_type && (
-                  <span style={{
-                    background: GREY_BG, color: '#1c1e21', border: '1px solid #DADDE1',
-                    fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
-                    padding: '2px 8px', borderRadius: 20,
-                  }}>
+                  <span style={{ background: GREY_BG, color: '#1c1e21', border: '1px solid #DADDE1', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>
                     {post.announcement_type}
                   </span>
                 )}
               </div>
-
               {post.caption && (
-                <p style={{
-                  margin: 0,
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 13,
-                  fontWeight: done ? 400 : 500,
-                  color: done ? '#9CA3AF' : '#1c1e21',
-                  display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  textDecoration: done ? 'line-through' : 'none',
-                  lineHeight: 1.45,
-                }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: done ? 400 : 500, color: done ? '#9CA3AF' : '#1c1e21', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textDecoration: done ? 'line-through' : 'none', lineHeight: 1.45 }}>
                   {post.caption}
                 </p>
               )}
             </div>
 
-            {/* Expand toggle */}
             {hasDetails && (
               <button
                 onClick={() => setExpanded(e => !e)}
-                style={{
-                  flexShrink: 0, marginTop: 1, padding: '4px 7px', borderRadius: 7,
-                  background: expanded ? GREY_BG : 'transparent', border: '1px solid #E4E6EB',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
-                  color: GREY, transition: 'all 0.15s',
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11,
-                  whiteSpace: 'nowrap',
-                }}
+                style={{ flexShrink: 0, marginTop: 1, padding: '4px 7px', borderRadius: 7, background: expanded ? GREY_BG : 'transparent', border: '1px solid #E4E6EB', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, color: GREY, transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}
                 onMouseEnter={e => e.currentTarget.style.background = GREY_BG}
                 onMouseLeave={e => e.currentTarget.style.background = expanded ? GREY_BG : 'transparent'}
               >
@@ -320,19 +236,10 @@ function DeadlineRow({ post, done, onToggleDone }) {
             )}
           </div>
 
-          {/* Expanded details */}
           {expanded && (
-            <div style={{
-              borderTop: '1px solid #F0F2F5', padding: '12px 14px 14px 12px',
-              display: 'flex', flexDirection: 'column', gap: 10,
-              animation: 'expandIn 0.18s ease',
-            }}>
+            <div style={{ borderTop: '1px solid #F0F2F5', padding: '12px 14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 10, animation: 'expandIn 0.18s ease' }}>
               {post.caption && (
-                <p style={{
-                  margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5,
-                  color: done ? '#9CA3AF' : '#1c1e21', lineHeight: 1.55,
-                  textDecoration: done ? 'line-through' : 'none',
-                }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: done ? '#9CA3AF' : '#1c1e21', lineHeight: 1.55, textDecoration: done ? 'line-through' : 'none' }}>
                   {post.caption}
                 </p>
               )}
@@ -342,12 +249,8 @@ function DeadlineRow({ post, done, onToggleDone }) {
                   style={{ width: 24, height: 24, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}
                   alt=""
                 />
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: '#050505' }}>
-                  {post.profiles?.display_name || 'Unknown'}
-                </span>
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#8A8D91' }}>
-                  · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </span>
+                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: '#050505' }}>{post.profiles?.display_name || 'Unknown'}</span>
+                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#8A8D91' }}>· {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
               </div>
               {photos.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: photos.length === 1 ? '1fr' : 'repeat(3,1fr)', gap: 4, borderRadius: 8, overflow: 'hidden' }}>
@@ -421,7 +324,6 @@ function LoadingSkeleton() {
   )
 }
 
-// Only All / Due Soon / Past Due / Done — no section labels inside the list
 const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
 
 export default function AnnouncementsPage() {
@@ -472,7 +374,7 @@ export default function AnnouncementsPage() {
   const isDueSoon = (d) => {
     const dl = getDeadlineDate(d.due_date, d.due_time)
     if (isPast(dl)) return false
-    return isToday(new Date(d.due_date)) || isTomorrow(new Date(d.due_date))
+    return isToday(new Date(d.due_date + 'T00:00:00')) || isTomorrow(new Date(d.due_date + 'T00:00:00'))
   }
   const isPastDue = (d) => isPast(getDeadlineDate(d.due_date, d.due_time))
   const applyType = (list) => typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
@@ -480,14 +382,12 @@ export default function AnnouncementsPage() {
   const doneDeadlines   = deadlines.filter(d => doneIds.has(d.id))
   const activeDeadlines = deadlines.filter(d => !doneIds.has(d.id))
 
-  // Flat list — no section grouping
   let displayItems = []
-  if (filter === 'All')          displayItems = applyType(activeDeadlines)
+  if (filter === 'All')         displayItems = applyType(activeDeadlines)
   else if (filter === 'Due Soon')  displayItems = applyType(activeDeadlines.filter(isDueSoon))
   else if (filter === 'Past Due')  displayItems = applyType(activeDeadlines.filter(isPastDue))
   else if (filter === 'Done')      displayItems = applyType(doneDeadlines)
 
-  // Counts for notification bar (always based on active, unfiltered)
   const pastDueCount = activeDeadlines.filter(isPastDue).length
   const dueSoonCount = activeDeadlines.filter(isDueSoon).length
 
@@ -498,22 +398,18 @@ export default function AnnouncementsPage() {
   const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
 
   const emptyLabel = {
-    'Due Soon':  { emoji: '🎉', title: 'Nothing due soon!',    subtitle: 'No tasks due today or tomorrow' },
-    'Past Due':  { emoji: '✅', title: 'No past due tasks',    subtitle: "You're all caught up" },
+    'Due Soon':  { emoji: '🎉', title: 'Nothing due soon!',      subtitle: 'No tasks due today or tomorrow' },
+    'Past Due':  { emoji: '✅', title: 'No past due tasks',      subtitle: "You're all caught up" },
     'Done':      { emoji: '📋', title: 'No completed tasks yet', subtitle: 'Mark tasks as done to see them here' },
-    'All':       { emoji: '🗓️', title: 'All clear!',           subtitle: 'No deadlines match this filter' },
+    'All':       { emoji: '🗓️', title: 'All clear!',             subtitle: 'No deadlines match this filter' },
   }
 
   return (
     <div style={{ paddingTop: 14 }}>
-
-      {/* Notification bar */}
       {!loading && <NotifBar pastDueCount={pastDueCount} dueSoonCount={dueSoonCount} />}
 
-      {/* Header card */}
       <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 10, boxShadow: '0 2px 12px rgba(192,57,43,0.15)' }}>
         <div style={{ background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`, padding: '18px 20px 16px' }}>
-
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: loading || typeEntries.length === 0 ? 0 : 14 }}>
             <div style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Clock size={22} color="white" />
@@ -529,35 +425,20 @@ export default function AnnouncementsPage() {
             )}
           </div>
 
-          {/* Type filter pills */}
           {!loading && typeEntries.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {typeEntries.map(([type, count]) => {
                 const isActive = typeFilter === type
                 return (
-                  <button
-                    key={type}
-                    onClick={() => setTypeFilter(t => t === type ? 'All Types' : type)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: isActive ? '4px 10px 4px 6px' : '4px 10px',
-                      borderRadius: 20,
-                      border: `1.5px solid ${isActive ? 'white' : 'rgba(255,255,255,0.35)'}`,
-                      background: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
+                  <button key={type} onClick={() => setTypeFilter(t => t === type ? 'All Types' : type)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: isActive ? '4px 10px 4px 6px' : '4px 10px', borderRadius: 20, border: `1.5px solid ${isActive ? 'white' : 'rgba(255,255,255,0.35)'}`, background: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.15)', cursor: 'pointer', transition: 'all 0.15s' }}>
                     {isActive && (
                       <span style={{ width: 15, height: 15, borderRadius: '50%', background: RED, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <X size={8} color="white" strokeWidth={3} />
                       </span>
                     )}
-                    <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: isActive ? RED : 'white' }}>
-                      {type}
-                    </span>
-                    <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 11, background: isActive ? RED : 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 10, padding: '1px 6px', lineHeight: 1.6, minWidth: 18, textAlign: 'center' }}>
-                      {count}
-                    </span>
+                    <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: isActive ? RED : 'white' }}>{type}</span>
+                    <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 11, background: isActive ? RED : 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 10, padding: '1px 6px', lineHeight: 1.6, minWidth: 18, textAlign: 'center' }}>{count}</span>
                   </button>
                 )
               })}
@@ -565,43 +446,25 @@ export default function AnnouncementsPage() {
           )}
         </div>
 
-        {/* Tab bar */}
         <div style={{ background: 'white', padding: '10px 14px', borderTop: '1px solid #F0F2F5' }}>
           <div style={{ display: 'flex', background: GREY_BG, borderRadius: 8, padding: 3, gap: 1 }}>
             {FILTERS.map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{
-                flex: 1, padding: '7px 1px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10,
-                background: filter === f ? 'white' : 'transparent',
-                color: filter === f ? '#050505' : GREY,
-                boxShadow: filter === f ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s', whiteSpace: 'nowrap',
-              }}>{f}</button>
+              <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, padding: '7px 1px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10, background: filter === f ? 'white' : 'transparent', color: filter === f ? '#050505' : GREY, boxShadow: filter === f ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>{f}</button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Content — flat list, no section headers */}
       {loading ? (
         <LoadingSkeleton />
       ) : deadlines.length === 0 ? (
         <EmptyState emoji="📭" title="No deadlines yet" subtitle="Enroll in subjects to see their deadlines" />
       ) : displayItems.length === 0 ? (
-        <EmptyState
-          emoji={emptyLabel[filter]?.emoji || '🗓️'}
-          title={emptyLabel[filter]?.title || 'Nothing here'}
-          subtitle={emptyLabel[filter]?.subtitle || ''}
-        />
+        <EmptyState emoji={emptyLabel[filter]?.emoji || '🗓️'} title={emptyLabel[filter]?.title || 'Nothing here'} subtitle={emptyLabel[filter]?.subtitle || ''} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {displayItems.map(post => (
-            <DeadlineRow
-              key={post.id}
-              post={post}
-              done={filter === 'Done' || doneIds.has(post.id)}
-              onToggleDone={toggleDone}
-            />
+            <DeadlineRow key={post.id} post={post} done={filter === 'Done' || doneIds.has(post.id)} onToggleDone={toggleDone} />
           ))}
         </div>
       )}
