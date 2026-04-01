@@ -10,7 +10,7 @@ import { useModMode } from '../hooks/useModMode'
 import { supabase } from '../lib/supabase'
 import {
   Home, MessageSquare, BookMarked, Grid3X3,
-  LogOut, Settings, Check, X, Menu, Search, CalendarClock,
+  LogOut, Settings, Check, X, Menu, Search, CalendarClock, Bell,
   Bookmark, Heart, Moon, Sun, Info, MoreHorizontal,
   EyeOff, Eye, Send, Shield, Crown
 } from 'lucide-react'
@@ -402,8 +402,8 @@ export default function Layout({ children, onOpenSearch }) {
 
               <div ref={notifRef} style={{ position:'relative' }}>
                 <button onClick={() => setShowNotifs(v => !v)}
-                  style={{ width:36,height:36,borderRadius:9,background:showNotifs?'#FADBD8':surfaceBg,border:`1.5px solid ${showNotifs?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'all 0.15s' }}>
-                  <CalendarClock size={17} color={showNotifs?RED:textSec} strokeWidth={showNotifs?2.5:2}/>
+                    style={{ width:36,height:36,borderRadius:9,background:showNotifs?'#FADBD8':surfaceBg,border:`1.5px solid ${showNotifs?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'all 0.15s' }}>
+                    <Bell size={17} color={showNotifs?RED:textSec} strokeWidth={showNotifs?2.5:2}/>
                   {unreadCount > 0 && (
                     <span style={{ position:'absolute',top:-4,right:-4,minWidth:17,height:17,borderRadius:9,background:RED,color:'white',fontSize:9.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'2px solid white' }}>
                       {unreadCount > 9 ? '9+' : unreadCount}
@@ -426,7 +426,7 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
 
           {showNotifs && !isDesktop && (
-            <div style={{ position:'fixed',left:0,right:0,top:52,zIndex:99,animation:'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
+            <div style={{ position:'fixed',left:0,right:0,top:52,bottom:0,zIndex:99,display:'flex',flexDirection:'column',animation:'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
               <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={() => setShowNotifs(false)} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg} mobile/>
             </div>
           )}
@@ -587,10 +587,10 @@ function SidebarBtn({ icon, label, onClick, danger, dark, surfaceBg, textPri }) 
 function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose, navigate, dark, cardBg, borderCol, textPri, textSec, textMut, surfaceBg, mobile }) {
   const RED = '#C0392B'
   return (
-    <div style={{ background:cardBg,borderRadius:mobile?'0 0 16px 16px':13,border:mobile?'none':`1px solid ${borderCol}`,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',overflow:'hidden',width:mobile?'100%':310,maxHeight:mobile?'75vh':380,display:'flex',flexDirection:'column' }}>
+    <div style={{ background:cardBg,borderRadius:mobile?'0':13,border:mobile?'none':`1px solid ${borderCol}`,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',overflow:'hidden',width:mobile?'100%':310,height:mobile?'100%':undefined,maxHeight:mobile?'100%':380,display:'flex',flexDirection:'column' }}>
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:mobile?'14px 16px 12px':'11px 14px 10px',borderBottom:`1px solid ${borderCol}`,flexShrink:0 }}>
         <div style={{ display:'flex',alignItems:'center',gap:7 }}>
-          <CalendarClock size={15} color={RED} strokeWidth={2.5}/>
+          <Bell size={15} color={RED} strokeWidth={2.5}/>
           <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:700,fontSize:14,color:textPri }}>Notifications</span>
           {unreadCount > 0 && <span style={{ background:RED,color:'white',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:10,padding:'1px 6px',borderRadius:10 }}>{unreadCount}</span>}
         </div>
@@ -613,7 +613,7 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
 function NotifItem({ notif, onRead, onClose, navigate, cardBg, textPri, textSec, surfaceBg }) {
   const [hovered, setHovered] = useState(false)
   const RED = '#C0392B'
-  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨' }
+  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨', like:'❤️', comment:'💬', deadline:'📅', reminder:'🔔', material:'📁', mute:'🔇', ban:'🚫', role:'🛡️' }
   function handleClick() { onRead(notif.id); onClose(); if (notif.post_id) navigate(`/?post=${notif.post_id}`) }
   return (
     <button onClick={handleClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
