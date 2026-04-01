@@ -51,16 +51,14 @@ function useIsDesktop() {
 function useForceLogout(profile, signOut, navigate) {
   useEffect(() => {
     if (!profile?.id) return
- 
+
     let channel = null
- 
-    // FIX #5: Fetch session FIRST, then subscribe so there is no race window
-    // where an event could arrive before sessionCreatedAt is populated.
+
     supabase.auth.getSession().then(({ data }) => {
       const sessionCreatedAt = data?.session?.created_at
         ? new Date(data.session.created_at)
         : new Date(0)
- 
+
       channel = supabase
         .channel('force-logout-' + profile.id)
         .on(
@@ -72,10 +70,15 @@ function useForceLogout(profile, signOut, navigate) {
             filter: `id=eq.${profile.id}`,
           },
           async (payload) => {
+            // ✅ ONLY react to force_logout_at changes
+            // Ignore mute, ban, role, and any other profile updates
             const flaggedAt = payload.new?.force_logout_at
-            if (!flaggedAt) return
+            const previousFlaggedAt = payload.old?.force_logout_at
+
+            // If force_logout_at didn't change, do nothing
+            if (!flaggedAt || flaggedAt === previousFlaggedAt) return
+
             const flagTime = new Date(flaggedAt)
-            // sessionCreatedAt is guaranteed to be set now (not null)
             if (flagTime > sessionCreatedAt) {
               await supabase.auth.signOut()
               navigate('/auth')
@@ -84,11 +87,11 @@ function useForceLogout(profile, signOut, navigate) {
         )
         .subscribe()
     })
- 
+
     return () => {
       if (channel) supabase.removeChannel(channel)
     }
-  }, [profile?.id, signOut, navigate]) 
+  }, [profile?.id, signOut, navigate])
 }
 
 function getNavItems(dmUnread) {
