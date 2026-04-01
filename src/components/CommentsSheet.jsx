@@ -84,6 +84,22 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         content,
       })
       if (error) throw error
+            const { data: postRow } = await supabase
+        .from('posts')
+        .select('author_id, caption')
+        .eq('id', postId)
+        .single()
+ 
+      if (postRow?.author_id && postRow.author_id !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: postRow.author_id,
+          post_id: postId,
+          type: 'comment',
+          message: `💬 Someone commented on your post: "${content.slice(0, 60)}${content.length > 60 ? '…' : ''}"`,
+          is_read: false,
+        })
+      }
+
     } catch (err) {
       setText(content)
       console.error(err)
