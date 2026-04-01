@@ -380,7 +380,7 @@ if (postData.author_id && postData.author_id !== currentUserId) {
     user_id: postData.author_id,
     post_id: postData.id,
     type: 'like',
-    message: `❤️ ${likerName} liked ${postSnippet}${countSuffix}`,
+    message: `❤️ ${likerName} liked your post "${postData.caption?.slice(0, 40) || 'No caption'}…"${countSuffix}`,
     is_read: false,
   })
 }
