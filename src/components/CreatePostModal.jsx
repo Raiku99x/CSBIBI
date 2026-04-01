@@ -2,6 +2,7 @@ import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useRole } from '../hooks/useRole'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','5C4A7A','6B5B8A','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','4A3A7A','3E3068']
 function dicebearUrl(name = '') {
@@ -109,6 +110,7 @@ export default function CreatePostModal({
   const [showQuotePreview, setShowQuotePreview] = useState(false)
   const [pastingMsg, setPastingMsg] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
+  const { isSuperadmin } = useRole()
 
   const photoRef = useRef()
   const fileRef = useRef()
@@ -745,7 +747,7 @@ export default function CreatePostModal({
         )}
 
         {/* ── SCHEDULE POST SECTION ── */}
-        <div style={{ marginTop: 12 }}>
+        {isSuperadmin && <div style={{ marginTop: 12 }}>
           <button
             type="button"
             onClick={() => {
@@ -845,7 +847,7 @@ export default function CreatePostModal({
               </p>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Photo previews */}
         {photoPreviews.length > 0 && (
