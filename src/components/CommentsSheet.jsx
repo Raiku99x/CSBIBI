@@ -99,7 +99,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           user_id: postRow.author_id,
           post_id: postId,
           type: 'comment',
-          message: `💬 ${commenterName} commented on ${postSnippet}: "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
+          message: `💬 ${commenterName} commented on your post "${postRow.caption?.slice(0, 40) || 'No caption'}…" — "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
           is_read: false,
         })
       }
