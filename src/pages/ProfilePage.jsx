@@ -20,28 +20,29 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [saving, setSaving] = useState(false)
   const [focused, setFocused] = useState(null)
+
+  // Pending avatar — local preview only, not uploaded until Save is pressed
+  const [pendingAvatarFile, setPendingAvatarFile] = useState(null)
+  const [pendingAvatarPreview, setPendingAvatarPreview] = useState(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const fileInputRef = useRef()
 
-  async function handleSave(e) {
-    e.preventDefault()
-    if (!displayName.trim()) { toast.error('Name cannot be empty'); return }
-    setSaving(true)
-    try {
-      const currentIsDicebear = !profile?.avatar_url || profile.avatar_url.includes('dicebear.com')
-      const newAvatar = currentIsDicebear
-        ? dicebearUrl(displayName.trim())
-        : profile.avatar_url
-      await updateProfile({ display_name: displayName.trim(), avatar_url: newAvatar })
-      toast.success('Profile updated!')
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
+  // Detect unsaved changes
+  const nameChanged = displayName.trim() !== (profile?.display_name || '')
+  const hasUnsavedChanges = nameChanged || !!pendingAvatarFile
+
+  function handleBack() {
+    if (hasUnsavedChanges) {
+      if (window.confirm('You have unsaved changes. Discard and go back?')) {
+        navigate(-1)
+      }
+    } else {
+      navigate(-1)
     }
   }
 
-  async function handleAvatarUpload(e) {
+  // Only preview locally — do NOT upload yet
+  function handleAvatarPick(e) {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
@@ -52,29 +53,62 @@ export default function ProfilePage() {
       toast.error('Image must be under 5MB')
       return
     }
-    setUploadingAvatar(true)
+    setPendingAvatarFile(file)
+    setPendingAvatarPreview(URL.createObjectURL(file))
+    e.target.value = ''
+    toast('Photo selected — press Save Changes to apply', { icon: '📸' })
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!displayName.trim()) { toast.error('Name cannot be empty'); return }
+    setSaving(true)
     try {
-      const ext = file.name.split('.').pop().toLowerCase()
-      const path = `avatars/${profile.id}_${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('post-media')
-        .upload(path, file, { upsert: true })
-      if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('post-media').getPublicUrl(path)
-      await updateProfile({ avatar_url: data.publicUrl })
-      toast.success('Profile picture updated!')
+      let newAvatarUrl = profile?.avatar_url
+
+      // Upload avatar only now, on Save
+      if (pendingAvatarFile) {
+        setUploadingAvatar(true)
+        const ext = pendingAvatarFile.name.split('.').pop().toLowerCase()
+        const path = `avatars/${profile.id}_${Date.now()}.${ext}`
+        const { error: uploadError } = await supabase.storage
+          .from('post-media')
+          .upload(path, pendingAvatarFile, { upsert: true })
+        if (uploadError) throw uploadError
+        const { data } = supabase.storage.from('post-media').getPublicUrl(path)
+        newAvatarUrl = data.publicUrl
+        setUploadingAvatar(false)
+      } else {
+        // Regenerate dicebear only if still using it and name changed
+        const currentIsDicebear = !profile?.avatar_url || profile.avatar_url.includes('dicebear.com')
+        if (currentIsDicebear && nameChanged) {
+          newAvatarUrl = dicebearUrl(displayName.trim())
+        }
+      }
+
+      await updateProfile({ display_name: displayName.trim(), avatar_url: newAvatarUrl })
+
+      // Clear pending state
+      setPendingAvatarFile(null)
+      setPendingAvatarPreview(null)
+      toast.success('Profile updated!')
     } catch (err) {
-      toast.error(err.message || 'Upload failed')
-    } finally {
       setUploadingAvatar(false)
-      e.target.value = ''
+      toast.error(err.message || 'Failed to save')
+    } finally {
+      setSaving(false)
     }
   }
+
+  // Show local preview if pending, otherwise show saved avatar
+  const displayedAvatar = pendingAvatarPreview
+    || profile?.avatar_url
+    || dicebearUrl(profile?.display_name)
 
   return (
     <div style={{ paddingTop: 12 }}>
       <button
-        onClick={() => navigate(-1)}
+        onClick={handleBack}
         style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#0D7377', marginBottom: 12 }}
       >
         <ArrowLeft size={16} /> Back
@@ -84,39 +118,101 @@ export default function ProfilePage() {
         <div style={{ height: 100, background: 'linear-gradient(135deg, #0D7377 0%, #0A5C60 100%)' }} />
 
         <div style={{ padding: '0 20px 20px', position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 16 }}>
-            {/* Avatar with upload */}
-            <div style={{ position: 'relative', marginTop: -44 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: hasUnsavedChanges ? 12 : 16 }}>
+
+            {/* Avatar */}
+            <div style={{ position: 'relative', marginTop: -44, flexShrink: 0 }}>
               <img
-                src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-                style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '4px solid white', background: '#E4E6EB', display: 'block', opacity: uploadingAvatar ? 0.5 : 1, transition: 'opacity 0.2s' }}
+                src={displayedAvatar}
+                style={{
+                  width: 88,
+                  height: 88,
+                  borderRadius: 16,   // rounded square — matches feed cards
+                  objectFit: 'cover',
+                  border: '4px solid white',
+                  background: '#E4E6EB',
+                  display: 'block',
+                  opacity: saving && uploadingAvatar ? 0.5 : 1,
+                  transition: 'opacity 0.2s',
+                  // teal ring when there's a pending unsaved photo
+                  outline: pendingAvatarPreview ? '2.5px solid #0D7377' : 'none',
+                  outlineOffset: 2,
+                }}
                 alt="avatar"
               />
+
+              {/* UNSAVED badge */}
+              {pendingAvatarPreview && (
+                <div style={{
+                  position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)',
+                  background: '#0D7377', color: 'white',
+                  fontSize: 9, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui',
+                  padding: '2px 7px', borderRadius: 8, border: '2px solid white',
+                  whiteSpace: 'nowrap', letterSpacing: 0.4,
+                }}>
+                  UNSAVED
+                </div>
+              )}
+
+              {/* Camera button — rounded square to match avatar shape */}
               <div
-                onClick={() => !uploadingAvatar && fileInputRef.current?.click()}
-                style={{ position: 'absolute', bottom: 4, right: 0, width: 26, height: 26, borderRadius: '50%', background: uploadingAvatar ? '#E4E6EB' : '#050505', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingAvatar ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}
+                onClick={() => !(saving && uploadingAvatar) && fileInputRef.current?.click()}
+                style={{
+                  position: 'absolute', bottom: -6, right: -6,
+                  width: 28, height: 28, borderRadius: 8,
+                  background: saving && uploadingAvatar ? '#CED0D4' : '#050505',
+                  border: '2px solid white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: saving && uploadingAvatar ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
                 title="Change profile photo"
+                onMouseEnter={e => { if (!(saving && uploadingAvatar)) e.currentTarget.style.background = '#0D7377' }}
+                onMouseLeave={e => { if (!(saving && uploadingAvatar)) e.currentTarget.style.background = '#050505' }}
               >
-                {uploadingAvatar
-                  ? <Loader2 size={12} color="#65676B" style={{ animation: 'spin 0.8s linear infinite' }} />
-                  : <Camera size={12} color="white" />
+                {saving && uploadingAvatar
+                  ? <Loader2 size={13} color="#65676B" style={{ animation: 'spin 0.8s linear infinite' }} />
+                  : <Camera size={13} color="white" />
                 }
               </div>
+
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
                 style={{ display: 'none' }}
-                onChange={handleAvatarUpload}
+                onChange={handleAvatarPick}
               />
             </div>
 
             {/* Name + email */}
-            <div style={{ paddingBottom: 4 }}>
-              <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>{profile?.display_name}</p>
-              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#65676B' }}>{profile?.email}</p>
+            <div style={{ paddingBottom: 4, minWidth: 0 }}>
+              <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {displayName || profile?.display_name}
+              </p>
+              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#65676B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {profile?.email}
+              </p>
             </div>
           </div>
+
+          {/* Unsaved changes warning bar */}
+          {hasUnsavedChanges && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 12px',
+              background: '#FFF7ED',
+              border: '1px solid #FED7AA',
+              borderLeft: '3px solid #F59E0B',
+              borderRadius: '0 10px 10px 0',
+              marginBottom: 14,
+            }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0, animation: 'pulse 2s ease-in-out infinite' }} />
+              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 600, color: '#92400E' }}>
+                Unsaved changes — press <strong>Save Changes</strong> to apply
+              </p>
+            </div>
+          )}
 
           <div style={{ height: 1, background: '#E4E6EB', marginBottom: 20 }} />
 
@@ -137,19 +233,35 @@ export default function ProfilePage() {
               />
             </FormField>
 
-            <button type="submit" disabled={saving}
-              style={{ padding: '13px 0', borderRadius: 10, border: 'none', background: saving ? '#7EC8C8' : '#0D7377', color: 'white', cursor: saving ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
-              onMouseDown={e => { if (!saving) e.currentTarget.style.transform = 'scale(0.985)' }}
+            <button
+              type="submit"
+              disabled={saving || !hasUnsavedChanges}
+              style={{
+                padding: '13px 0', borderRadius: 10, border: 'none',
+                background: saving ? '#7EC8C8' : !hasUnsavedChanges ? '#CED0D4' : '#0D7377',
+                color: 'white',
+                cursor: saving || !hasUnsavedChanges ? 'not-allowed' : 'pointer',
+                fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'background 0.15s, transform 0.1s',
+              }}
+              onMouseDown={e => { if (!saving && hasUnsavedChanges) e.currentTarget.style.transform = 'scale(0.985)' }}
               onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}
             >
               {saving && <Loader2 size={17} style={{ animation: 'spin 0.8s linear infinite' }} />}
-              {saving ? 'Saving…' : 'Save Changes'}
+              {saving
+                ? uploadingAvatar ? 'Uploading photo…' : 'Saving…'
+                : 'Save Changes'
+              }
             </button>
           </form>
         </div>
       </div>
 
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+      <style>{`
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+      `}</style>
     </div>
   )
 }
