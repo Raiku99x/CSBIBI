@@ -15,6 +15,7 @@ import AnnouncementsPage from './pages/AnnouncementsPage'
 import EnrolledSubjectsPage from './pages/EnrolledSubjectsPage'
 import AppsPage from './pages/AppsPage'
 import ProfilePage from './pages/ProfilePage'
+import CodeGatePage from './pages/CodeGatePage'
 import { supabase } from './lib/supabase'
 
 // ── Maintenance mode hook ─────────────────────────────────────
