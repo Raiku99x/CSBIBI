@@ -356,6 +356,16 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     try {
       if (nowLiked) {
         await supabase.from('likes').insert({ post_id: postData.id, user_id: currentUserId })
+        // Notify the post author (but not if they liked their own post)
+        if (postData.author_id && postData.author_id !== currentUserId) {
+          await supabase.from('notifications').insert({
+            user_id: postData.author_id,
+            post_id: postData.id,
+            type: 'like',
+            message: `❤️ Someone liked your post${postData.caption ? ': "' + postData.caption.slice(0, 50) + (postData.caption.length > 50 ? '…' : '') + '"' : ''}`,
+            is_read: false,
+          })
+        }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
       }
