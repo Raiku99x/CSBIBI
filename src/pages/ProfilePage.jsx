@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { Loader2, ArrowLeft, Camera, Mail, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -19,14 +20,15 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [saving, setSaving] = useState(false)
   const [focused, setFocused] = useState(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const fileInputRef = useRef()
 
   async function handleSave(e) {
     e.preventDefault()
     if (!displayName.trim()) { toast.error('Name cannot be empty'); return }
     setSaving(true)
     try {
-      // FIX #14: only regenerate avatar if the current URL is already a DiceBear URL.
-      // Preserves any custom avatar that may have been set by an admin or future upload feature.
+
       const currentIsDicebear = !profile?.avatar_url || profile.avatar_url.includes('dicebear.com')
       const newAvatar = currentIsDicebear
         ? dicebearUrl(displayName.trim())
@@ -40,7 +42,36 @@ export default function ProfilePage() {
       setSaving(false)
     }
   }
-
+  async function handleAvatarUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB')
+      return
+    }
+    setUploadingAvatar(true)
+    try {
+      const ext = file.name.split('.').pop().toLowerCase()
+      const path = `avatars/${profile.id}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('post-media')
+        .upload(path, file, { upsert: true })
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('post-media').getPublicUrl(path)
+      await updateProfile({ avatar_url: data.publicUrl })
+      toast.success('Profile picture updated!')
+    } catch (err) {
+      toast.error(err.message || 'Upload failed')
+    } finally {
+      setUploadingAvatar(false)
+      e.target.value = ''
+    }
+  }
+  
   return (
     <div style={{ paddingTop: 12 }}>
       <button
@@ -54,16 +85,29 @@ export default function ProfilePage() {
         <div style={{ height: 100, background: 'linear-gradient(135deg, #0D7377 0%, #0A5C60 100%)' }} />
 
         <div style={{ padding: '0 20px 20px', position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 16 }}>
             <div style={{ position: 'relative', marginTop: -44 }}>
               <img
                 src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-                style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '4px solid white', background: '#E4E6EB', display: 'block' }}
+                style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '4px solid white', background: '#E4E6EB', display: 'block', opacity: uploadingAvatar ? 0.5 : 1, transition: 'opacity 0.2s' }}
                 alt="avatar"
               />
-              <div style={{ position: 'absolute', bottom: 4, right: 0, width: 26, height: 26, borderRadius: '50%', background: '#E4E6EB', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                <Camera size={13} color="#050505" />
+              <div
+                onClick={() => !uploadingAvatar && fileInputRef.current?.click()}
+                style={{ position: 'absolute', bottom: 4, right: 0, width: 26, height: 26, borderRadius: '50%', background: uploadingAvatar ? '#E4E6EB' : '#050505', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingAvatar ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}
+                title="Change profile photo"
+              >
+                {uploadingAvatar
+                  ? <Loader2 size={12} color="#65676B" style={{ animation: 'spin 0.8s linear infinite' }} />
+                  : <Camera size={12} color="white" />
+                }
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                style={{ display: 'none' }}
+                onChange={handleAvatarUpload}
+              />
             </div>
             <div style={{ paddingBottom: 4 }}>
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>{profile?.display_name}</p>
