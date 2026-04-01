@@ -158,14 +158,20 @@ export default function MaintenanceScreen({ message }) {
           }}>
             <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
           </div>
-          <span style={{
-            fontFamily: '"Instrument Sans", system-ui',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#BCC0C4',
-          }}>
+          {/* Looks like plain text — secretly a link back to login */}
+          <a
+            href="/auth"
+            style={{
+              fontFamily: '"Instrument Sans", system-ui',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#BCC0C4',
+              textDecoration: 'none',
+              cursor: 'default',
+            }}
+          >
             CSB Platform
-          </span>
+          </a>
         </div>
       </div>
 
