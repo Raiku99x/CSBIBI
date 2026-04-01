@@ -72,34 +72,41 @@ function useMaintenanceMode() {
 function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth()
   const { maintenance, checking } = useMaintenanceMode()
-
+ 
   // Still loading auth or maintenance setting
   if (loading || checking) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F2F5' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
-            <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F0F2F5' }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+          <div style={{ width:48, height:48, borderRadius:14, overflow:'hidden', boxShadow:'0 4px 16px rgba(192,57,43,0.3)' }}>
+            <img src="/announce.png" alt="CSB" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
           </div>
-          <p style={{ fontSize: 13, color: '#8A8D91', fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, margin: 0 }}>
+          <p style={{ fontSize:13, color:'#8A8D91', fontFamily:'"Instrument Sans", system-ui', fontWeight:500, margin:0 }}>
             Loading CSB…
           </p>
         </div>
       </div>
     )
   }
-
+ 
+  // Not logged in → auth page
   if (!user) return <Navigate to="/auth" replace />
-
-  // Ban gate (checked before maintenance so banned users see ban screen, not maintenance)
+ 
+  // Ban gate
   if (profile?.is_banned) return <BannedScreen />
-
-  // Maintenance gate — superadmins bypass so they can still use the app
+ 
+  // Maintenance gate — superadmins bypass
   const isSuperadmin = profile?.role === 'superadmin'
   if (maintenance.enabled && !isSuperadmin) {
     return <MaintenanceScreen message={maintenance.message} />
   }
-
+ 
+  // ── Student code gate ──────────────────────────────────
+  const needsVerification = !profile?.is_verified && profile?.role === 'user'
+  if (needsVerification) {
+    return <CodeGatePage />
+  }
+ 
   return children
 }
 
