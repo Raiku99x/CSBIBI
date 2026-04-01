@@ -28,12 +28,10 @@ export default function ProfilePage() {
     if (!displayName.trim()) { toast.error('Name cannot be empty'); return }
     setSaving(true)
     try {
-
       const currentIsDicebear = !profile?.avatar_url || profile.avatar_url.includes('dicebear.com')
       const newAvatar = currentIsDicebear
         ? dicebearUrl(displayName.trim())
         : profile.avatar_url
-
       await updateProfile({ display_name: displayName.trim(), avatar_url: newAvatar })
       toast.success('Profile updated!')
     } catch (err) {
@@ -42,6 +40,7 @@ export default function ProfilePage() {
       setSaving(false)
     }
   }
+
   async function handleAvatarUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -71,7 +70,7 @@ export default function ProfilePage() {
       e.target.value = ''
     }
   }
-  
+
   return (
     <div style={{ paddingTop: 12 }}>
       <button
@@ -85,6 +84,8 @@ export default function ProfilePage() {
         <div style={{ height: 100, background: 'linear-gradient(135deg, #0D7377 0%, #0A5C60 100%)' }} />
 
         <div style={{ padding: '0 20px 20px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 16 }}>
+            {/* Avatar with upload */}
             <div style={{ position: 'relative', marginTop: -44 }}>
               <img
                 src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
@@ -109,6 +110,8 @@ export default function ProfilePage() {
                 onChange={handleAvatarUpload}
               />
             </div>
+
+            {/* Name + email */}
             <div style={{ paddingBottom: 4 }}>
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>{profile?.display_name}</p>
               <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#65676B' }}>{profile?.email}</p>
