@@ -7,6 +7,7 @@ import { SavedPostsProvider } from './contexts/SavedPostsContext'
 import Layout from './components/Layout'
 import SearchOverlay from './components/SearchOverlay'
 import BannedScreen from './components/BannedScreen'
+import MaintenanceScreen from './components/MaintenanceScreen'
 import AuthPage from './pages/AuthPage'
 import FeedPage from './pages/FeedPage'
 import MessagesPage from './pages/MessagesPage'
@@ -16,10 +17,64 @@ import AppsPage from './pages/AppsPage'
 import ProfilePage from './pages/ProfilePage'
 import { supabase } from './lib/supabase'
 
+// ── Maintenance mode hook ─────────────────────────────────────
+// Fetches the app_settings row for maintenance_mode and subscribes
+// to realtime changes so flipping the toggle takes effect immediately
+// without any page refresh.
+function useMaintenanceMode() {
+  const [maintenance, setMaintenance] = useState({ enabled: false, message: '' })
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    async function fetchSetting() {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'maintenance_mode')
+        .single()
+
+      if (data?.value) {
+        try {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+          setMaintenance({ enabled: parsed.enabled ?? false, message: parsed.message ?? '' })
+        } catch {
+          // malformed value — treat as off
+        }
+      }
+      setChecking(false)
+    }
+
+    fetchSetting()
+
+    // Realtime: update instantly when admin toggles maintenance mode
+    const ch = supabase
+      .channel('maintenance-mode-watch')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.maintenance_mode' },
+        (payload) => {
+          const raw = payload.new?.value
+          if (!raw) return
+          try {
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+            setMaintenance({ enabled: parsed.enabled ?? false, message: parsed.message ?? '' })
+          } catch { /* ignore */ }
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(ch)
+  }, [])
+
+  return { maintenance, checking }
+}
+
 function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth()
+  const { maintenance, checking } = useMaintenanceMode()
 
-  if (loading) {
+  // Still loading auth or maintenance setting
+  if (loading || checking) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F2F5' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -36,8 +91,14 @@ function ProtectedRoute({ children }) {
 
   if (!user) return <Navigate to="/auth" replace />
 
-  // Ban gate
+  // Ban gate (checked before maintenance so banned users see ban screen, not maintenance)
   if (profile?.is_banned) return <BannedScreen />
+
+  // Maintenance gate — superadmins bypass so they can still use the app
+  const isSuperadmin = profile?.role === 'superadmin'
+  if (maintenance.enabled && !isSuperadmin) {
+    return <MaintenanceScreen message={maintenance.message} />
+  }
 
   return children
 }
