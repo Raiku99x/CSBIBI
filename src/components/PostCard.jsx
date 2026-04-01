@@ -86,30 +86,42 @@ function parseQuoted(raw) {
 }
 
 // ── Share Sheet ───────────────────────────────────────────────
-function ShareSheet({ post, onClose }) {
+function ShareOption({ icon, label, onClick, success }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 12px', border:'none', cursor:'pointer', background:hovered?(success?'#F0FDF4':'#F7F8FA'):'transparent', borderRadius:8, fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:success?'#16a34a':'#050505', textAlign:'left', transition:'background 0.1s' }}>
+      {icon} {label}
+    </button>
+  )
+}
+
+function ShareSheet({ post, onClose, anchorRef }) {
   const [copied, setCopied] = useState(false)
-  const [flipUp, setFlipUp] = useState(true)
-  const sheetRef  = useRef()
-  const buttonRef = useRef()
- 
+  const sheetRef = useRef()
+
   const shareUrl  = `${window.location.origin}/?post=${post.id}`
   const author    = post.profiles?.display_name || 'Someone'
   const subject   = post.subjects?.name ? ` [${post.subjects.name}]` : ''
   const caption   = post.caption ? post.caption.slice(0, 100) + (post.caption.length > 100 ? '…' : '') : ''
   const shareText = `${author}${subject}: ${caption}`
- 
+
   useEffect(() => {
-    if (!buttonRef.current) return
-    const rect = buttonRef.current.getBoundingClientRect()
-    const spaceAbove = rect.top
-    const spaceBelow = window.innerHeight - rect.bottom
-    setFlipUp(spaceAbove > 140 || spaceAbove >= spaceBelow)
-  }, [])
- 
+    function h(e) {
+      if (sheetRef.current && !sheetRef.current.contains(e.target) &&
+          anchorRef?.current && !anchorRef.current.contains(e.target)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [onClose])
+
   async function handleNativeShare() {
     try { await navigator.share({ title: 'CSB Post', text: shareText, url: shareUrl }); onClose() } catch {}
   }
- 
+
   async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -122,56 +134,42 @@ function ShareSheet({ post, onClose }) {
       setCopied(true); setTimeout(() => { setCopied(false); onClose() }, 1400)
     }
   }
- 
-  useEffect(() => {
-    function h(e) { if (sheetRef.current && !sheetRef.current.contains(e.target)) onClose() }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [onClose])
- 
-  // FIX #21: position above OR below depending on flipUp
-  const positionStyle = flipUp
-    ? { bottom: 'calc(100% + 8px)', top: 'auto' }
-    : { top:    'calc(100% + 8px)', bottom: 'auto' }
- 
+
   return (
-    // Wrap in a relative container so the button ref and sheet are siblings
-    <div ref={buttonRef} style={{ display: 'inline-block' }}>
-      <div ref={sheetRef} style={{
-        position: 'absolute',
-        ...positionStyle,
-        left: '50%', transform: 'translateX(-50%)',
-        width: 210,
-        background: 'white',
-        borderRadius: 14,
-        border: '1px solid #E4E6EB',
-        boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
-        overflow: 'hidden',
-        zIndex: 30,
-        animation: 'slideUp 0.18s ease',
-      }}>
-        <div style={{ padding: '11px 14px 8px', borderBottom: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 13, color: '#050505' }}>Share post</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 2 }}>
-            <X size={13} color="#65676B" />
-          </button>
-        </div>
-        <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {!!navigator.share && (
-            <ShareOption icon={<Share2 size={18} color="#65676B" />} label="More options…" onClick={handleNativeShare} />
-          )}
-          <ShareOption
-            icon={copied ? <Check size={18} color="#16a34a" /> : <Link size={18} color="#65676B" />}
-            label={copied ? 'Link copied!' : 'Copy link'}
-            onClick={handleCopyLink}
-            success={copied}
-          />
-        </div>
+    <div ref={sheetRef} style={{
+      position: 'absolute',
+      bottom: 'calc(100% + 8px)',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 210,
+      background: 'white',
+      borderRadius: 14,
+      border: '1px solid #E4E6EB',
+      boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
+      overflow: 'hidden',
+      zIndex: 30,
+      animation: 'slideUp 0.18s ease',
+    }}>
+      <div style={{ padding: '11px 14px 8px', borderBottom: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 13, color: '#050505' }}>Share post</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 2 }}>
+          <X size={13} color="#65676B" />
+        </button>
+      </div>
+      <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {!!navigator.share && (
+          <ShareOption icon={<Share2 size={18} color="#65676B" />} label="More options…" onClick={handleNativeShare} />
+        )}
+        <ShareOption
+          icon={copied ? <Check size={18} color="#16a34a" /> : <Link size={18} color="#65676B" />}
+          label={copied ? 'Link copied!' : 'Copy link'}
+          onClick={handleCopyLink}
+          success={copied}
+        />
       </div>
     </div>
   )
 }
-
 // ── Lightbox ──────────────────────────────────────────────────
 function Lightbox({ photos, initialIndex, onClose }) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
@@ -423,7 +421,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
   return (
     <>
-      <article style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6, overflow:'hidden' }}>
+      <article style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6, position:'relative' }}>
 
         {/* ── Pinned bar ── */}
         {postData.is_pinned && (
@@ -637,9 +635,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             label={postData.is_locked ? 'Locked' : 'Comment'}
             disabled={postData.is_locked}
           />
-          <div ref={shareRef} style={{ flex:1,position:'relative' }}>
+          <div ref={shareRef} style={{ flex:1, position:'relative' }}>
             <ActionBtn onClick={() => setShowShare(v => !v)} icon={<Share2 size={17} color={showShare?RED:'#65676B'}/>} label="Share" active={showShare} activeColor={RED} noflex/>
-            {showShare && <ShareSheet post={postData} onClose={() => setShowShare(false)}/>}
+            {showShare && <ShareSheet post={postData} onClose={() => setShowShare(false)} anchorRef={shareRef}/>}
           </div>
         </div>
       </article>
