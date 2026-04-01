@@ -15,7 +15,7 @@ export default function CodeGatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const trimmed = code.trim().toUpperCase()
+    const trimmed = code.trim().toLowerCase()
     if (!trimmed) { toast.error('Enter your student code'); return }
 
     setLoading(true)
@@ -145,9 +145,9 @@ export default function CodeGatePage() {
                   className="code-input"
                   type="text"
                   value={code}
-                  onChange={e => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. BSCS-001"
-                  maxLength={20}
+                  onChange={e => setCode(e.target.value.toLowerCase())}
+                  placeholder="e.g. jdelacruz@my.cspc.edu.ph"
+                  maxLength={30}
                   autoFocus
                   spellCheck={false}
                   autoComplete="off"
@@ -156,6 +156,12 @@ export default function CodeGatePage() {
                 <p style={{ margin:'8px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11.5,color:'#BCC0C4',textAlign:'center' }}>
                   Codes are case-insensitive · Contact admin if you lost yours
                 </p>
+                <div style={{ marginTop:10,padding:'10px 14px',background:'linear-gradient(135deg,#FEF9E7,#FEF3C7)',borderRadius:10,border:'1.5px solid #F6C343',display:'flex',gap:8,alignItems:'center',justifyContent:'center' }}>
+                  <span style={{ fontSize:15,flexShrink:0 }}>💡</span>
+                  <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12.5,color:'#92620A',textAlign:'center',letterSpacing:'0.02em' }}>
+                    YOUR CODE IS YOUR CSPC EMAIL
+                  </p>
+                </div>
               </div>
 
               <button
