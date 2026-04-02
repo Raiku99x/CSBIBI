@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useDeadlineCompletions } from '../hooks/useDeadlineCompletions'
 import { format, formatDistanceToNow, isPast, isToday, isTomorrow, differenceInDays } from 'date-fns'
 import {
   Clock, ChevronDown, ChevronUp,
   BookOpen, FileText, Download, Check, X, RotateCcw,
-  AlertCircle, AlertTriangle
+  AlertCircle, AlertTriangle, Loader2
 } from 'lucide-react'
 
 const RED     = '#C0392B'
@@ -21,11 +22,9 @@ function formatTime12(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-// FIX #11: Parse "YYYY-MM-DD" as LOCAL date parts, not UTC.
-// new Date("2025-12-25") is midnight UTC which shifts the day in UTC+ timezones.
 function getDeadlineDate(due_date, due_time) {
   const [y, m, d] = due_date.split('-').map(Number)
-  const date = new Date(y, m - 1, d) // local midnight — no TZ shift
+  const date = new Date(y, m - 1, d)
   if (due_time) {
     const [h, min] = due_time.split(':').map(Number)
     date.setHours(h, min, 0, 0)
@@ -117,7 +116,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
   )
 }
 
-function DeadlineRow({ post, done, onToggleDone }) {
+function DeadlineRow({ post, done, onToggleDone, toggling }) {
   const [expanded, setExpanded] = useState(false)
   const [animating, setAnimating] = useState(false)
   const [hiding, setHiding] = useState(false)
@@ -129,6 +128,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
   const leftAccent = done ? '#E5E7EB' : status.past ? '#DADDE1' : status.urgent ? RED : BLUE
 
   function handleToggle() {
+    if (toggling) return
     if (done) {
       setHiding(true)
       setTimeout(() => onToggleDone(post.id), 320)
@@ -156,7 +156,7 @@ function DeadlineRow({ post, done, onToggleDone }) {
       transition: 'background 0.25s, border-color 0.25s, opacity 0.32s, transform 0.32s',
       opacity: hiding ? 0 : done ? 0.65 : 1,
       transform: hiding ? (done ? 'scale(0.97)' : 'translateX(40px)') : 'none',
-      pointerEvents: animating || hiding ? 'none' : 'auto',
+      pointerEvents: animating || hiding || toggling ? 'none' : 'auto',
     }}>
       <div style={{ display: 'flex' }}>
         <div style={{ width: 4, flexShrink: 0, background: animating ? '#22C55E' : leftAccent, transition: 'background 0.25s' }} />
@@ -186,21 +186,28 @@ function DeadlineRow({ post, done, onToggleDone }) {
               </div>
               <button
                 onClick={handleToggle}
+                disabled={toggling}
                 style={{
                   width: 62, padding: '5px 0', borderRadius: 8, border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                  cursor: 'pointer',
+                  cursor: toggling ? 'not-allowed' : 'pointer',
                   fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11,
                   background: animating ? '#DCFCE7' : done ? '#FFF1F2' : '#F0FDF4',
                   color: animating ? '#16a34a' : done ? '#e11d48' : '#4ade80',
                   outline: `2px solid ${animating ? '#86EFAC' : done ? '#FEE2E2' : '#D1FAE5'}`,
                   transition: 'all 0.2s',
                   transform: animating ? 'scale(1.05)' : 'scale(1)',
+                  opacity: toggling ? 0.6 : 1,
                 }}
-                onMouseEnter={e => { if (!animating) { e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'; e.currentTarget.style.color = done ? '#be123c' : '#16a34a' } }}
-                onMouseLeave={e => { if (!animating) { e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'; e.currentTarget.style.color = done ? '#e11d48' : '#4ade80' } }}
+                onMouseEnter={e => { if (!animating && !toggling) { e.currentTarget.style.background = done ? '#FEE2E2' : '#DCFCE7'; e.currentTarget.style.color = done ? '#be123c' : '#16a34a' } }}
+                onMouseLeave={e => { if (!animating && !toggling) { e.currentTarget.style.background = done ? '#FFF1F2' : '#F0FDF4'; e.currentTarget.style.color = done ? '#e11d48' : '#4ade80' } }}
               >
-                {done ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</> : <><Check size={11} strokeWidth={2.5} /> Done</>}
+                {toggling
+                  ? <Loader2 size={10} style={{ animation: 'spin 0.8s linear infinite' }} />
+                  : done
+                    ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
+                    : <><Check size={11} strokeWidth={2.5} /> Done</>
+                }
               </button>
             </div>
 
@@ -328,22 +335,18 @@ const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
 
 export default function AnnouncementsPage() {
   const { user } = useAuth()
+  const { isDone, toggleDone, doneIds, loading: completionsLoading } = useDeadlineCompletions()
+  const [togglingId, setTogglingId] = useState(null)
+
   const [deadlines, setDeadlines]   = useState([])
   const [loading, setLoading]       = useState(true)
   const [filter, setFilter]         = useState('All')
   const [typeFilter, setTypeFilter] = useState('All Types')
-  const [doneIds, setDoneIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('csb_done_deadlines') || '[]')) }
-    catch { return new Set() }
-  })
 
-  function toggleDone(id) {
-    setDoneIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      try { localStorage.setItem('csb_done_deadlines', JSON.stringify([...next])) } catch {}
-      return next
-    })
+  async function handleToggleDone(postId) {
+    setTogglingId(postId)
+    await toggleDone(postId)
+    setTogglingId(null)
   }
 
   useEffect(() => {
@@ -379,8 +382,8 @@ export default function AnnouncementsPage() {
   const isPastDue = (d) => isPast(getDeadlineDate(d.due_date, d.due_time))
   const applyType = (list) => typeFilter === 'All Types' ? list : list.filter(d => d.announcement_type === typeFilter)
 
-  const doneDeadlines   = deadlines.filter(d => doneIds.has(d.id))
-  const activeDeadlines = deadlines.filter(d => !doneIds.has(d.id))
+  const doneDeadlines   = deadlines.filter(d => isDone(d.id))
+  const activeDeadlines = deadlines.filter(d => !isDone(d.id))
 
   let displayItems = []
   if (filter === 'All')         displayItems = applyType(activeDeadlines)
@@ -404,13 +407,15 @@ export default function AnnouncementsPage() {
     'All':       { emoji: '🗓️', title: 'All clear!',             subtitle: 'No deadlines match this filter' },
   }
 
+  const isPageLoading = loading || completionsLoading
+
   return (
     <div style={{ paddingTop: 14 }}>
-      {!loading && <NotifBar pastDueCount={pastDueCount} dueSoonCount={dueSoonCount} />}
+      {!isPageLoading && <NotifBar pastDueCount={pastDueCount} dueSoonCount={dueSoonCount} />}
 
       <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 10, boxShadow: '0 2px 12px rgba(192,57,43,0.15)' }}>
         <div style={{ background: `linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`, padding: '18px 20px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: loading || typeEntries.length === 0 ? 0 : 14 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: isPageLoading || typeEntries.length === 0 ? 0 : 14 }}>
             <div style={{ width: 46, height: 46, borderRadius: 12, flexShrink: 0, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Clock size={22} color="white" />
             </div>
@@ -418,14 +423,14 @@ export default function AnnouncementsPage() {
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: 'white' }}>Deadlines</p>
               <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>From your enrolled subjects</p>
             </div>
-            {!loading && (
+            {!isPageLoading && (
               <div style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', padding: '4px 12px', borderRadius: 20, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13 }}>
                 {deadlines.length}
               </div>
             )}
           </div>
 
-          {!loading && typeEntries.length > 0 && (
+          {!isPageLoading && typeEntries.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {typeEntries.map(([type, count]) => {
                 const isActive = typeFilter === type
@@ -455,7 +460,7 @@ export default function AnnouncementsPage() {
         </div>
       </div>
 
-      {loading ? (
+      {isPageLoading ? (
         <LoadingSkeleton />
       ) : deadlines.length === 0 ? (
         <EmptyState emoji="📭" title="No deadlines yet" subtitle="Enroll in subjects to see their deadlines" />
@@ -464,7 +469,13 @@ export default function AnnouncementsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {displayItems.map(post => (
-            <DeadlineRow key={post.id} post={post} done={filter === 'Done' || doneIds.has(post.id)} onToggleDone={toggleDone} />
+            <DeadlineRow
+              key={post.id}
+              post={post}
+              done={filter === 'Done' || isDone(post.id)}
+              onToggleDone={handleToggleDone}
+              toggling={togglingId === post.id}
+            />
           ))}
         </div>
       )}
@@ -472,6 +483,7 @@ export default function AnnouncementsPage() {
       <style>{`
         @keyframes expandIn  { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes spin      { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
         @media (max-width: 600px) { .dl-detail-label { display: none; } }
       `}</style>
     </div>
