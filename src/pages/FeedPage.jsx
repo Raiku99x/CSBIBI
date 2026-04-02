@@ -281,7 +281,11 @@ export default function FeedPage() {
       {showCreate && (
         <CreatePostModal
           onClose={handleModalClose}
-          onCreated={() => {}}
+          onCreated={(post) => {
+            setPosts(prev =>
+              prev.some(p => p.id === post.id) ? prev : [post, ...prev]
+            )
+          }}
           subjects={subjects}
           defaultType={createType}
           defaultSubType={createSubType}
