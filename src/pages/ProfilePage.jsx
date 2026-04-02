@@ -227,6 +227,12 @@ export default function ProfilePage() {
               />
             </FormField>
 
+            <FormField label="Username" icon={<span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:15, color:'#BCC0C4', fontWeight:600 }}>@</span>} disabled>
+              <input type="text" value={profile?.username || profile?.display_name?.toLowerCase().replace(/\s+/g,'') || ''} disabled
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontSize: 15, color: '#BCC0C4' }}
+              />
+            </FormField>
+
             <FormField label="Email Address" icon={<Mail size={16} color="#BCC0C4" />} disabled>
               <input type="email" value={profile?.email || ''} disabled
                 style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontSize: 15, color: '#BCC0C4' }}
