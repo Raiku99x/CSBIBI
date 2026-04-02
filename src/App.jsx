@@ -1,7 +1,35 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'import { Toaster } from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+function ShortLinkResolver() {
+  const { shortId } = useParams()
+  const [, setNav] = useState(null)
+
+  useEffect(() => {
+    async function resolve() {
+      const { data } = await supabase
+        .from('posts')
+        .select('id')
+        .eq('short_id', shortId)
+        .single()
+      window.location.replace(data?.id ? `/?post=${data.id}` : '/')
+    }
+    resolve()
+  }, [shortId])
+
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F0F2F5' }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+        <div style={{ width:48, height:48, borderRadius:14, overflow:'hidden' }}>
+          <img src="/announce.png" alt="CSB" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+        </div>
+        <p style={{ fontSize:13, color:'#8A8D91', fontFamily:'"Instrument Sans", system-ui', fontWeight:500, margin:0 }}>
+          Opening post…
+        </p>
+      </div>
+    </div>
+  )
+}
 import { DarkModeProvider } from './contexts/DarkModeContext'
 import { SavedPostsProvider } from './contexts/SavedPostsContext'
 import Layout from './components/Layout'
@@ -174,7 +202,7 @@ function AppRoutes() {
             </Layout>
           </ProtectedRoute>
         } />
-
+        <Route path="/p/:shortId" element={<ShortLinkResolver />} />
         <Route path="/chat" element={<Navigate to="/messages" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
