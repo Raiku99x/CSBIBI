@@ -60,6 +60,8 @@ export default function FeedPage() {
     const { data } = await supabase
       .from('posts')
       .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
     if (data) {
       setPosts(data)
       const more = data.length === PAGE_SIZE
@@ -78,6 +80,8 @@ export default function FeedPage() {
     const { data } = await supabase
       .from('posts')
       .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+      .order('created_at', { ascending: false })
+      .lt('created_at', oldestCreatedAt.current)
       .limit(PAGE_SIZE)
     if (data && data.length > 0) {
       setPosts(prev => {
@@ -116,14 +120,14 @@ export default function FeedPage() {
     const channel = supabase.channel('feed-posts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
         const { data } = await supabase
+          .from('posts')
           .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+          .eq('id', payload.new.id)
+          .single()
         if (data) {
           const isFuture = isScheduledFuture(data)
           const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
           if (canSee) {
-            // ── FIX: deduplicate before prepending ──
-            // fetchInitial() and the realtime event both fire when you create a post.
-            // Without this check, whichever arrives second adds a duplicate.
             setPosts(prev =>
               prev.some(p => p.id === data.id) ? prev : [data, ...prev]
             )
