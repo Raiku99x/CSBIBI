@@ -71,7 +71,7 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
         { data: postsData },
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('posts').select('*, profiles(*), subjects(*)').eq('author_id', userId).order('created_at', { ascending: false }).limit(20),
+        supabase.from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)').eq('author_id', userId).order('created_at', { ascending: false }).limit(20),
       ])
 
       if (profileData) setProfile(profileData)
