@@ -15,7 +15,7 @@ function dicebearUrl(name = '') {
 }
 
 export default function ProfilePage() {
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [saving, setSaving] = useState(false)
@@ -108,6 +108,7 @@ export default function ProfilePage() {
       setPendingAvatarFile(null)
       setPendingAvatarPreview(null)
       if (nameChanged) setNameChangedAt(new Date())
+      await refreshProfile()
       toast.success('Profile updated!')
     } catch (err) {
       setUploadingAvatar(false)
