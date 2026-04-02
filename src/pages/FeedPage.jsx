@@ -59,9 +59,7 @@ export default function FeedPage() {
     setLoading(true)
     const { data } = await supabase
       .from('posts')
-      .select('*, profiles(*), subjects(*)')
-      .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE)
+      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
     if (data) {
       setPosts(data)
       const more = data.length === PAGE_SIZE
@@ -79,9 +77,7 @@ export default function FeedPage() {
     setLoadingMore(true)
     const { data } = await supabase
       .from('posts')
-      .select('*, profiles(*), subjects(*)')
-      .order('created_at', { ascending: false })
-      .lt('created_at', oldestCreatedAt.current)
+      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
       .limit(PAGE_SIZE)
     if (data && data.length > 0) {
       setPosts(prev => {
@@ -120,8 +116,7 @@ export default function FeedPage() {
     const channel = supabase.channel('feed-posts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
         const { data } = await supabase
-          .from('posts').select('*, profiles(*), subjects(*)')
-          .eq('id', payload.new.id).single()
+          .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         if (data) {
           const isFuture = isScheduledFuture(data)
           const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
