@@ -30,8 +30,10 @@ export default function ProfilePage() {
   // Detect unsaved changes
   const nameChanged = displayName.trim() !== (profile?.display_name || '')
 
-  const lastNameChange = profile?.display_name_changed_at ? new Date(profile.display_name_changed_at) : null
-  const daysSinceChange = lastNameChange ? Math.floor((Date.now() - lastNameChange) / (1000 * 60 * 60 * 24)) : 999
+  const [nameChangedAt, setNameChangedAt] = useState(
+    profile?.display_name_changed_at ? new Date(profile.display_name_changed_at) : null
+  )
+  const daysSinceChange = nameChangedAt ? Math.floor((Date.now() - nameChangedAt) / (1000 * 60 * 60 * 24)) : 999
   const canChangeName = daysSinceChange >= 20
   const daysLeft = 20 - daysSinceChange
   
@@ -105,6 +107,7 @@ export default function ProfilePage() {
       // Clear pending state
       setPendingAvatarFile(null)
       setPendingAvatarPreview(null)
+      if (nameChanged) setNameChangedAt(new Date())
       toast.success('Profile updated!')
     } catch (err) {
       setUploadingAvatar(false)
