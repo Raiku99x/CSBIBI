@@ -186,7 +186,7 @@ function SubjectDetail({ subject, isEnrolled, userId, onBack, onToggle }) {
   useEffect(() => {
     async function load() {
       const [{ data: postsData }, { data: appsData }] = await Promise.all([
-        supabase.from('posts').select('*, profiles(*), subjects(*)')
+        supabase.from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
           .eq('subject_id', subject.id).order('created_at', { ascending: false }),
         supabase.from('apps').select('*').eq('subject_id', subject.id),
       ])
