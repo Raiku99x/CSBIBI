@@ -2,12 +2,13 @@ import { useSavedPosts } from '../contexts/SavedPostsContext'
 import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow, format, isPast } from 'date-fns'
 import {
   FileText, Download, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
   MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2,
-  Link, MessageSquare, Check, Shield, Crown, Pin, Lock, BadgeCheck
+  Link, MessageSquare, Check, Shield, Crown, Pin, Lock, BadgeCheck,
+  MessageCircleMore
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
@@ -85,27 +86,136 @@ function parseQuoted(raw) {
   } catch { return { from: '', message: raw } }
 }
 
-// ── Share Sheet ───────────────────────────────────────────────
-function ShareOption({ icon, label, onClick, success }) {
+// ── Messenger text formatter ──────────────────────────────────
+function buildMessengerText(post) {
+  const subType   = post.sub_type
+  const postType  = post.post_type
+  const caption   = post.caption || ''
+  const author    = post.profiles?.display_name || 'Unknown'
+  const subject   = post.subjects?.name || null
+  const annType   = post.announcement_type || null
+  const dueDate   = post.due_date || null
+  const dueTime   = post.due_time || null
+  const shareUrl  = `${window.location.origin}/?post=${post.id}`
+
+  const photos    = parsePhotos(post.photo_url)
+  const files     = parseFiles(post.file_url, post.file_name)
+  const quoted    = parseQuoted(post.quoted_message)
+
+  const isPastDue = dueDate && isPast(
+    (() => {
+      const [y, m, d] = dueDate.split('-').map(Number)
+      const dt = new Date(y, m - 1, d)
+      if (dueTime) { const [h, min] = dueTime.split(':').map(Number); dt.setHours(h, min, 0, 0) }
+      else dt.setHours(23, 59, 0, 0)
+      return dt
+    })()
+  )
+
+  const lines = []
+
+  // ── Header line ──
+  if (subType === 'deadline') {
+    lines.push(`📅 Deadline${subject ? ` — ${subject}` : ''}`)
+  } else if (subType === 'reminder') {
+    lines.push(`🔔 Reminder${subject ? ` — ${subject}` : ''}`)
+  } else if (subType === 'material') {
+    lines.push(`📁 New Material${subject ? ` — ${subject}` : ''}`)
+  } else if (subType === 'announcement' || postType === 'announcement') {
+    lines.push(`📢 Announcement${subject ? ` — ${subject}` : ' — General'}`)
+  } else {
+    // status
+    lines.push(`💬 ${author} posted a status`)
+  }
+
+  // ── Announcement type tag ──
+  if (annType) lines.push(`🏷️ ${annType}`)
+
+  // ── Due date ──
+  if (dueDate) {
+    const [y, mo, d] = dueDate.split('-').map(Number)
+    const formatted = format(new Date(y, mo - 1, d), 'MMM d, yyyy')
+    const timeStr = dueTime ? ` · ${formatTime12(dueTime)}` : ''
+    lines.push(`⏰ Due: ${formatted}${timeStr}`)
+  }
+
+  // ── Past due warning ──
+  if (isPastDue) lines.push(`⚠️ PAST DUE`)
+
+  // ── Blank line then caption ──
+  if (caption.trim()) {
+    lines.push('')
+    lines.push(caption.trim())
+  }
+
+  // ── Quoted message ──
+  if (quoted && quoted.message) {
+    lines.push('')
+    const MAX_QUOTE = 200
+    const msgText = quoted.message.length > MAX_QUOTE
+      ? quoted.message.slice(0, MAX_QUOTE).trimEnd() + '...'
+      : quoted.message
+    const fromLabel = quoted.from ? `From ${quoted.from}` : 'Quoted message'
+    lines.push(`💬 ${fromLabel}:`)
+    lines.push(`"${msgText}"`)
+  }
+
+  // ── Photos ──
+  if (photos.length > 0) {
+    lines.push('')
+    lines.push(`📸 ${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`)
+  }
+
+  // ── Files ──
+  if (files.length > 0) {
+    lines.push('')
+    lines.push(`📎 ${files.length} file${files.length !== 1 ? 's' : ''}:`)
+    files.forEach(f => lines.push(`   • ${f.name}`))
+  }
+
+  // ── Author (for non-status) ──
+  if (subType !== 'status' && postType !== 'status') {
+    lines.push('')
+    lines.push(`👤 ${author}`)
+  }
+
+  // ── Link ──
+  lines.push(`🔗 ${shareUrl}`)
+
+  return lines.join('\n')
+}
+
+// ── Share Option Row ──────────────────────────────────────────
+function ShareOption({ icon, label, sublabel, onClick, success }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button onClick={onClick}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 12px', border:'none', cursor:'pointer', background:hovered?(success?'#F0FDF4':'#F7F8FA'):'transparent', borderRadius:8, fontFamily:'"Instrument Sans",system-ui', fontWeight:600, fontSize:13, color:success?'#16a34a':'#050505', textAlign:'left', transition:'background 0.1s' }}>
-      {icon} {label}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 12px', border: 'none', cursor: 'pointer',
+        background: hovered ? (success ? '#F0FDF4' : '#F7F8FA') : 'transparent',
+        borderRadius: 8, textAlign: 'left', transition: 'background 0.1s',
+      }}>
+      <div style={{ width: 34, height: 34, borderRadius: 9, background: success ? '#DCFCE7' : '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: success ? '#16a34a' : '#050505' }}>{label}</p>
+        {sublabel && <p style={{ margin: '1px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#8A8D91' }}>{sublabel}</p>}
+      </div>
+      {success && <Check size={14} color="#16a34a"/>}
     </button>
   )
 }
 
+// ── Share Sheet ───────────────────────────────────────────────
 function ShareSheet({ post, onClose, anchorRef }) {
-  const [copied, setCopied] = useState(false)
+  const [copiedLink, setCopiedLink]         = useState(false)
+  const [copiedMessenger, setCopiedMessenger] = useState(false)
   const sheetRef = useRef()
 
-  const shareUrl  = `${window.location.origin}/?post=${post.id}`
-  const author    = post.profiles?.display_name || 'Someone'
-  const subject   = post.subjects?.name ? ` [${post.subjects.name}]` : ''
-  const caption   = post.caption ? post.caption.slice(0, 100) + (post.caption.length > 100 ? '…' : '') : ''
-  const shareText = `${author}${subject}: ${caption}`
+  const shareUrl = `${window.location.origin}/?post=${post.id}`
 
   useEffect(() => {
     function h(e) {
@@ -119,20 +229,40 @@ function ShareSheet({ post, onClose, anchorRef }) {
   }, [onClose])
 
   async function handleNativeShare() {
-    try { await navigator.share({ title: 'CSB Post', text: shareText, url: shareUrl }); onClose() } catch {}
+    try {
+      await navigator.share({
+        title: 'CSB Post',
+        text: post.caption || '',
+        url: shareUrl,
+      })
+      onClose()
+    } catch {}
   }
 
   async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      setTimeout(() => { setCopied(false); onClose() }, 1400)
     } catch {
       const ta = document.createElement('textarea')
       ta.value = shareUrl
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
-      setCopied(true); setTimeout(() => { setCopied(false); onClose() }, 1400)
     }
+    setCopiedLink(true)
+    setTimeout(() => { setCopiedLink(false); onClose() }, 1400)
+  }
+
+  async function handleCopyMessenger() {
+    const text = buildMessengerText(post)
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
+    }
+    setCopiedMessenger(true)
+    toast.success('Copied! Paste it in Messenger 💬', { duration: 2500 })
+    setTimeout(() => { setCopiedMessenger(false); onClose() }, 1600)
   }
 
   return (
@@ -141,7 +271,7 @@ function ShareSheet({ post, onClose, anchorRef }) {
       bottom: 'calc(100% + 8px)',
       left: '50%',
       transform: 'translateX(-50%)',
-      width: 210,
+      width: 230,
       background: 'white',
       borderRadius: 14,
       border: '1px solid #E4E6EB',
@@ -150,26 +280,54 @@ function ShareSheet({ post, onClose, anchorRef }) {
       zIndex: 30,
       animation: 'slideUp 0.18s ease',
     }}>
+      {/* Header */}
       <div style={{ padding: '11px 14px 8px', borderBottom: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 13, color: '#050505' }}>Share post</span>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 2 }}>
           <X size={13} color="#65676B" />
         </button>
       </div>
+
+      {/* Options */}
       <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+        {/* Native share — mobile only */}
         {!!navigator.share && (
-          <ShareOption icon={<Share2 size={18} color="#65676B" />} label="More options…" onClick={handleNativeShare} />
+          <ShareOption
+            icon={<Share2 size={16} color="#65676B"/>}
+            label="More options…"
+            onClick={handleNativeShare}
+          />
         )}
+
+        {/* Copy link */}
         <ShareOption
-          icon={copied ? <Check size={18} color="#16a34a" /> : <Link size={18} color="#65676B" />}
-          label={copied ? 'Link copied!' : 'Copy link'}
+          icon={copiedLink ? <Check size={16} color="#16a34a"/> : <Link size={16} color="#65676B"/>}
+          label={copiedLink ? 'Link copied!' : 'Copy link'}
+          sublabel="Share anywhere"
           onClick={handleCopyLink}
-          success={copied}
+          success={copiedLink}
+        />
+
+        {/* Divider */}
+        <div style={{ height: 1, background: '#F0F2F5', margin: '2px 0' }}/>
+
+        {/* Copy for Messenger */}
+        <ShareOption
+          icon={copiedMessenger
+            ? <Check size={16} color="#16a34a"/>
+            : <MessageCircleMore size={16} color="#0084FF"/>
+          }
+          label={copiedMessenger ? 'Copied!' : 'Copy for Messenger'}
+          sublabel="Formatted text + link"
+          onClick={handleCopyMessenger}
+          success={copiedMessenger}
         />
       </div>
     </div>
   )
 }
+
 // ── Lightbox ──────────────────────────────────────────────────
 function Lightbox({ photos, initialIndex, onClose }) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
@@ -291,7 +449,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   async function handleModDelete() {
     if (!window.confirm(`Delete this post by ${postData.profiles?.display_name}? This cannot be undone.`)) return
     try {
-      // Log to audit
       await supabase.from('audit_logs').insert({
         actor_id: currentUserId,
         action: 'delete_post',
@@ -356,34 +513,19 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     try {
       if (nowLiked) {
         await supabase.from('likes').insert({ post_id: postData.id, user_id: currentUserId })
-if (postData.author_id && postData.author_id !== currentUserId) {
-  // Fetch current like count for this post
-  const { count: totalLikes } = await supabase
-    .from('likes')
-    .select('id', { count: 'exact', head: true })
-    .eq('post_id', postData.id)
-
-  const likerName = profile?.display_name || 'Someone'
-  const postSnippet = postData.caption
-    ? `"${postData.caption.slice(0, 35)}${postData.caption.length > 35 ? '…' : ''}"`
-    : 'your post'
-  const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
-
-  await supabase
-    .from('notifications')
-    .delete()
-    .eq('user_id', postData.author_id)
-    .eq('post_id', postData.id)
-    .eq('type', 'like')
-
-  await supabase.from('notifications').insert({
-    user_id: postData.author_id,
-    post_id: postData.id,
-    type: 'like',
-    message: `❤️ ${likerName} liked your post "${postData.caption?.slice(0, 40) || 'No caption'}…"${countSuffix}`,
-    is_read: false,
-  })
-}
+        if (postData.author_id && postData.author_id !== currentUserId) {
+          const { count: totalLikes } = await supabase
+            .from('likes').select('id', { count: 'exact', head: true }).eq('post_id', postData.id)
+          const likerName = profile?.display_name || 'Someone'
+          const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
+          await supabase.from('notifications').delete()
+            .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+          await supabase.from('notifications').insert({
+            user_id: postData.author_id, post_id: postData.id, type: 'like',
+            message: `❤️ ${likerName} liked your post "${postData.caption?.slice(0, 40) || 'No caption'}…"${countSuffix}`,
+            is_read: false,
+          })
+        }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
       }
@@ -444,7 +586,15 @@ if (postData.author_id && postData.author_id !== currentUserId) {
 
   const banner = getBanner(postData.sub_type, postData.post_type)
   const typeLabel = getTypeLabel(postData.sub_type, postData.post_type)
-  const isPastDue = postData.due_date && new Date(postData.due_date) < new Date()
+  const isPastDue = postData.due_date && isPast(
+    (() => {
+      const [y, m, d] = (postData.due_date).split('-').map(Number)
+      const dt = new Date(y, m - 1, d)
+      if (postData.due_time) { const [h, min] = postData.due_time.split(':').map(Number); dt.setHours(h, min, 0, 0) }
+      else dt.setHours(23, 59, 0, 0)
+      return dt
+    })()
+  )
   const isOwn = postData.author_id === currentUserId
 
   return (
@@ -487,7 +637,7 @@ if (postData.author_id && postData.author_id !== currentUserId) {
                 {isPastDue && <AlertCircle size={10} color="white"/>}
                 <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:600 }}>
                   {isPastDue ? 'Past due · ' : 'Due · '}
-                  {format(new Date(postData.due_date), 'MMM d, yyyy')}
+                  {format(new Date(postData.due_date + 'T00:00:00'), 'MMM d, yyyy')}
                   {postData.due_time ? ` · ${formatTime12(postData.due_time)}` : ''}
                 </span>
               </div>
@@ -511,7 +661,6 @@ if (postData.author_id && postData.author_id !== currentUserId) {
               >
                 {postData.profiles?.display_name || 'Unknown'}
               </span>
-              {/* Mod badge on post author — shown when mod mode is ON */}
               {canModerate && postData.profiles?.role === 'moderator' && (
                 <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,border:`1px solid #AED6F1`,borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui' }}>
                   <Shield size={9}/> Mod
@@ -547,8 +696,6 @@ if (postData.author_id && postData.author_id !== currentUserId) {
             </button>
             {showMenu && (
               <div style={{ position:'absolute',right:0,top:'calc(100% + 4px)',background:'white',borderRadius:10,border:'1px solid #E4E6EB',boxShadow:'0 6px 20px rgba(0,0,0,0.12)',overflow:'hidden',zIndex:20,minWidth:175,animation:'slideDown 0.15s ease' }}>
-
-                {/* Own post actions */}
                 {isOwn && (
                   <>
                     <MenuItem icon={<Pencil size={14} color="#65676B"/>} label="Edit post" onClick={() => { setShowMenu(false); setShowEdit(true) }}/>
@@ -556,8 +703,6 @@ if (postData.author_id && postData.author_id !== currentUserId) {
                     <MenuItem icon={<Trash2 size={14} color={RED}/>} label="Delete post" danger onClick={() => { setShowMenu(false); if(window.confirm('Delete this post?')) handleDelete() }}/>
                   </>
                 )}
-
-                {/* Save — for others' posts */}
                 {!isOwn && (
                   <MenuItem
                     icon={<Bookmark size={14} color={saved?BLUE:'#65676B'} fill={saved?BLUE:'none'}/>}
@@ -565,8 +710,6 @@ if (postData.author_id && postData.author_id !== currentUserId) {
                     onClick={() => { toggleSaved(postData.id); setShowMenu(false) }}
                   />
                 )}
-
-                {/* Mod controls — shown when mod mode ON */}
                 {canModerate && (
                   <>
                     <MenuDivider/>
