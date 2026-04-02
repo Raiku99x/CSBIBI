@@ -14,6 +14,13 @@ const TEAL = '#0D7377'
 
 const GENDERS = ['Male', 'Female', 'Prefer not to say']
 
+// ── Sanitize text input — strip HTML/script chars ─────────────
+function sanitize(str) {
+  return str
+    .replace(/[<>'"&]/g, c => ({'<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;','&':'&amp;'}[c]))
+    .trim()
+}
+
 // ── Dicebear fallback ─────────────────────────────────────────
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42']
 function dicebearUrl(name = '') {
@@ -57,7 +64,6 @@ function StepBar({ step }) {
   )
 }
 
-// ── Input wrapper ─────────────────────────────────────────────
 function Field({ label, children, error, required }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -73,36 +79,30 @@ function Field({ label, children, error, required }) {
 export default function CodeGatePage() {
   const { user, profile, updateProfile, signOut } = useAuth()
 
-  // step: 1=verify, 2=basic info, 3=subjects, 4=photo
   const [step, setStep]         = useState(1)
   const [loading, setLoading]   = useState(false)
   const [success, setSuccess]   = useState(false)
 
-  // Step 1 — code verification
-  const [code, setCode]         = useState('')
-  const [codeRow, setCodeRow]   = useState(null) // verified code data
-  const [codeError, setCodeError] = useState('') // 'invalid' | 'used' | ''
+  const [code, setCode]           = useState('')
+  const [codeRow, setCodeRow]     = useState(null)
+  const [codeError, setCodeError] = useState('')
 
-  // Step 2 — basic info
-  const [fullName, setFullName]     = useState('')  // always blank — user picks their name
-  const [gender, setGender]         = useState('')
-  const [birthday, setBirthday]     = useState('')
-  const [nameError, setNameError]   = useState('')
-  const [genderError, setGenderError] = useState('')
-  const [bdayError, setBdayError]   = useState('')
+  const [fullName, setFullName]         = useState('')
+  const [gender, setGender]             = useState('')
+  const [birthday, setBirthday]         = useState('')
+  const [nameError, setNameError]       = useState('')
+  const [genderError, setGenderError]   = useState('')
+  const [bdayError, setBdayError]       = useState('')
 
-  // Step 3 — subjects
-  const [subjects, setSubjects]         = useState([])
+  const [subjects, setSubjects]                 = useState([])
   const [selectedSubjects, setSelectedSubjects] = useState(new Set())
-  const [subjectError, setSubjectError] = useState('')
-  const [subjectsLoading, setSubjectsLoading] = useState(false)
+  const [subjectError, setSubjectError]         = useState('')
+  const [subjectsLoading, setSubjectsLoading]   = useState(false)
 
-  // Step 4 — photo
   const [avatarFile, setAvatarFile]       = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const fileRef = useRef()
 
-  // Load subjects when we reach step 3
   useEffect(() => {
     if (step === 3 && subjects.length === 0) {
       setSubjectsLoading(true)
@@ -119,39 +119,22 @@ export default function CodeGatePage() {
     e.preventDefault()
     const trimmed = code.trim().toLowerCase()
     if (!trimmed) { setCodeError('invalid'); return }
+    // Sanity check — no script injection in code field
+    if (trimmed.length > 100 || /<|>|script/i.test(trimmed)) { setCodeError('invalid'); return }
+
     setLoading(true)
     setCodeError('')
     try {
-      // First check if code exists at all
       const { data: anyRow } = await supabase
-        .from('allowed_codes')
-        .select('id, is_used')
-        .eq('code', trimmed)
-        .single()
+        .from('allowed_codes').select('id, is_used').eq('code', trimmed).single()
 
-      if (!anyRow) {
-        // Code doesn't exist
-        setCodeError('invalid')
-        setLoading(false)
-        return
-      }
+      if (!anyRow) { setCodeError('invalid'); setLoading(false); return }
+      if (anyRow.is_used) { setCodeError('used'); setLoading(false); return }
 
-      if (anyRow.is_used) {
-        // Code exists but already claimed
-        setCodeError('used')
-        setLoading(false)
-        return
-      }
-
-      // Code is valid and unused — fetch full row
       const { data: row } = await supabase
-        .from('allowed_codes')
-        .select('*')
-        .eq('code', trimmed)
-        .single()
+        .from('allowed_codes').select('*').eq('code', trimmed).single()
 
       setCodeRow(row)
-      // Do NOT pre-fill name — let user choose
       setFullName('')
       setStep(2)
     } catch (err) {
@@ -165,9 +148,31 @@ export default function CodeGatePage() {
   function handleBasicNext() {
     let ok = true
     setNameError(''); setGenderError(''); setBdayError('')
-    if (!fullName.trim()) { setNameError('Full name is required'); ok = false }
+
+    // Full name validation
+    if (!fullName.trim()) {
+      setNameError('Full name is required'); ok = false
+    } else if (fullName.trim().length < 2) {
+      setNameError('Name is too short'); ok = false
+    } else if (fullName.trim().length > 50) {
+      setNameError('Name is too long'); ok = false
+    } else if (/\d/.test(fullName.trim())) {
+      setNameError('Name cannot contain numbers'); ok = false
+    } else if (/<|>|script|javascript/i.test(fullName.trim())) {
+      setNameError('Invalid characters in name'); ok = false
+    }
+
     if (!gender) { setGenderError('Please select your gender'); ok = false }
-    if (!birthday) { setBdayError('Birthday is required'); ok = false }
+
+    // Birthday validation
+    if (!birthday) {
+      setBdayError('Birthday is required'); ok = false
+    } else {
+      const age = Math.floor((Date.now() - new Date(birthday)) / (1000 * 60 * 60 * 24 * 365))
+      if (age < 15) { setBdayError('Must be at least 15 years old'); ok = false }
+      else if (age > 40) { setBdayError('Please enter a valid birthday'); ok = false }
+    }
+
     if (ok) setStep(3)
   }
 
@@ -189,7 +194,7 @@ export default function CodeGatePage() {
     setStep(4)
   }
 
-  // ── Step 4: photo pick ────────────────────────────────────
+  // ── Step 4: photo ─────────────────────────────────────────
   function handlePhotoPick(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -204,15 +209,11 @@ export default function CodeGatePage() {
   async function handleFinish(skipPhoto = false) {
     setLoading(true)
     try {
-      // 1. Claim the code
       const { error: claimErr } = await supabase
-        .from('allowed_codes')
-        .update({ is_used: true, user_id: user.id })
-        .eq('id', codeRow.id)
-        .eq('is_used', false)
+        .from('allowed_codes').update({ is_used: true, user_id: user.id })
+        .eq('id', codeRow.id).eq('is_used', false)
       if (claimErr) { toast.error('Code was just claimed. Try again.'); setLoading(false); return }
 
-      // 2. Upload avatar if provided
       let avatarUrl = dicebearUrl(fullName.trim())
       if (!skipPhoto && avatarFile) {
         const ext = avatarFile.name.split('.').pop().toLowerCase()
@@ -223,28 +224,29 @@ export default function CodeGatePage() {
         avatarUrl = data.publicUrl
       }
 
-      // 3. Enroll subjects
       if (selectedSubjects.size > 0) {
         const inserts = [...selectedSubjects].map(subject_id => ({ user_id: user.id, subject_id }))
         await supabase.from('user_subjects').insert(inserts)
       }
 
-      // 4. Update profile
+      // Sanitize before saving
+      const safeName = sanitize(fullName.trim())
+      const safeUsername = safeName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+
       await updateProfile({
-        display_name: fullName.trim(),
-        username:     fullName.trim().toLowerCase().replace(/\s+/g, ''),
+        display_name: safeName,
+        username:     safeUsername,
         identifier:   codeRow.identifier,
         section:      codeRow.section,
         student_code: codeRow.code,
         is_verified:  true,
         avatar_url:   avatarUrl,
-        // store extra info in metadata columns if they exist, or just save what we can
         gender:       gender,
         birthday:     birthday,
       })
 
       setSuccess(true)
-      toast.success(`Welcome, ${fullName.split(' ')[0]}! 🎉`)
+      toast.success(`Welcome, ${safeName.split(' ')[0]}! 🎉`)
     } catch (err) {
       toast.error(err.message || 'Something went wrong')
     } finally {
@@ -252,7 +254,6 @@ export default function CodeGatePage() {
     }
   }
 
-  // ── Success screen ────────────────────────────────────────
   if (success) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEEF2', padding: 24 }}>
@@ -268,7 +269,6 @@ export default function CodeGatePage() {
     )
   }
 
-  // ── Shared page shell ─────────────────────────────────────
   return (
     <>
       <style>{`
@@ -298,7 +298,6 @@ export default function CodeGatePage() {
 
         <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1, animation: 'fadeSlideUp 0.4s cubic-bezier(0.16,1,0.3,1)' }}>
 
-          {/* Logo */}
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
             <div style={{ width: 64, height: 64, borderRadius: 17, overflow: 'hidden', margin: '0 auto 11px', border: '3px solid white', boxShadow: '0 6px 24px rgba(192,57,43,0.22)' }}>
               <img src="/announce.png" alt="CSB" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
@@ -307,7 +306,6 @@ export default function CodeGatePage() {
             <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10, color: BLUE, letterSpacing: '2px', textTransform: 'uppercase', marginTop: 3 }}>Computer Science Board</div>
           </div>
 
-          {/* Card */}
           <div className="csb-card" style={{ background: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: 22, padding: '26px 24px 30px', boxShadow: '0 20px 60px rgba(0,0,0,0.10),0 4px 16px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.98)' }}>
 
             <StepBar step={step}/>
@@ -333,7 +331,6 @@ export default function CodeGatePage() {
                   </div>
                 </div>
 
-                {/* ── Error banners — separated ── */}
                 {codeError === 'invalid' && (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 13px', background: '#FEF2F2', border: '1.5px solid #FECACA', borderLeft: `4px solid ${RED}`, borderRadius: '0 10px 10px 0', marginBottom: 14, animation: 'stepIn 0.2s ease' }}>
                     <span style={{ fontSize: 16, flexShrink: 0 }}>❌</span>
@@ -352,7 +349,7 @@ export default function CodeGatePage() {
                     <div>
                       <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: '#C2410C' }}>Code already used</p>
                       <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#92400E', lineHeight: 1.4 }}>
-                        This code has already been claimed by someone. Contact your admin if you think this is a mistake.
+                        This code has already been claimed. Contact your admin if you think this is a mistake.
                       </p>
                     </div>
                   </div>
@@ -361,10 +358,11 @@ export default function CodeGatePage() {
                 <Field label="Enter your code" required>
                   <div style={{ position: 'relative' }}>
                     <Mail size={15} color="#BCC0C4" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}/>
-                    <input className="csb-input" style={{ paddingLeft: 38, borderColor: codeError ? RED : undefined }} type="text" value={code}
+                    <input className="csb-input" style={{ paddingLeft: 38, borderColor: codeError ? RED : undefined }}
+                      type="text" value={code}
                       onChange={e => { setCode(e.target.value.toLowerCase()); setCodeError('') }}
                       placeholder="yourname@my.cspc.edu.ph"
-                      maxLength={60} autoFocus spellCheck={false} autoComplete="off" autoCapitalize="none" inputMode="email"/>
+                      maxLength={100} autoFocus spellCheck={false} autoComplete="off" autoCapitalize="none" inputMode="email"/>
                   </div>
                 </Field>
 
@@ -392,15 +390,18 @@ export default function CodeGatePage() {
                   <Field label="Full Name" required error={nameError}>
                     <div style={{ position: 'relative' }}>
                       <User size={15} color="#BCC0C4" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}/>
-                      <input className="csb-input" style={{ paddingLeft: 38, borderColor: nameError ? RED : undefined }} type="text"
-                        value={fullName} onChange={e => { setFullName(e.target.value); setNameError('') }}
-                        placeholder="e.g. Juan Dela Cruz" autoFocus/>
+                      <input className="csb-input" style={{ paddingLeft: 38, borderColor: nameError ? RED : undefined }}
+                        type="text" value={fullName}
+                        onChange={e => { setFullName(e.target.value); setNameError('') }}
+                        placeholder="e.g. Juan Dela Cruz"
+                        maxLength={50} autoFocus/>
                     </div>
                   </Field>
 
                   <Field label="Gender" required error={genderError}>
                     <div style={{ position: 'relative' }}>
-                      <select className="csb-input" value={gender} onChange={e => { setGender(e.target.value); setGenderError('') }}
+                      <select className="csb-input" value={gender}
+                        onChange={e => { setGender(e.target.value); setGenderError('') }}
                         style={{ appearance: 'none', paddingRight: 36, borderColor: genderError ? RED : undefined, color: gender ? '#050505' : '#C0C4CC' }}>
                         <option value="" disabled>Select gender</option>
                         {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -469,8 +470,7 @@ export default function CodeGatePage() {
                   ) : subjects.map(s => {
                     const selected = selectedSubjects.has(s.id)
                     return (
-                      <button key={s.id} className={`subject-chip${selected ? ' selected' : ''}`}
-                        onClick={() => toggleSubject(s.id)}>
+                      <button key={s.id} className={`subject-chip${selected ? ' selected' : ''}`} onClick={() => toggleSubject(s.id)}>
                         <div style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${selected ? TEAL : '#D1D5DB'}`, background: selected ? TEAL : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
                           {selected && <Check size={11} color="white" strokeWidth={3}/>}
                         </div>
@@ -506,14 +506,11 @@ export default function CodeGatePage() {
                   </div>
                 </div>
 
-                {/* Avatar preview */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginBottom: 22 }}>
                   <div style={{ position: 'relative' }}>
-                    <img
-                      src={avatarPreview || dicebearUrl(fullName)}
+                    <img src={avatarPreview || dicebearUrl(fullName)}
                       style={{ width: 96, height: 96, borderRadius: 22, objectFit: 'cover', border: `3px solid ${avatarPreview ? TEAL : '#E4E6EB'}`, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', transition: 'border-color 0.2s' }}
-                      alt="avatar preview"
-                    />
+                      alt="avatar preview"/>
                     {avatarPreview && (
                       <button onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
                         style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%', background: RED, border: '2px solid white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -522,7 +519,7 @@ export default function CodeGatePage() {
                     )}
                   </div>
                   <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#9CA3AF', textAlign: 'center' }}>
-                    {avatarPreview ? '✓ Photo selected' : `Auto-generated from your name`}
+                    {avatarPreview ? '✓ Photo selected' : 'Auto-generated from your name'}
                   </p>
                 </div>
 
@@ -540,7 +537,7 @@ export default function CodeGatePage() {
                   </button>
                   <button className="csb-btn" onClick={() => handleFinish(!avatarFile)} disabled={loading}
                     style={{ background: loading ? '#7EC8C8' : TEAL, color: 'white', flex: 1, boxShadow: '0 6px 20px rgba(13,115,119,0.24)' }}>
-                    {loading ? <><Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }}/> Setting up…</> : <><span>{avatarFile ? "Finish" : "Skip & Finish"}</span><Check size={15}/></>}
+                    {loading ? <><Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }}/> Setting up…</> : <><span>{avatarFile ? 'Finish' : 'Skip & Finish'}</span><Check size={15}/></>}
                   </button>
                 </div>
               </div>
@@ -548,7 +545,6 @@ export default function CodeGatePage() {
 
           </div>
 
-          {/* Sign out */}
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <button onClick={signOut}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: '#9EA3A8', transition: 'color 0.12s', padding: '6px 10px', borderRadius: 8 }}
