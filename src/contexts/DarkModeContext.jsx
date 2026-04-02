@@ -9,12 +9,14 @@ export function DarkModeProvider({ children }) {
 
   useEffect(() => {
     try { localStorage.setItem('csb_dark_mode', dark) } catch {}
-    // Apply CSS variables to :root for global dark mode
     const root = document.documentElement
     if (dark) {
       root.setAttribute('data-theme', 'dark')
+      // Also set on body for maximum specificity coverage
+      document.body.setAttribute('data-theme', 'dark')
     } else {
       root.removeAttribute('data-theme')
+      document.body.removeAttribute('data-theme')
     }
   }, [dark])
 
