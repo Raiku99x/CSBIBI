@@ -29,7 +29,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   const fetchComments = useCallback(async () => {
     const { data } = await supabase
       .from('comments')
-      .select('*, profiles(*)')
+      .select('*, profiles!comments_author_id_fkey(*)')
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
     if (data) setComments(data)
@@ -40,7 +40,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
     fetchComments()
     const ch = supabase.channel('comments-' + postId)
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, async (payload) => {
-        const { data } = await supabase.from('comments').select('*, profiles(*)').eq('id', payload.new.id).single()
+        const { data } = await supabase.from('comments').select('*, profiles!comments_author_id_fkey(*)').eq('id', payload.new.id).single()
         if (data) { setComments(prev => [...prev, data]); onCommentCountChange?.(c => c + 1) }
       })
       .on('postgres_changes', { event:'DELETE', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, (payload) => {
