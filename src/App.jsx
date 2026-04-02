@@ -1,9 +1,26 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'import { Toaster } from 'react-hot-toast'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { DarkModeProvider } from './contexts/DarkModeContext'
+import { SavedPostsProvider } from './contexts/SavedPostsContext'
+import Layout from './components/Layout'
+import SearchOverlay from './components/SearchOverlay'
+import BannedScreen from './components/BannedScreen'
+import MaintenanceScreen from './components/MaintenanceScreen'
+import AuthPage from './pages/AuthPage'
+import FeedPage from './pages/FeedPage'
+import MessagesPage from './pages/MessagesPage'
+import AnnouncementsPage from './pages/AnnouncementsPage'
+import EnrolledSubjectsPage from './pages/EnrolledSubjectsPage'
+import AppsPage from './pages/AppsPage'
+import ProfilePage from './pages/ProfilePage'
+import CodeGatePage from './pages/CodeGatePage'
+import { supabase } from './lib/supabase'
+
+// ── Short link resolver ───────────────────────────────────────
 function ShortLinkResolver() {
   const { shortId } = useParams()
-  const [, setNav] = useState(null)
 
   useEffect(() => {
     async function resolve() {
@@ -30,26 +47,8 @@ function ShortLinkResolver() {
     </div>
   )
 }
-import { DarkModeProvider } from './contexts/DarkModeContext'
-import { SavedPostsProvider } from './contexts/SavedPostsContext'
-import Layout from './components/Layout'
-import SearchOverlay from './components/SearchOverlay'
-import BannedScreen from './components/BannedScreen'
-import MaintenanceScreen from './components/MaintenanceScreen'
-import AuthPage from './pages/AuthPage'
-import FeedPage from './pages/FeedPage'
-import MessagesPage from './pages/MessagesPage'
-import AnnouncementsPage from './pages/AnnouncementsPage'
-import EnrolledSubjectsPage from './pages/EnrolledSubjectsPage'
-import AppsPage from './pages/AppsPage'
-import ProfilePage from './pages/ProfilePage'
-import CodeGatePage from './pages/CodeGatePage'
-import { supabase } from './lib/supabase'
 
 // ── Maintenance mode hook ─────────────────────────────────────
-// Fetches the app_settings row for maintenance_mode and subscribes
-// to realtime changes so flipping the toggle takes effect immediately
-// without any page refresh.
 function useMaintenanceMode() {
   const [maintenance, setMaintenance] = useState({ enabled: false, message: '' })
   const [checking, setChecking] = useState(true)
@@ -75,7 +74,6 @@ function useMaintenanceMode() {
 
     fetchSetting()
 
-    // Realtime: update instantly when admin toggles maintenance mode
     const ch = supabase
       .channel('maintenance-mode-watch')
       .on(
@@ -102,7 +100,6 @@ function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth()
   const { maintenance, checking } = useMaintenanceMode()
  
-  // Still loading auth or maintenance setting
   if (loading || checking) {
     return (
       <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F0F2F5' }}>
@@ -118,19 +115,14 @@ function ProtectedRoute({ children }) {
     )
   }
  
-  // Not logged in → auth page
   if (!user) return <Navigate to="/auth" replace />
- 
-  // Ban gate
   if (profile?.is_banned) return <BannedScreen />
  
-  // Maintenance gate — superadmins bypass
   const isSuperadmin = profile?.role === 'superadmin'
   if (maintenance.enabled && !isSuperadmin) {
     return <MaintenanceScreen message={maintenance.message} />
   }
  
-  // ── Student code gate ──────────────────────────────────
   const needsVerification = !profile?.is_verified && profile?.role === 'user'
   if (needsVerification) {
     return <CodeGatePage />
@@ -202,6 +194,7 @@ function AppRoutes() {
             </Layout>
           </ProtectedRoute>
         } />
+
         <Route path="/p/:shortId" element={<ShortLinkResolver />} />
         <Route path="/chat" element={<Navigate to="/messages" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
