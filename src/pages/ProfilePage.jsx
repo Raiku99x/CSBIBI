@@ -228,7 +228,7 @@ export default function ProfilePage() {
             </FormField>
 
             <FormField label="Username" icon={<span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:15, color:'#BCC0C4', fontWeight:600 }}>@</span>} disabled>
-              <input type="text" value={profile?.username ? `@${profile.username}` : '—'} disabled
+              <input type="text" value={profile?.username || '—'} disabled
                 style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontSize: 15, color: '#BCC0C4' }}
               />
             </FormField>
