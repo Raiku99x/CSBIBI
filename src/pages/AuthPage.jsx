@@ -31,6 +31,7 @@ export default function AuthPage() {
   const [otp, setOtp]             = useState(['', '', '', '', '', ''])
   const [loading, setLoading]     = useState(false)
   const [otpAttempts, setOtpAttempts] = useState(0)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const { signInWithGoogle, signInWithOTP, verifyOTP } = useAuth()
 
   async function handleGoogle() {
@@ -57,6 +58,13 @@ export default function AuthPage() {
       toast.success('Code sent! Check your email.')
       setStep('otp-verify')
       setOtpAttempts(0)
+      setResendCooldown(180)
+      const timer = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) { clearInterval(timer); return 0 }
+          return prev - 1
+        })
+      }, 1000)
     } catch (err) {
       toast.error(err.message || 'Failed to send code')
     } finally {
@@ -343,11 +351,14 @@ export default function AuthPage() {
                   </button>
                 </form>
 
-                <button onClick={e => { setOtpAttempts(0); handleSendOTP(e) }} disabled={loading}
-                  style={{ width:'100%',marginTop:12,padding:'10px',borderRadius:10,border:'none',background:'transparent',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:'#65676B',transition:'color 0.12s' }}
-                  onMouseEnter={e => e.currentTarget.style.color=RED}
-                  onMouseLeave={e => e.currentTarget.style.color='#65676B'}>
-                  Didn't receive it? Resend code
+                <button onClick={e => { setOtpAttempts(0); handleSendOTP(e) }}
+                  disabled={loading || resendCooldown > 0}
+                  style={{ width:'100%',marginTop:12,padding:'10px',borderRadius:10,border:'none',background:'transparent',cursor:resendCooldown>0?'default':'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:resendCooldown>0?'#BCC0C4':'#65676B',transition:'color 0.12s' }}
+                  onMouseEnter={e => { if(!resendCooldown) e.currentTarget.style.color=RED }}
+                  onMouseLeave={e => { if(!resendCooldown) e.currentTarget.style.color='#65676B' }}>
+                  {resendCooldown > 0
+                    ? `Resend in ${Math.floor(resendCooldown/60)}:${String(resendCooldown%60).padStart(2,'0')}`
+                    : "Didn't receive it? Resend code"}
                 </button>
               </>
             )}
