@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMuteGate } from '../hooks/useMuteGate'
+import { useDarkMode } from '../contexts/DarkModeContext'
 import { formatDistanceToNow } from 'date-fns'
 import { X, Send, Loader2, Trash2, MicOff } from 'lucide-react'
 
@@ -16,8 +17,8 @@ const RED = '#C0392B'
 
 export default function CommentsSheet({ postId, onClose, onCommentCountChange }) {
   const { user, profile } = useAuth()
-  // FIX #1: was { isMuted, muteMessage } — those names don't exist in useMuteGate
   const { effectivelyMuted, getMuteMessage } = useMuteGate()
+  const { colors } = useDarkMode()
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -38,22 +39,11 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   useEffect(() => {
     fetchComments()
     const ch = supabase.channel('comments-' + postId)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'comments',
-        filter: `post_id=eq.${postId}`,
-      }, async (payload) => {
-        const { data } = await supabase
-          .from('comments').select('*, profiles(*)')
-          .eq('id', payload.new.id).single()
-        if (data) {
-          setComments(prev => [...prev, data])
-          onCommentCountChange?.(c => c + 1)
-        }
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, async (payload) => {
+        const { data } = await supabase.from('comments').select('*, profiles(*)').eq('id', payload.new.id).single()
+        if (data) { setComments(prev => [...prev, data]); onCommentCountChange?.(c => c + 1) }
       })
-      .on('postgres_changes', {
-        event: 'DELETE', schema: 'public', table: 'comments',
-        filter: `post_id=eq.${postId}`,
-      }, (payload) => {
+      .on('postgres_changes', { event:'DELETE', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, (payload) => {
         setComments(prev => prev.filter(c => c.id !== payload.old.id))
         onCommentCountChange?.(c => Math.max(0, c - 1))
       })
@@ -61,56 +51,29 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
     return () => supabase.removeChannel(ch)
   }, [fetchComments, postId])
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [comments])
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [comments])
+  useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
 
   async function handleSend(e) {
     e.preventDefault()
-    // FIX #1: was isMuted — now effectivelyMuted
     if (!text.trim() || effectivelyMuted) return
     setSending(true)
     const content = text.trim()
     setText('')
     try {
-      const { error } = await supabase.from('comments').insert({
-        post_id: postId,
-        author_id: user.id,
-        content,
-      })
+      const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: user.id, content })
       if (error) throw error
-            const { data: postRow } = await supabase
-        .from('posts')
-        .select('author_id, caption')
-        .eq('id', postId)
-        .single()
- 
+      const { data: postRow } = await supabase.from('posts').select('author_id, caption').eq('id', postId).single()
       if (postRow?.author_id && postRow.author_id !== user.id) {
         const commenterName = profile?.display_name || 'Someone'
-        const postSnippet = postRow.caption
-          ? `"${postRow.caption.slice(0, 35)}${postRow.caption.length > 35 ? '…' : ''}"`
-          : 'your post'
         await supabase.from('notifications').insert({
-          user_id: postRow.author_id,
-          post_id: postId,
-          type: 'comment',
-          message: `💬 ${commenterName} commented on your post "${postRow.caption?.slice(0, 40) || 'No caption'}…" — "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
+          user_id: postRow.author_id, post_id: postId, type: 'comment',
+          message: `💬 ${commenterName} commented on your post "${postRow.caption?.slice(0,40)||'No caption'}…" — "${content.slice(0,50)}${content.length>50?'…':''}"`,
           is_read: false,
         })
       }
-
-    } catch (err) {
-      setText(content)
-      console.error(err)
-    } finally {
-      setSending(false)
-      inputRef.current?.focus()
-    }
+    } catch (err) { setText(content); console.error(err) }
+    finally { setSending(false); inputRef.current?.focus() }
   }
 
   async function handleDelete(commentId) {
@@ -119,56 +82,40 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 60,
-          background: 'rgba(0,0,0,0.5)',
-          animation: 'fadeIn 0.2s ease',
-        }}
-      />
+      <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
 
       <div style={{
-        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 680, zIndex: 61,
-        background: 'white',
-        borderRadius: '16px 16px 0 0',
-        boxShadow: '0 -4px 32px rgba(0,0,0,0.18)',
-        display: 'flex', flexDirection: 'column',
-        maxHeight: '80vh',
-        animation: 'slideUp 0.25s cubic-bezier(0.16,1,0.3,1)',
+        position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',
+        width:'100%',maxWidth:680,zIndex:61,
+        background:colors.cardBg,
+        borderRadius:'16px 16px 0 0',
+        boxShadow:'0 -4px 32px rgba(0,0,0,0.25)',
+        display:'flex',flexDirection:'column',
+        maxHeight:'80vh',
+        animation:'slideUp 0.25s cubic-bezier(0.16,1,0.3,1)',
       }}>
-
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E4E6EB' }} />
+        <div style={{ display:'flex',justifyContent:'center',padding:'10px 0 4px' }}>
+          <div style={{ width:36,height:4,borderRadius:2,background:colors.border }}/>
         </div>
 
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '4px 16px 12px', borderBottom: '1px solid #F0F2F5',
-        }}>
-          <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 16, color: '#050505' }}>
-            Comments {comments.length > 0 && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#65676B' }}>· {comments.length}</span>}
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 16px 12px',borderBottom:`1px solid ${colors.border}` }}>
+          <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:16,color:colors.textPri }}>
+            Comments {comments.length > 0 && <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:colors.textSec }}>· {comments.length}</span>}
           </span>
-          <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: '50%', background: '#F0F2F5',
-            border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <X size={15} color="#65676B" />
+          <button onClick={onClose} style={{ width:32,height:32,borderRadius:'50%',background:colors.surface,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+            <X size={15} color={colors.textSec}/>
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:14 }}>
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
-              <Loader2 size={22} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ display:'flex',justifyContent:'center',padding:32 }}>
+              <Loader2 size={22} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
             </div>
           ) : comments.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>💬</div>
-              <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#65676B', margin: 0 }}>
-                No comments yet — be the first!
-              </p>
+            <div style={{ textAlign:'center',padding:'32px 0' }}>
+              <div style={{ fontSize:36,marginBottom:8 }}>💬</div>
+              <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textSec,margin:0 }}>No comments yet — be the first!</p>
             </div>
           ) : (
             comments.map(comment => (
@@ -177,58 +124,31 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                 comment={comment}
                 isOwn={comment.author_id === user.id}
                 onDelete={() => handleDelete(comment.id)}
+                colors={colors}
               />
             ))
           )}
-          <div ref={bottomRef} />
+          <div ref={bottomRef}/>
         </div>
 
-        {/* Input area — replaced with mute banner if muted */}
-        <div style={{
-          borderTop: '1px solid #F0F2F5',
-          paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
-          background: 'white',
-        }}>
-          {/* FIX #1: was isMuted, muteMessage — now effectivelyMuted, getMuteMessage() */}
+        <div style={{ borderTop:`1px solid ${colors.border}`,paddingBottom:'calc(10px + env(safe-area-inset-bottom))',background:colors.cardBg }}>
           {effectivelyMuted ? (
-            <div style={{
-              margin: '10px 12px',
-              padding: '12px 14px',
-              background: '#FFF3E0',
-              border: '1px solid #FFB74D',
-              borderRadius: 12,
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <MicOff size={18} color="#E65100" style={{ flexShrink: 0 }} />
+            <div style={{ margin:'10px 12px',padding:'12px 14px',background:'rgba(230,81,0,0.1)',border:'1px solid rgba(230,81,0,0.3)',borderRadius:12,display:'flex',alignItems:'center',gap:10 }}>
+              <MicOff size={18} color="#E65100" style={{ flexShrink:0 }}/>
               <div>
-                <p style={{
-                  margin: 0,
-                  fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13,
-                  color: '#E65100',
-                }}>
-                  You are muted
-                </p>
-                <p style={{
-                  margin: '2px 0 0',
-                  fontFamily: '"Instrument Sans", system-ui', fontSize: 12,
-                  color: '#BF360C',
-                }}>
-                  {getMuteMessage()}
-                </p>
+                <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:'#E65100' }}>You are muted</p>
+                <p style={{ margin:'2px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#BF360C' }}>{getMuteMessage()}</p>
               </div>
             </div>
           ) : (
-            <div style={{ padding: '10px 12px' }}>
-              <form onSubmit={handleSend} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+            <div style={{ padding:'10px 12px' }}>
+              <form onSubmit={handleSend} style={{ display:'flex',alignItems:'flex-end',gap:8 }}>
                 <img
                   src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-                  style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                  style={{ width:34,height:34,borderRadius:10,objectFit:'cover',flexShrink:0 }}
                   alt=""
                 />
-                <div style={{
-                  flex: 1, background: '#F0F2F5', borderRadius: 20, padding: '8px 14px',
-                  display: 'flex', alignItems: 'center',
-                }}>
+                <div style={{ flex:1,background:colors.surface,borderRadius:20,padding:'8px 14px',display:'flex',alignItems:'center' }}>
                   <textarea
                     ref={inputRef}
                     rows={1}
@@ -241,10 +161,9 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
                     placeholder="Write a comment…"
                     style={{
-                      flex: 1, border: 'none', background: 'transparent', outline: 'none',
-                      fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505',
-                      resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block',
-                      width: '100%',
+                      flex:1,border:'none',background:'transparent',outline:'none',
+                      fontFamily:'"Instrument Sans",system-ui',fontSize:14.5,color:colors.textPri,
+                      resize:'none',lineHeight:1.4,maxHeight:100,overflow:'hidden',display:'block',width:'100%',
                     }}
                   />
                 </div>
@@ -252,19 +171,19 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                   type="submit"
                   disabled={sending || !text.trim()}
                   style={{
-                    width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                    background: text.trim() ? RED : '#E4E6EB',
-                    border: 'none', cursor: text.trim() ? 'pointer' : 'default',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.15s, transform 0.1s',
-                    boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none',
+                    width:38,height:38,borderRadius:'50%',flexShrink:0,
+                    background:text.trim()?RED:colors.surface,
+                    border:'none',cursor:text.trim()?'pointer':'default',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    transition:'background 0.15s, transform 0.1s',
+                    boxShadow:text.trim()?'0 2px 8px rgba(192,57,43,0.3)':'none',
                   }}
                   onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
                   onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   {sending
-                    ? <Loader2 size={16} color="white" style={{ animation: 'spin 0.8s linear infinite' }} />
-                    : <Send size={15} color={text.trim() ? 'white' : '#BCC0C4'} />
+                    ? <Loader2 size={16} color="white" style={{ animation:'spin 0.8s linear infinite' }}/>
+                    : <Send size={15} color={text.trim()?'white':colors.textMut}/>
                   }
                 </button>
               </form>
@@ -274,64 +193,48 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       </div>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(100%) } to { opacity: 1; transform: translateX(-50%) translateY(0) } }
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes fadeIn  { from{opacity:0}to{opacity:1} }
+        @keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)}to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        @keyframes spin    { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
       `}</style>
     </>
   )
 }
 
-function CommentRow({ comment, isOwn, onDelete }) {
+function CommentRow({ comment, isOwn, onDelete, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
     <div
-      style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}
+      style={{ display:'flex',gap:10,alignItems:'flex-start' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <img
         src={comment.profiles?.avatar_url || dicebearUrl(comment.profiles?.display_name)}
-        style={{ width: 34, height: 34, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+        style={{ width:34,height:34,borderRadius:10,objectFit:'cover',flexShrink:0 }}
         alt=""
       />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          background: '#F0F2F5', borderRadius: '4px 16px 16px 16px',
-          padding: '8px 12px', display: 'inline-block', maxWidth: '100%',
-        }}>
-          <p style={{
-            margin: '0 0 3px',
-            fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: '#050505',
-          }}>
+      <div style={{ flex:1,minWidth:0 }}>
+        <div style={{ background:colors.surface,borderRadius:'4px 16px 16px 16px',padding:'8px 12px',display:'inline-block',maxWidth:'100%' }}>
+          <p style={{ margin:'0 0 3px',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>
             {comment.profiles?.display_name || 'Unknown'}
           </p>
-          <p style={{
-            margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 14,
-            color: '#1c1e21', lineHeight: 1.45, wordBreak: 'break-word',
-          }}>
+          <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textPri,lineHeight:1.45,wordBreak:'break-word' }}>
             {comment.content}
           </p>
         </div>
-        <p style={{
-          margin: '4px 0 0 4px',
-          fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4',
-        }}>
+        <p style={{ margin:'4px 0 0 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textMut }}>
           {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
         </p>
       </div>
       {isOwn && hovered && (
         <button
           onClick={onDelete}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: '#BCC0C4', padding: '4px', display: 'flex', flexShrink: 0,
-            transition: 'color 0.12s',
-          }}
+          style={{ background:'none',border:'none',cursor:'pointer',color:colors.textMut,padding:'4px',display:'flex',flexShrink:0,transition:'color 0.12s' }}
           onMouseEnter={e => e.currentTarget.style.color = '#C0392B'}
-          onMouseLeave={e => e.currentTarget.style.color = '#BCC0C4'}
+          onMouseLeave={e => e.currentTarget.style.color = colors.textMut}
         >
-          <Trash2 size={13} />
+          <Trash2 size={13}/>
         </button>
       )}
     </div>
