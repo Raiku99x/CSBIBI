@@ -25,6 +25,16 @@ function GoogleIcon() {
   )
 }
 
+function startCooldownTimer(setResendCooldown, seconds = 180) {
+  setResendCooldown(seconds)
+  const timer = setInterval(() => {
+    setResendCooldown(prev => {
+      if (prev <= 1) { clearInterval(timer); return 0 }
+      return prev - 1
+    })
+  }, 1000)
+}
+
 export default function AuthPage() {
   const [step, setStep]           = useState('choose')
   const [email, setEmail]         = useState('')
@@ -47,9 +57,12 @@ export default function AuthPage() {
   async function handleSendOTP(e) {
     e.preventDefault()
     if (!email.trim()) { toast.error('Enter your email'); return }
-    // Basic email format check
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       toast.error('Enter a valid email address')
+      return
+    }
+    if (resendCooldown > 0) {
+      toast.error(`Please wait ${Math.floor(resendCooldown / 60)}:${String(resendCooldown % 60).padStart(2, '0')} before resending.`)
       return
     }
     setLoading(true)
@@ -58,14 +71,10 @@ export default function AuthPage() {
       toast.success('Code sent! Check your email.')
       setStep('otp-verify')
       setOtpAttempts(0)
-      setResendCooldown(180)
-      const timer = setInterval(() => {
-        setResendCooldown(prev => {
-          if (prev <= 1) { clearInterval(timer); return 0 }
-          return prev - 1
-        })
-      }, 1000)
+      startCooldownTimer(setResendCooldown, 180)
     } catch (err) {
+      // Start cooldown even on Supabase rate limit error
+      startCooldownTimer(setResendCooldown, 180)
       toast.error(err.message || 'Failed to send code')
     } finally {
       setLoading(false)
@@ -77,7 +86,6 @@ export default function AuthPage() {
     const token = otp.join('')
     if (token.length !== 6) { toast.error('Enter the full 6-digit code'); return }
 
-    // Block after 5 failed attempts
     if (otpAttempts >= 5) {
       toast.error('Too many failed attempts. Request a new code.', { duration: 5000 })
       setStep('otp-email')
@@ -351,13 +359,14 @@ export default function AuthPage() {
                   </button>
                 </form>
 
-                <button onClick={e => { setOtpAttempts(0); handleSendOTP(e) }}
+                <button
+                  onClick={e => { setOtpAttempts(0); handleSendOTP(e) }}
                   disabled={loading || resendCooldown > 0}
                   style={{ width:'100%',marginTop:12,padding:'10px',borderRadius:10,border:'none',background:'transparent',cursor:resendCooldown>0?'default':'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:resendCooldown>0?'#BCC0C4':'#65676B',transition:'color 0.12s' }}
-                  onMouseEnter={e => { if(!resendCooldown) e.currentTarget.style.color=RED }}
+                  onMouseEnter={e => { if(!resendCooldown && !loading) e.currentTarget.style.color=RED }}
                   onMouseLeave={e => { if(!resendCooldown) e.currentTarget.style.color='#65676B' }}>
                   {resendCooldown > 0
-                    ? `Resend in ${Math.floor(resendCooldown/60)}:${String(resendCooldown%60).padStart(2,'0')}`
+                    ? `Resend in ${Math.floor(resendCooldown / 60)}:${String(resendCooldown % 60).padStart(2, '0')}`
                     : "Didn't receive it? Resend code"}
                 </button>
               </>
