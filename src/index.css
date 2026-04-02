@@ -5,10 +5,9 @@
 @tailwind utilities;
 
 /* ══════════════════════════════════════════════════════
-   LIGHT MODE — Warm neutral base, red/teal brand
+   LIGHT MODE — CSS CUSTOM PROPERTIES
    ══════════════════════════════════════════════════════ */
 :root {
-  /* Brand */
   --red:             #C0392B;
   --red-dark:        #922B21;
   --red-light:       #FADBD8;
@@ -19,7 +18,6 @@
   --blue:            #1A5276;
   --blue-light:      #D6EAF8;
 
-  /* Page structure */
   --page-bg:         #ECEEF1;
   --sidebar-bg:      #F4F5F7;
   --card-bg:         #FFFFFF;
@@ -28,29 +26,24 @@
   --surface-hover:   #E8EAEE;
   --surface-active:  #DDE0E6;
 
-  /* Borders */
   --border:          #E4E6EB;
   --border-strong:   #DADDE1;
   --border-subtle:   #ECEEF1;
 
-  /* Text */
-  --text-primary:    #0C0D0F;
-  --text-secondary:  #5A5C62;
-  --text-muted:      #9EA3AB;
+  --text-primary:    #050505;
+  --text-secondary:  #65676B;
+  --text-muted:      #BCC0C4;
   --text-disabled:   #BCC0C4;
 
-  /* Interactive */
   --input-bg:        #F7F8FA;
   --input-border:    #DADDE1;
   --input-focus:     var(--teal);
 
-  /* Shadows */
   --shadow-card:     0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-elevated: 0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
   --shadow-float:    0 16px 48px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08);
   --shadow-brand:    0 4px 14px rgba(192,57,43,0.28);
 
-  /* Status */
   --success:         #15803D;
   --success-bg:      #DCFCE7;
   --warning:         #B45309;
@@ -60,7 +53,6 @@
   --info:            var(--blue);
   --info-bg:         var(--blue-light);
 
-  /* Radius */
   --radius-sm:   6px;
   --radius-md:   10px;
   --radius-lg:   14px;
@@ -68,27 +60,21 @@
   --radius-2xl:  24px;
   --radius-full: 9999px;
 
-  /* Nav */
-  --nav-bg:          rgba(255,255,255,0.95);
+  --nav-bg:          rgba(255,255,255,0.97);
   --header-bg:       rgba(255,255,255,0.97);
 
-  /* Online indicator */
   --online-color:    #22C55E;
-
-  /* Notification badge */
   --badge-bg:        var(--red);
-
-  /* Scrollbar */
   --scrollbar-thumb: rgba(192,57,43,0.30);
   --scrollbar-hover: var(--red);
+  --chat-bg:         #E9EBEE;
 }
 
 /* ══════════════════════════════════════════════════════
-   DARK MODE — Deep charcoal, elevated surfaces
-   Inspired by Linear/Vercel dark themes — not just inverted light
+   DARK MODE — CSS CUSTOM PROPERTIES
+   All components that use var(--xxx) get dark mode free
    ══════════════════════════════════════════════════════ */
 [data-theme="dark"] {
-  /* Brand — slightly desaturated for dark comfort */
   --red:             #E05545;
   --red-dark:        #B8392B;
   --red-light:       rgba(224,85,69,0.15);
@@ -99,7 +85,6 @@
   --blue:            #5B9BD5;
   --blue-light:      rgba(91,155,213,0.14);
 
-  /* Page structure — layered depth system */
   --page-bg:         #111214;
   --sidebar-bg:      #161719;
   --card-bg:         #1C1D20;
@@ -108,48 +93,36 @@
   --surface-hover:   #2A2C30;
   --surface-active:  #313438;
 
-  /* Borders — luminous, not harsh */
   --border:          rgba(255,255,255,0.07);
   --border-strong:   rgba(255,255,255,0.11);
   --border-subtle:   rgba(255,255,255,0.04);
 
-  /* Text — warm whites, not stark */
   --text-primary:    #F0F1F3;
   --text-secondary:  #A3A7B0;
   --text-muted:      #6B6F78;
   --text-disabled:   #484C55;
 
-  /* Interactive */
   --input-bg:        #15161A;
   --input-border:    rgba(255,255,255,0.10);
   --input-focus:     var(--teal);
 
-  /* Shadows — glows, not black */
   --shadow-card:     0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
   --shadow-elevated: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
   --shadow-float:    0 20px 60px rgba(0,0,0,0.65), 0 4px 16px rgba(0,0,0,0.4);
   --shadow-brand:    0 4px 20px rgba(224,85,69,0.35);
 
-  /* Status — muted for dark */
   --success:         #4ADE80;
   --success-bg:      rgba(74,222,128,0.12);
   --warning:         #FCD34D;
   --warning-bg:      rgba(252,211,77,0.12);
-  --danger:          var(--red);
-  --danger-bg:       var(--red-light);
-  --info:            var(--blue);
-  --info-bg:         var(--blue-light);
 
-  /* Nav — glossy dark glass */
   --nav-bg:          rgba(22,23,25,0.96);
   --header-bg:       rgba(17,18,20,0.97);
 
-  /* Online */
   --online-color:    #4ADE80;
-
-  /* Scrollbar */
   --scrollbar-thumb: rgba(224,85,69,0.25);
   --scrollbar-hover: rgba(224,85,69,0.45);
+  --chat-bg:         #0F1012;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -172,40 +145,40 @@
     transition: background 0.2s ease, color 0.2s ease;
   }
 
-  /* Custom scrollbars */
   ::-webkit-scrollbar       { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; transition: background 0.15s; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
-
   * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 }
 
 /* ══════════════════════════════════════════════════════
-   DARK MODE COMPONENT OVERRIDES
-   All the inline-style components need these overrides
+   DARK MODE — STRUCTURAL OVERRIDES
+   Only target elements whose color comes from CSS, not JS inline styles.
+   Components using useDarkMode().colors handle themselves via JS.
    ══════════════════════════════════════════════════════ */
 
-/* Post cards */
-[data-theme="dark"] article {
-  background: var(--card-bg) !important;
+/* Header + nav use var() already via Layout.jsx dark computed styles,
+   but these catch any stragglers */
+[data-theme="dark"] header {
+  background: var(--header-bg) !important;
   border-color: var(--border) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-/* Comment sheet */
-[data-theme="dark"] [style*="background: white"],
-[data-theme="dark"] [style*="background:white"],
-[data-theme="dark"] [style*="background:'white'"] {
-  background: var(--card-bg) !important;
-}
-
-/* Feed compose card + all white cards */
-[data-theme="dark"] .csb-card-white {
-  background: var(--card-bg) !important;
+[data-theme="dark"] nav {
+  background: var(--nav-bg) !important;
   border-color: var(--border) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
-/* Input fields globally in dark mode */
+[data-theme="dark"] aside {
+  background: var(--sidebar-bg) !important;
+}
+
+/* Inputs — these work because they target element types, not inline style content */
 [data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
 [data-theme="dark"] textarea,
 [data-theme="dark"] select {
@@ -220,654 +193,102 @@
   color: var(--text-muted) !important;
 }
 
-/* Date/time inputs */
 [data-theme="dark"] input[type="date"],
 [data-theme="dark"] input[type="time"] {
   color-scheme: dark;
 }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SPECIFIC COMPONENT PATCHES
-   Targeting the hardcoded inline color values
-   ══════════════════════════════════════════════════════ */
-
-/* Header */
-[data-theme="dark"] header {
-  background: var(--header-bg) !important;
-  border-color: var(--border) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* Bottom nav */
-[data-theme="dark"] nav {
-  background: var(--nav-bg) !important;
-  border-color: var(--border) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-/* Sidebar */
-[data-theme="dark"] aside {
-  background: var(--sidebar-bg) !important;
-}
-
-/* All modals/sheets */
-[data-theme="dark"] [style*="position: fixed"][style*="background: white"],
-[data-theme="dark"] [style*="position:fixed"][style*="background:white"] {
-  background: var(--card-bg) !important;
-}
-
-/* Bottom sheets (comments, etc.) */
-[data-theme="dark"] [style*="borderRadius: '16px 16px 0 0'"],
-[data-theme="dark"] [style*='borderRadius: "16px 16px 0 0"'] {
-  background: var(--card-bg) !important;
-}
-
-/* Comment rows */
-[data-theme="dark"] [style*="background: '#F0F2F5'"],
-[data-theme="dark"] [style*='background: "#F0F2F5"'] {
-  background: var(--surface) !important;
-}
-
-/* Notification panel */
-[data-theme="dark"] [style*="background:cardBg"] {
-  background: var(--card-bg) !important;
-}
-
-/* Surface buttons / action areas */
-[data-theme="dark"] [style*="background: '#E4E6EB'"],
-[data-theme="dark"] [style*='background: "#E4E6EB"'],
-[data-theme="dark"] [style*="background:'#E4E6EB'"],
-[data-theme="dark"] [style*='background:"#E4E6EB"'] {
-  background: var(--surface) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F0F2F5'"],
-[data-theme="dark"] [style*='background: "#F0F2F5"'],
-[data-theme="dark"] [style*="background:'#F0F2F5'"],
-[data-theme="dark"] [style*='background:"#F0F2F5"'] {
-  background: var(--surface) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F7F8FA'"],
-[data-theme="dark"] [style*='background: "#F7F8FA"'],
-[data-theme="dark"] [style*="background:'#F7F8FA'"],
-[data-theme="dark"] [style*='background:"#F7F8FA"'] {
-  background: var(--input-bg) !important;
-}
-
-/* Text color overrides */
-[data-theme="dark"] [style*="color: '#050505'"],
-[data-theme="dark"] [style*='color: "#050505"'],
-[data-theme="dark"] [style*="color:'#050505'"],
-[data-theme="dark"] [style*='color:"#050505"'] {
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] [style*="color: '#1c1e21'"],
-[data-theme="dark"] [style*='color: "#1c1e21"'],
-[data-theme="dark"] [style*="color:'#1c1e21'"],
-[data-theme="dark"] [style*='color:"#1c1e21"'] {
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] [style*="color: '#65676B'"],
-[data-theme="dark"] [style*='color: "#65676B"'],
-[data-theme="dark"] [style*="color:'#65676B'"],
-[data-theme="dark"] [style*='color:"#65676B"'] {
-  color: var(--text-secondary) !important;
-}
-
-[data-theme="dark"] [style*="color: '#8A8D91'"],
-[data-theme="dark"] [style*='color: "#8A8D91"'],
-[data-theme="dark"] [style*="color:'#8A8D91'"],
-[data-theme="dark"] [style*='color:"#8A8D91"'] {
-  color: var(--text-muted) !important;
-}
-
-[data-theme="dark"] [style*="color: '#BCC0C4'"],
-[data-theme="dark"] [style*='color: "#BCC0C4"'],
-[data-theme="dark"] [style*="color:'#BCC0C4'"],
-[data-theme="dark"] [style*='color:"#BCC0C4"'] {
-  color: var(--text-disabled) !important;
-}
-
-/* Border overrides */
-[data-theme="dark"] [style*="borderColor: '#E4E6EB'"],
-[data-theme="dark"] [style*='borderColor: "#E4E6EB"'],
-[data-theme="dark"] [style*="border: '1px solid #E4E6EB'"],
-[data-theme="dark"] [style*='border: "1px solid #E4E6EB"'],
-[data-theme="dark"] [style*="border: '1px solid #DADDE1'"],
-[data-theme="dark"] [style*='border: "1px solid #DADDE1"'] {
-  border-color: var(--border) !important;
-}
-
-/* Dividers */
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="height: 1"],
-[data-theme="dark"] [style*='background: "#F0F2F5"'][style*="height: 1"],
-[data-theme="dark"] [style*="background: '#E4E6EB'"][style*="height: 1"],
-[data-theme="dark"] [style*='background: "#E4E6EB"'][style*="height: 1"] {
-  background: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — FEED PAGE COMPOSE BOX
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .csb-compose {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — MESSAGES / CHAT
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#E9EBEE'"] {
-  background: var(--page-bg) !important;
-}
-
-/* Chat bubbles from others */
-[data-theme="dark"] [style*="background: white"][style*="borderRadius"][style*="18px"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
-}
-
-/* Inbox background */
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="flex: 1"] {
-  background: var(--page-bg) !important;
-}
-
-/* ConvoRow white bg */
-[data-theme="dark"] [style*="background: white"][style*="borderBottom: '1px solid #F0F2F5'"] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — DEADLINES PAGE
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: white"][style*="borderRadius: 12"] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — PROFILE & AUTH PAGES
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FAFAFA'"] {
-  background: var(--surface) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F7F8FA'"] {
-  background: var(--input-bg) !important;
-}
-
-/* Auth page card */
-[data-theme="dark"] [style*="background: 'rgba(255,255,255,0.88)'"],
-[data-theme="dark"] [style*='background: "rgba(255,255,255,0.88)"'] {
-  background: rgba(28, 30, 34, 0.96) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SEARCH OVERLAY
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="position: 'fixed'"][style*="background: '#E9EBEE'"],
-[data-theme="dark"] [style*='position: "fixed"'][style*='background: "#E9EBEE"'] {
-  background: var(--page-bg) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SKELETON LOADERS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .shimmer,
-[data-theme="dark"] [style*="background: 'linear-gradient(90deg, #F0F2F5"] {
-  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%) !important;
-  background-size: 200% 100% !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SHARE SHEET
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: white"][style*="borderRadius: 14"] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — ADMIN DASHBOARD
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="position: 'fixed'"],
-[data-theme="dark"] [style*='background: "#F0F2F5"'][style*='position: "fixed"'] {
-  background: var(--page-bg) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — POST CARD BANNERS (keep gradient)
-   Status bars retain brand colors
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF8E1'"] {
-  background: rgba(252,211,77,0.08) !important;
-  border-color: rgba(252,211,77,0.2) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F8FAFC'"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F0FDF4'"] {
-  background: rgba(74,222,128,0.08) !important;
-  border-color: rgba(74,222,128,0.2) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — MENU DROPDOWNS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'white'"][style*="borderRadius: 10"][style*="boxShadow"],
-[data-theme="dark"] [style*='background: "white"'][style*="borderRadius: 10"][style*="boxShadow"] {
-  background: var(--card-bg) !important;
-  border-color: var(--border-strong) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — NOTIFICATION PANEL  
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF8F8'"] {
-  background: rgba(224,85,69,0.07) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — QUOTE BLOCKS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF5F5'"],
-[data-theme="dark"] [style*="background: '#FFF8F8'"] {
-  background: rgba(224,85,69,0.06) !important;
-}
-
-[data-theme="dark"] [style*="background: '#EBF5FB'"] {
-  background: rgba(91,155,213,0.10) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F7F9FC'"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — CODE GATE / ONBOARDING
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .csb-outer {
-  background:
-    radial-gradient(ellipse 70% 50% at 95% 5%, rgba(224,85,69,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 5% 90%, rgba(44,181,186,0.07) 0%, transparent 60%),
-    var(--page-bg) !important;
-}
-
-[data-theme="dark"] .csb-card {
-  background: rgba(28,30,34,0.97) !important;
-  border-color: var(--border-strong) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SUBJECTS / ENROLLED PAGE
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FAFAFA'"][style*="borderBottom"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — MODALS (AboutModal, etc.)
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="borderRadius: 20"][style*="overflow: 'hidden'"][style*="boxShadow"] {
-  background: var(--card-bg) !important;
-}
-
-/* Info rows in modals */
-[data-theme="dark"] [style*="borderBottom: '1px solid var(--border"] {
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SYSTEM BANNER (keep branded gradient)
-   ══════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — ANNOUNCEMENT TYPES / ADMIN CARDS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'white'"][style*="borderRadius: 12"][style*="border: '1px solid #DADDE1'"],
-[data-theme="dark"] [style*='background: "white"'][style*="borderRadius: 12"][style*='border: "1px solid #DADDE1"'] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-[data-theme="dark"] [style*="background: 'white'"][style*="borderRadius: 10"],
-[data-theme="dark"] [style*='background: "white"'][style*="borderRadius: 10"] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — MAINTENANCE / BANNED SCREENS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="minHeight: '100vh'"],
-[data-theme="dark"] [style*='background: "#F0F2F5"'][style*='minHeight: "100vh"'] {
-  background: var(--page-bg) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SAVED / LIKED POSTS PAGES
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'var(--page-bg, #F0F2F5)'"],
-[data-theme="dark"] [style*='background: "var(--page-bg, #F0F2F5)"'] {
-  background: var(--page-bg) !important;
-}
-
-[data-theme="dark"] [style*="background: 'var(--card-bg, white)'"],
-[data-theme="dark"] [style*='background: "var(--card-bg, white)"'] {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — PROFILE PAGE COVER
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="height: 100"][style*="background: 'linear-gradient(135deg, #0D7377"] {
-  /* keep the teal gradient — it looks great in dark mode */
-}
-
-/* Profile form fields */
-[data-theme="dark"] [style*="borderRadius: 12"][style*="border: '1.5px solid"] {
-  background: var(--input-bg) !important;
-  border-color: var(--input-border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — EMOJI / STATUS TILES
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF7ED'"] {
-  background: rgba(252,211,77,0.08) !important;
-  border-color: rgba(252,211,77,0.18) !important;
-}
-
-[data-theme="dark"] [style*="background: '#FFFBEB'"],
-[data-theme="dark"] [style*="background: '#FEF3C7'"],
-[data-theme="dark"] [style*="background: '#FEF9C3'"] {
-  background: rgba(252,211,77,0.10) !important;
-  border-color: rgba(252,211,77,0.20) !important;
-}
-
-[data-theme="dark"] [style*="color: '#92400E'"] {
-  color: #FCD34D !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — USER PROFILE PANEL
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="position: 'fixed'"][style*="right: 0"] {
-  background: var(--page-bg) !important;
-}
-
-[data-theme="dark"] [style*="background: 'white'"][style*="margin: '0 0 8px'"] {
-  background: var(--card-bg) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — LIGHTBOX
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'rgba(0,0,0,0.94)'"] {
-  background: rgba(0,0,0,0.97) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — FILE ATTACHMENT CARDS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F7F9FC'"],
-[data-theme="dark"] [style*='background: "#F7F9FC"'] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-[data-theme="dark"] a[style*="background: '#F7F9FC'"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — APPS PAGE
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] a[style*="background: '#F7F8FA'"][style*="borderRadius: 10"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-[data-theme="dark"] a[style*="background: '#E6F4F4'"] {
-  background: var(--teal-light) !important;
-  border-color: var(--teal-dark) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — MUTE BANNER IN FEED
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF7ED'"][style*="border: '1px solid #FED7AA'"] {
-  background: rgba(252,211,77,0.07) !important;
-  border-color: rgba(252,211,77,0.18) !important;
-  border-left-color: #C2410C !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SUBJECT CHIPS IN CODE GATE
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .subject-chip {
-  background: var(--card-bg) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .subject-chip:hover {
-  border-color: var(--teal) !important;
-  background: var(--teal-light) !important;
-}
-
-[data-theme="dark"] .subject-chip.selected {
-  border-color: var(--teal) !important;
-  background: var(--teal-light) !important;
-  color: var(--teal) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — OTP INPUT (AUTH)
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .otp-input {
-  background: var(--surface) !important;
-  border-color: var(--border-strong) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .otp-input:focus {
-  border-color: var(--red) !important;
-  background: var(--card-bg) !important;
-  box-shadow: 0 0 0 3px rgba(224,85,69,0.18) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — CSB INPUTS (CODE GATE)
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] .csb-input {
-  background: var(--surface) !important;
-  border-color: var(--border-strong) !important;
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .csb-input:focus {
-  background: var(--card-bg) !important;
-  border-color: var(--teal) !important;
-  box-shadow: 0 0 0 3px rgba(44,181,186,0.15) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — STEP BAR (CODE GATE)
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#E5E7EB'"][style*="flex: 1"][style*="height: 2"] {
-  background: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — DEADLINES PAGE CALENDAR TILES
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FADBD8'"][style*="border: '1px solid #F5B7B1'"] {
-  background: rgba(224,85,69,0.12) !important;
-  border-color: rgba(224,85,69,0.25) !important;
-}
-
-[data-theme="dark"] [style*="background: '#D6EAF8'"][style*="border"],
-[data-theme="dark"] [style*="background: '#AED6F1'"] {
-  background: rgba(91,155,213,0.12) !important;
-  border-color: rgba(91,155,213,0.25) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F0F2F5'"][style*="border: '1px solid #E4E6EB'"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-/* Done button in deadlines */
-[data-theme="dark"] [style*="background: '#F0FDF4'"][style*="color: '#4ade80'"] {
-  background: rgba(74,222,128,0.08) !important;
-  outline-color: rgba(74,222,128,0.2) !important;
-}
-
-[data-theme="dark"] [style*="background: '#FFF1F2'"][style*="color: '#e11d48'"] {
-  background: rgba(224,85,69,0.08) !important;
-  outline-color: rgba(224,85,69,0.2) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SEARCH FILTER PILLS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'white'"][style*="borderRadius: '20px'"],
-[data-theme="dark"] [style*='background: "white"'][style*='borderRadius: "20px"'] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text-secondary) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SIDEBAR SCROLL
-   ══════════════════════════════════════════════════════ */
+/* Sidebar scrollbar dark */
 [data-theme="dark"] .csb-sidebar-scroll::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.08);
 }
-
 [data-theme="dark"] .csb-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.15);
 }
 
 /* ══════════════════════════════════════════════════════
-   DARK MODE — LIKED/SAVED POSTS HEADER
+   COMPONENT CLASSES
+   These are referenced in JSX via className, so they work perfectly in dark mode
    ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'var(--surface, #E4E6EB)'"] {
-  background: var(--surface) !important;
+
+/* Post cards */
+.csb-post-card {
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+  position: relative;
 }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — PINNED/OFFICIAL/LOCKED POST BARS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#FFF8E1'"][style*="borderBottom: '1px solid #FFE082'"] {
-  background: rgba(252,211,77,0.07) !important;
-  border-color: rgba(252,211,77,0.15) !important;
-}
-
-[data-theme="dark"] [style*="background: '#F0FDF4'"][style*="borderBottom: '1px solid #BBF7D0'"] {
-  background: rgba(74,222,128,0.07) !important;
-  border-color: rgba(74,222,128,0.15) !important;
-}
-
-/* Locked bar */
-[data-theme="dark"] [style*="background: '#F8FAFC'"][style*="borderBottom: '1px solid #E2E8F0'"] {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — EMOJI STATES IN EMPTY STATES
-   ══════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — TOAST NOTIFICATIONS (already dark — keep)
-   ══════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — PRESENCE / ONLINE SIDEBAR
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: 'white'"][style*="borderRadius: 10"][style*="marginBottom: 2"] {
+/* Compose card */
+.csb-compose {
   background: var(--card-bg) !important;
   border-color: var(--border) !important;
 }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — REPORT (About) MODAL INFO ROWS
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="borderBottom: '1px solid var(--border"] {
-  border-color: var(--border) !important;
+/* Chat bubbles */
+.csb-chat-bg {
+  background: var(--chat-bg);
 }
 
-/* Force dark on var(--card-bg, white) pattern */
-[data-theme="dark"] [style*="background: 'var(--card-bg, white)'"] {
-  background: var(--card-bg) !important;
+.csb-bubble-other {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SCHEDULED BADGE
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F5F3FF'"][style*="borderTop"][style*="7C3AED"] {
-  background: rgba(124,58,237,0.10) !important;
-  border-color: rgba(124,58,237,0.25) !important;
+/* Subject chips in CodeGate */
+.subject-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Instrument Sans', system-ui;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+.subject-chip:hover {
+  border-color: var(--teal);
+  background: var(--teal-light);
+}
+.subject-chip.selected {
+  border-color: var(--teal);
+  background: var(--teal-light);
+  color: var(--teal);
 }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SCHEDULE POST SECTION
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F5F3FF'"][style*="border: '1.5px solid #DDD6FE'"] {
-  background: rgba(124,58,237,0.08) !important;
-  border-color: rgba(124,58,237,0.22) !important;
-}
-
-/* ══════════════════════════════════════════════════════
-   DARK MODE — QUOTE ATTACH BUTTON
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] [style*="background: '#F7F8FA'"][style*="border: '1.5px solid #E4E6EB'"][style*="cursor: 'pointer'"] {
+/* OTP inputs in auth */
+.otp-input {
   background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text-secondary) !important;
+  border: 1.5px solid var(--border-strong) !important;
+  color: var(--text-primary) !important;
+}
+.otp-input:focus {
+  border-color: var(--red) !important;
+  background: var(--card-bg) !important;
+  box-shadow: 0 0 0 3px rgba(192,57,43,0.15) !important;
 }
 
-/* ══════════════════════════════════════════════════════
-   ANIMATIONS
-   ══════════════════════════════════════════════════════ */
-@keyframes fadeIn    { from { opacity: 0 } to { opacity: 1 } }
-@keyframes slideUp   { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes scaleIn   { from { opacity: 0; transform: scale(0.95) } to { opacity: 1; transform: scale(1) } }
-@keyframes shimmer   { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
-@keyframes spin      { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-@keyframes pulse-dot { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
-
-.animate-fade-in   { animation: fadeIn 0.25s ease-out forwards; }
-.animate-slide-up  { animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
-.animate-slide-down{ animation: slideDown 0.2s ease-out forwards; }
-.animate-scale-in  { animation: scaleIn 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-
-.shimmer {
-  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+/* CSB generic inputs */
+.csb-input {
+  background: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--text-primary) !important;
+}
+.csb-input:focus {
+  background: var(--card-bg) !important;
+  border-color: var(--teal) !important;
+  box-shadow: 0 0 0 3px rgba(13,115,119,0.15) !important;
 }
 
-/* ══════════════════════════════════════════════════════
-   UTILITY CLASSES
-   ══════════════════════════════════════════════════════ */
+/* Card with var-based colors */
 .card {
   background: var(--card-bg);
   border-radius: var(--radius-md);
@@ -882,6 +303,18 @@
   box-shadow: var(--shadow-elevated);
 }
 
+/* ══════════════════════════════════════════════════════
+   SIDEBAR SCROLLBAR
+   ══════════════════════════════════════════════════════ */
+.csb-sidebar-scroll::-webkit-scrollbar       { width: 4px; }
+.csb-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.csb-sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+.csb-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.csb-sidebar-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* ══════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ══════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -899,7 +332,7 @@
   transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
   box-shadow: var(--shadow-brand);
 }
-.btn-primary:hover  { background: var(--red-dark); box-shadow: 0 6px 20px rgba(192,57,43,0.4); }
+.btn-primary:hover  { background: var(--red-dark); }
 .btn-primary:active { transform: scale(0.97); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 
@@ -962,26 +395,23 @@
 }
 
 /* ══════════════════════════════════════════════════════
-   SIDEBAR SCROLLBAR STYLES
+   ANIMATIONS
    ══════════════════════════════════════════════════════ */
-.csb-sidebar-scroll::-webkit-scrollbar       { width: 4px; }
-.csb-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-.csb-sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
-.csb-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-.csb-sidebar-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+@keyframes fadeIn    { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp   { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes scaleIn   { from { opacity: 0; transform: scale(0.95) } to { opacity: 1; transform: scale(1) } }
+@keyframes shimmer   { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+@keyframes spin      { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
 
-/* ══════════════════════════════════════════════════════
-   DARK MODE — SMOOTH TRANSITIONS
-   Apply to key structural elements for buttery toggle
-   ══════════════════════════════════════════════════════ */
-[data-theme="dark"] * {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.15s;
-  transition-timing-function: ease;
-}
+.animate-fade-in    { animation: fadeIn 0.25s ease-out forwards; }
+.animate-slide-up   { animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+.animate-slide-down { animation: slideDown 0.2s ease-out forwards; }
+.animate-scale-in   { animation: scaleIn 0.2s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 
-/* But don't transition transforms/opacity (breaks animations) */
-[data-theme="dark"] [style*="animation"],
-[data-theme="dark"] [class*="animate"] {
-  transition-property: background-color, border-color, color;
+.shimmer {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }
