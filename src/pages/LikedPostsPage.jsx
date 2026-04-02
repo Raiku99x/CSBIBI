@@ -34,7 +34,7 @@ export default function LikedPostsPage({ onClose }) {
       if (!likes?.length) { setLoading(false); return }
       const ids = likes.map(l => l.post_id)
       const { data } = await supabase
-        .from('posts').select('*, profiles(*), subjects(*)')
+        .from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .in('id', ids).order('created_at', { ascending: false })
       if (data) setPosts(data)
       setLoading(false)
