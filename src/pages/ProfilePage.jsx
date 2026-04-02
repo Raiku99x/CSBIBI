@@ -29,6 +29,12 @@ export default function ProfilePage() {
 
   // Detect unsaved changes
   const nameChanged = displayName.trim() !== (profile?.display_name || '')
+
+  const lastNameChange = profile?.display_name_changed_at ? new Date(profile.display_name_changed_at) : null
+  const daysSinceChange = lastNameChange ? Math.floor((Date.now() - lastNameChange) / (1000 * 60 * 60 * 24)) : 999
+  const canChangeName = daysSinceChange >= 20
+  const daysLeft = 20 - daysSinceChange
+  
   const hasUnsavedChanges = nameChanged || !!pendingAvatarFile
 
   function handleBack() {
@@ -62,6 +68,10 @@ export default function ProfilePage() {
   async function handleSave(e) {
     e.preventDefault()
     if (!displayName.trim()) { toast.error('Name cannot be empty'); return }
+    if (nameChanged && !canChangeName) {
+      toast.error(`You can only change your display name every 20 days. ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining.`, { duration: 4000 })
+      return
+    }
     setSaving(true)
     try {
       let newAvatarUrl = profile?.avatar_url
@@ -86,7 +96,11 @@ export default function ProfilePage() {
         }
       }
 
-      await updateProfile({ display_name: displayName.trim(), avatar_url: newAvatarUrl })
+      await updateProfile({
+        display_name: displayName.trim(),
+        avatar_url: newAvatarUrl,
+        ...(nameChanged ? { display_name_changed_at: new Date().toISOString() } : {}),
+      })
 
       // Clear pending state
       setPendingAvatarFile(null)
@@ -227,6 +241,17 @@ export default function ProfilePage() {
               />
             </FormField>
 
+            {nameChanged && !canChangeName && (
+              <p style={{ margin:'-10px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:12, fontWeight:600, color:'#C2410C' }}>
+                ⏳ You can change your name again in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+              </p>
+            )}
+            {canChangeName && lastNameChange && (
+              <p style={{ margin:'-10px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#8A8D91' }}>
+                Last changed {daysSinceChange} days ago
+              </p>
+            )}
+            
             <FormField label="Username" icon={<span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:15, color:'#BCC0C4', fontWeight:600 }}>@</span>} disabled>
               <input type="text" value={profile?.username || '—'} disabled
                 style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: '"Instrument Sans", system-ui', fontSize: 15, color: '#BCC0C4' }}
