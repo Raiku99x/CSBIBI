@@ -117,16 +117,15 @@ function buildMessengerText(post) {
 
   // ── Header line ──
   if (subType === 'deadline') {
-    lines.push(`📅 Deadline${subject ? ` — ${subject}` : ''}`)
+    lines.push(`📅 DEADLINE${subject ? ` — ${subject}` : ''}`)
   } else if (subType === 'reminder') {
-    lines.push(`🔔 Reminder${subject ? ` — ${subject}` : ''}`)
+    lines.push(`🔔 REMINDER${subject ? ` — ${subject}` : ''}`)
   } else if (subType === 'material') {
-    lines.push(`📁 New Material${subject ? ` — ${subject}` : ''}`)
+    lines.push(`📁 NEW MATERIAL${subject ? ` — ${subject}` : ''}`)
   } else if (subType === 'announcement' || postType === 'announcement') {
-    lines.push(`📢 Announcement${subject ? ` — ${subject}` : ' — General'}`)
+    lines.push(`📢 ANNOUNCEMENT${subject ? ` — ${subject}` : ' — General'}`)
   } else {
-    // status
-    lines.push(`💬 ${author} posted a status`)
+    lines.push(`💬 STATUS — ${author}`)
   }
 
   // ── Announcement type tag ──
