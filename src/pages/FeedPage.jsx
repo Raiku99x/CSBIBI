@@ -75,7 +75,7 @@ export default function FeedPage() {
 
   // Scroll to and highlight the target post — retries until element is in DOM
   useEffect(() => {
-    if (!targetPostId || loading) return
+    if (!targetPostId) return
     let attempts = 0
     const timer = setInterval(() => {
       const el = document.getElementById('post-' + targetPostId)
