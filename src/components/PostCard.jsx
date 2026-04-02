@@ -1,6 +1,7 @@
 import { useSavedPosts } from '../contexts/SavedPostsContext'
 import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
+import { useDarkMode } from '../contexts/DarkModeContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatDistanceToNow, format, isPast } from 'date-fns'
 import {
@@ -35,11 +36,11 @@ function formatTime12(timeStr) {
 }
 
 function getBanner(subType, postType) {
-  if (subType === 'deadline')      return { bg: `linear-gradient(90deg,#B03A2E,#922B21)`, label: 'DEADLINE',      icon: <Clock size={12} color="white" /> }
-  if (subType === 'reminder')      return { bg: `linear-gradient(90deg,${RED},#A93226)`,  label: 'REMINDER',      icon: <Bell size={12} color="white" /> }
-  if (subType === 'material')      return { bg: `linear-gradient(90deg,${BLUE},#154360)`, label: 'MATERIAL',      icon: <FileText size={12} color="white" /> }
-  if (subType === 'announcement')  return { bg: `linear-gradient(90deg,${RED},${BLUE})`,  label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
-  if (postType === 'announcement') return { bg: `linear-gradient(90deg,${RED},${BLUE})`,  label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
+  if (subType === 'deadline')      return { bg: `linear-gradient(90deg,#B03A2E,#922B21)`,    label: 'DEADLINE',      icon: <Clock size={12} color="white" /> }
+  if (subType === 'reminder')      return { bg: `linear-gradient(90deg,${RED},#A93226)`,      label: 'REMINDER',      icon: <Bell size={12} color="white" /> }
+  if (subType === 'material')      return { bg: `linear-gradient(90deg,${BLUE},#154360)`,     label: 'MATERIAL',      icon: <FileText size={12} color="white" /> }
+  if (subType === 'announcement')  return { bg: `linear-gradient(90deg,${RED},${BLUE})`,      label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
+  if (postType === 'announcement') return { bg: `linear-gradient(90deg,${RED},${BLUE})`,      label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
   return null
 }
 
@@ -86,7 +87,6 @@ function parseQuoted(raw) {
   } catch { return { from: '', message: raw } }
 }
 
-// ── Messenger text formatter ──────────────────────────────────
 function buildMessengerText(post) {
   const subType   = post.sub_type
   const postType  = post.post_type
@@ -96,9 +96,8 @@ function buildMessengerText(post) {
   const annType   = post.announcement_type || null
   const dueDate   = post.due_date || null
   const dueTime   = post.due_time || null
-  const shortId  = post.short_id || post.id.replace(/-/g, '').slice(0, 4)
-  const shareUrl = `${window.location.origin}/p/${shortId}`
-
+  const shortId   = post.short_id || post.id.replace(/-/g, '').slice(0, 4)
+  const shareUrl  = `${window.location.origin}/p/${shortId}`
   const photos    = parsePhotos(post.photo_url)
   const files     = parseFiles(post.file_url, post.file_name)
   const quoted    = parseQuoted(post.quoted_message)
@@ -114,106 +113,59 @@ function buildMessengerText(post) {
   )
 
   const lines = []
+  if (subType === 'deadline')             lines.push(`📅 DEADLINE${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'reminder')        lines.push(`🔔 REMINDER${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'material')        lines.push(`📁 NEW MATERIAL${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'announcement' || postType === 'announcement') lines.push(`📢 ANNOUNCEMENT${subject ? ` — ${subject}` : ' — General'}`)
+  else                                    lines.push(`💬 STATUS — ${author}`)
 
-  // ── Header line ──
-  if (subType === 'deadline') {
-    lines.push(`📅 DEADLINE${subject ? ` — ${subject}` : ''}`)
-  } else if (subType === 'reminder') {
-    lines.push(`🔔 REMINDER${subject ? ` — ${subject}` : ''}`)
-  } else if (subType === 'material') {
-    lines.push(`📁 NEW MATERIAL${subject ? ` — ${subject}` : ''}`)
-  } else if (subType === 'announcement' || postType === 'announcement') {
-    lines.push(`📢 ANNOUNCEMENT${subject ? ` — ${subject}` : ' — General'}`)
-  } else {
-    lines.push(`💬 STATUS — ${author}`)
-  }
-
-  // ── Announcement type tag ──
   if (annType) lines.push(`🏷️ ${annType}`)
-
-  // ── Due date ──
   if (dueDate) {
     const [y, mo, d] = dueDate.split('-').map(Number)
     const formatted = format(new Date(y, mo - 1, d), 'MMM d, yyyy')
     const timeStr = dueTime ? ` · ${formatTime12(dueTime)}` : ''
     lines.push(`⏰ Due: ${formatted}${timeStr}`)
   }
-
-  // ── Past due warning ──
   if (isPastDue) lines.push(`⚠️ PAST DUE`)
-
-  // ── Blank line then caption ──
-  if (caption.trim()) {
-    lines.push('')
-    lines.push(caption.trim())
-  }
-
-  // ── Quoted message ──
+  if (caption.trim()) { lines.push(''); lines.push(caption.trim()) }
   if (quoted && quoted.message) {
-    const msgText = quoted.message
-    const fromLabel = quoted.from ? `From ${quoted.from}` : 'Quoted message'
     const divider = '─'.repeat(17)
     lines.push(divider)
-    lines.push(`💬 ${fromLabel}:`)
-    lines.push(`"${msgText}"`)
+    lines.push(`💬 ${quoted.from ? `From ${quoted.from}` : 'Quoted message'}:`)
+    lines.push(`"${quoted.message}"`)
     lines.push(divider)
   }
-
-  // ── Photos ──
-  if (photos.length > 0) {
-    lines.push('')
-    lines.push(`📸 ${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`)
-  }
-
-  // ── Files ──
-  if (files.length > 0) {
-    lines.push('')
-    lines.push(`📎 ${files.length} file${files.length !== 1 ? 's' : ''}:`)
-    files.forEach(f => lines.push(`   • ${f.name}`))
-  }
-
-  // ── Author (for non-status) ──
-  if (subType !== 'status' && postType !== 'status') {
-    lines.push('')
-    lines.push(`👤 ${author}`)
-  }
-
-  // ── Link ──
+  if (photos.length > 0) { lines.push(''); lines.push(`📸 ${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`) }
+  if (files.length > 0) { lines.push(''); lines.push(`📎 ${files.length} file${files.length !== 1 ? 's' : ''}:`); files.forEach(f => lines.push(`   • ${f.name}`)) }
+  if (subType !== 'status' && postType !== 'status') { lines.push(''); lines.push(`👤 ${author}`) }
   lines.push(`🔗 ${shareUrl.replace('https://', '')}`)
-
   return lines.join('\n')
 }
 
-// ── Share Option Row ──────────────────────────────────────────
 function ShareOption({ icon, label, sublabel, onClick, success }) {
   const [hovered, setHovered] = useState(false)
+  const { colors } = useDarkMode()
   return (
     <button onClick={onClick}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-        padding: '10px 12px', border: 'none', cursor: 'pointer',
-        background: hovered ? (success ? '#F0FDF4' : '#F7F8FA') : 'transparent',
-        borderRadius: 8, textAlign: 'left', transition: 'background 0.1s',
-      }}>
-      <div style={{ width: 34, height: 34, borderRadius: 9, background: success ? '#DCFCE7' : '#F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}>
+      style={{ width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 12px',border:'none',cursor:'pointer',background:hovered?(success?'rgba(22,163,74,0.08)':colors.surface):'transparent',borderRadius:8,textAlign:'left',transition:'background 0.1s' }}>
+      <div style={{ width:34,height:34,borderRadius:9,background:success?'rgba(22,163,74,0.12)':colors.surface,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
         {icon}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: success ? '#16a34a' : '#050505' }}>{label}</p>
-        {sublabel && <p style={{ margin: '1px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#8A8D91' }}>{sublabel}</p>}
+      <div style={{ flex:1,minWidth:0 }}>
+        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:success?'#16a34a':colors.textPri }}>{label}</p>
+        {sublabel && <p style={{ margin:'1px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textSec }}>{sublabel}</p>}
       </div>
       {success && <Check size={14} color="#16a34a"/>}
     </button>
   )
 }
 
-// ── Share Sheet ───────────────────────────────────────────────
 function ShareSheet({ post, onClose, anchorRef }) {
-  const [copiedLink, setCopiedLink]         = useState(false)
+  const [copiedLink, setCopiedLink]           = useState(false)
   const [copiedMessenger, setCopiedMessenger] = useState(false)
+  const { colors } = useDarkMode()
   const sheetRef = useRef()
-
   const shareUrl = `${window.location.origin}/?post=${post.id}`
 
   useEffect(() => {
@@ -228,22 +180,12 @@ function ShareSheet({ post, onClose, anchorRef }) {
   }, [onClose])
 
   async function handleNativeShare() {
-    try {
-      await navigator.share({
-        title: 'CSB Post',
-        text: post.caption || '',
-        url: shareUrl,
-      })
-      onClose()
-    } catch {}
+    try { await navigator.share({ title:'CSB Post', text:post.caption||'', url:shareUrl }); onClose() } catch {}
   }
 
   async function handleCopyLink() {
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = shareUrl
+    try { await navigator.clipboard.writeText(shareUrl) } catch {
+      const ta = document.createElement('textarea'); ta.value = shareUrl
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
     }
     setCopiedLink(true)
@@ -252,11 +194,8 @@ function ShareSheet({ post, onClose, anchorRef }) {
 
   async function handleCopyMessenger() {
     const text = buildMessengerText(post)
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = text
+    try { await navigator.clipboard.writeText(text) } catch {
+      const ta = document.createElement('textarea'); ta.value = text
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
     }
     setCopiedMessenger(true)
@@ -266,68 +205,32 @@ function ShareSheet({ post, onClose, anchorRef }) {
 
   return (
     <div ref={sheetRef} style={{
-      position: 'absolute',
-      bottom: 'calc(100% + 8px)',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      width: 230,
-      background: 'white',
-      borderRadius: 14,
-      border: '1px solid #E4E6EB',
-      boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
-      overflow: 'hidden',
-      zIndex: 30,
-      animation: 'slideUp 0.18s ease',
+      position:'absolute', bottom:'calc(100% + 8px)', left:'50%', transform:'translateX(-50%)',
+      width:230, background:colors.cardBg, borderRadius:14, border:`1px solid ${colors.border}`,
+      boxShadow:'0 8px 28px rgba(0,0,0,0.14)', overflow:'hidden', zIndex:30, animation:'slideUp 0.18s ease',
     }}>
-      {/* Header */}
-      <div style={{ padding: '11px 14px 8px', borderBottom: '1px solid #F0F2F5', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 13, color: '#050505' }}>Share post</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 2 }}>
-          <X size={13} color="#65676B" />
+      <div style={{ padding:'11px 14px 8px',borderBottom:`1px solid ${colors.border}`,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+        <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>Share post</span>
+        <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',display:'flex',padding:2 }}>
+          <X size={13} color={colors.textSec} />
         </button>
       </div>
-
-      {/* Options */}
-      <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-
-        {/* Native share — mobile only */}
+      <div style={{ padding:6,display:'flex',flexDirection:'column',gap:2 }}>
         {!!navigator.share && (
-          <ShareOption
-            icon={<Share2 size={16} color="#65676B"/>}
-            label="More options…"
-            onClick={handleNativeShare}
-          />
+          <ShareOption icon={<Share2 size={16} color={colors.textSec}/>} label="More options…" onClick={handleNativeShare}/>
         )}
-
-        {/* Copy link */}
+        <ShareOption icon={copiedLink?<Check size={16} color="#16a34a"/>:<Link size={16} color={colors.textSec}/>} label={copiedLink?'Link copied!':'Copy link'} sublabel="Share anywhere" onClick={handleCopyLink} success={copiedLink}/>
+        <div style={{ height:1,background:colors.border,margin:'2px 0' }}/>
         <ShareOption
-          icon={copiedLink ? <Check size={16} color="#16a34a"/> : <Link size={16} color="#65676B"/>}
-          label={copiedLink ? 'Link copied!' : 'Copy link'}
-          sublabel="Share anywhere"
-          onClick={handleCopyLink}
-          success={copiedLink}
-        />
-
-        {/* Divider */}
-        <div style={{ height: 1, background: '#F0F2F5', margin: '2px 0' }}/>
-
-        {/* Copy for Messenger */}
-        <ShareOption
-          icon={copiedMessenger
-            ? <Check size={16} color="#16a34a"/>
-            : <MessageCircleMore size={16} color="#0084FF"/>
-          }
-          label={copiedMessenger ? 'Copied!' : 'Copy for Messenger'}
-          sublabel="Formatted text + link"
-          onClick={handleCopyMessenger}
-          success={copiedMessenger}
+          icon={copiedMessenger?<Check size={16} color="#16a34a"/>:<MessageCircleMore size={16} color="#0084FF"/>}
+          label={copiedMessenger?'Copied!':'Copy for Messenger'} sublabel="Formatted text + link"
+          onClick={handleCopyMessenger} success={copiedMessenger}
         />
       </div>
     </div>
   )
 }
 
-// ── Lightbox ──────────────────────────────────────────────────
 function Lightbox({ photos, initialIndex, onClose }) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
   useEffect(() => {
@@ -342,9 +245,9 @@ function Lightbox({ photos, initialIndex, onClose }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [photos.length])
+  }, [photos.length, onClose])
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.94)',display:'flex',alignItems:'center',justifyContent:'center' }}
+    <div style={{ position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.96)',display:'flex',alignItems:'center',justifyContent:'center' }}
       onClick={e => { if(e.target===e.currentTarget) onClose() }}>
       <button onClick={onClose} style={{ position:'absolute',top:14,right:14,width:38,height:38,borderRadius:9,background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={17} color="white"/></button>
       {photos.length > 1 && <div style={{ position:'absolute',top:18,left:'50%',transform:'translateX(-50%)',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',color:'white',fontSize:12,fontWeight:600,fontFamily:'"Instrument Sans",system-ui',padding:'4px 12px',borderRadius:20 }}>{activeIdx+1}/{photos.length}</div>}
@@ -357,7 +260,6 @@ function Lightbox({ photos, initialIndex, onClose }) {
   )
 }
 
-// ── Photo Grid ────────────────────────────────────────────────
 function PhotoGrid({ photos, onPhotoClick }) {
   const display = photos.slice(0, 5)
   const remaining = photos.length - 5
@@ -370,37 +272,36 @@ function PhotoGrid({ photos, onPhotoClick }) {
     </div>
   )
   const count = display.length
-  if (count===1) return <div onClick={()=>onPhotoClick(0)} style={{cursor:'pointer',overflow:'hidden',maxHeight:380}} onMouseEnter={e=>{const img=e.currentTarget.querySelector('img');if(img)img.style.transform='scale(1.02)'}} onMouseLeave={e=>{const img=e.currentTarget.querySelector('img');if(img)img.style.transform='scale(1)'}}><img src={display[0]} style={{width:'100%',maxHeight:380,objectFit:'cover',display:'block',transition:'transform 0.25s ease'}} loading="lazy"/></div>
+  if (count===1) return <div onClick={()=>onPhotoClick(0)} style={{cursor:'pointer',overflow:'hidden',maxHeight:380}} onMouseEnter={e=>{const img=e.currentTarget.querySelector('img');if(img)img.style.transform='scale(1.02)'}} onMouseLeave={e=>{const img=e.currentTarget.querySelector('img');if(img)img.style.transform='scale(1)'}}><img src={display[0]} style={{width:'100%',maxHeight:380,objectFit:'cover',display:'block',transition:'transform 0.25s ease'}} loading="lazy" alt=""/></div>
   if (count===2) return <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,height:260}}>{display.map((u,i)=>wrap(u,i))}</div>
   if (count===3) return <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gridTemplateRows:'1fr 1fr',gap:2,height:260}}>{wrap(display[0],0,{gridRow:'1/3'})}{wrap(display[1],1)}{wrap(display[2],2)}</div>
   if (count===4) return <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gridTemplateRows:'1fr 1fr',gap:2,height:260}}>{display.map((u,i)=>wrap(u,i))}</div>
   return <div style={{display:'flex',flexDirection:'column',gap:2}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:2,height:200}}>{display.slice(0,2).map((u,i)=>wrap(u,i))}</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,height:130}}>{display.slice(2,5).map((u,i)=>wrap(u,i+2))}</div></div>
 }
 
-// ── Quoted Message Block ──────────────────────────────────────
-function QuotedMessageBlock({ from, message, subType, postType }) {
+function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = message.length > 180
   const displayText = isLong && !expanded ? message.slice(0, 180) + '…' : message
   const accentColor = getQuoteBlockAccent(subType, postType)
   return (
-    <div style={{ margin:'8px 0 4px', border:'1px solid #E8EAED', borderLeft:`3px solid ${accentColor}`, borderRadius:'0 8px 8px 0', overflow:'hidden', background:'transparent' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 4px 5px', borderBottom:'1px solid #F0F2F5' }}>
-        <div style={{ width:18, height:18, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+    <div style={{ margin:'8px 0 4px',border:`1px solid ${colors.border}`,borderLeft:`3px solid ${accentColor}`,borderRadius:'0 8px 8px 0',overflow:'hidden',background:'transparent' }}>
+      <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 4px 5px',borderBottom:`1px solid ${colors.border}` }}>
+        <div style={{ width:18,height:18,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/>
           </svg>
         </div>
-        <span style={{ fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:accentColor }}>
+        <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12,color:accentColor }}>
           {from ? `From ${from}` : 'Quoted message'}
         </span>
-        <span style={{ marginLeft:'auto', fontFamily:'"Instrument Sans",system-ui', fontSize:10.5, color:'#BCC0C4', fontStyle:'italic', paddingRight:4 }}>forwarded</span>
+        <span style={{ marginLeft:'auto',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:colors.textMut,fontStyle:'italic',paddingRight:4 }}>forwarded</span>
       </div>
       <div style={{ padding:'7px 4px 8px' }}>
-        <p style={{ margin:0, fontFamily:'"Instrument Sans",system-ui', fontSize:13.5, color:'#1c1e21', lineHeight:1.55, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13.5,color:colors.textPri,lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
           {displayText}
           {isLong && (
-            <button onClick={() => setExpanded(e => !e)} style={{ background:'none', border:'none', cursor:'pointer', color:accentColor, fontWeight:700, fontSize:13, fontFamily:'"Instrument Sans",system-ui', marginLeft:4, padding:0 }}>
+            <button onClick={() => setExpanded(e => !e)} style={{ background:'none',border:'none',cursor:'pointer',color:accentColor,fontWeight:700,fontSize:13,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>
               {expanded ? 'See less' : 'See more'}
             </button>
           )}
@@ -410,8 +311,8 @@ function QuotedMessageBlock({ from, message, subType, postType }) {
   )
 }
 
-// ── PostCard ──────────────────────────────────────────────────
 export default function PostCard({ post, currentUserId, subjects = [], profile, onUserClick }) {
+  const { colors } = useDarkMode()
   const [liked, setLiked]             = useState(false)
   const [likeCount, setLikeCount]     = useState(0)
   const [likeAvatars, setLikeAvatars] = useState([])
@@ -440,40 +341,25 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       if (error) throw error
       setDeleted(true)
       toast.success('Post deleted')
-    } catch (err) {
-      toast.error(err.message || 'Failed to delete')
-    }
+    } catch (err) { toast.error(err.message || 'Failed to delete') }
   }
 
   async function handleModDelete() {
     if (!window.confirm(`Delete this post by ${postData.profiles?.display_name}? This cannot be undone.`)) return
     try {
-      await supabase.from('audit_logs').insert({
-        actor_id: currentUserId,
-        action: 'delete_post',
-        target_type: 'post',
-        target_id: postData.id,
-        metadata: { author_id: postData.author_id, caption: postData.caption?.slice(0, 100) },
-      })
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action:'delete_post', target_type:'post', target_id:postData.id, metadata:{ author_id:postData.author_id, caption:postData.caption?.slice(0,100) } })
       const { error } = await supabase.from('posts').delete().eq('id', postData.id)
       if (error) throw error
       setDeleted(true)
       toast.success('Post removed by mod')
-    } catch (err) {
-      toast.error(err.message || 'Failed to delete')
-    }
+    } catch (err) { toast.error(err.message || 'Failed to delete') }
   }
 
   async function handleTogglePin() {
     try {
       const next = !postData.is_pinned
       await supabase.from('posts').update({ is_pinned: next }).eq('id', postData.id)
-      await supabase.from('audit_logs').insert({
-        actor_id: currentUserId,
-        action: next ? 'pin_post' : 'unpin_post',
-        target_type: 'post',
-        target_id: postData.id,
-      })
+      await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_pinned: next }))
       toast.success(next ? '📌 Post pinned' : 'Post unpinned')
     } catch (err) { toast.error(err.message) }
@@ -483,12 +369,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     try {
       const next = !postData.is_locked
       await supabase.from('posts').update({ is_locked: next }).eq('id', postData.id)
-      await supabase.from('audit_logs').insert({
-        actor_id: currentUserId,
-        action: next ? 'lock_post' : 'unlock_post',
-        target_type: 'post',
-        target_id: postData.id,
-      })
+      await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'lock_post':'unlock_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_locked: next }))
       toast.success(next ? '🔒 Comments locked' : '🔓 Comments unlocked')
     } catch (err) { toast.error(err.message) }
@@ -513,17 +394,11 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       if (nowLiked) {
         await supabase.from('likes').insert({ post_id: postData.id, user_id: currentUserId })
         if (postData.author_id && postData.author_id !== currentUserId) {
-          const { count: totalLikes } = await supabase
-            .from('likes').select('id', { count: 'exact', head: true }).eq('post_id', postData.id)
+          const { count: totalLikes } = await supabase.from('likes').select('id', { count:'exact', head:true }).eq('post_id', postData.id)
           const likerName = profile?.display_name || 'Someone'
           const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
-          await supabase.from('notifications').delete()
-            .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
-          await supabase.from('notifications').insert({
-            user_id: postData.author_id, post_id: postData.id, type: 'like',
-            message: `❤️ ${likerName} liked your post "${postData.caption?.slice(0, 40) || 'No caption'}…"${countSuffix}`,
-            is_read: false,
-          })
+          await supabase.from('notifications').delete().eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+          await supabase.from('notifications').insert({ user_id:postData.author_id, post_id:postData.id, type:'like', message:`❤️ ${likerName} liked your post "${postData.caption?.slice(0,40)||'No caption'}…"${countSuffix}`, is_read:false })
         }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
@@ -557,12 +432,12 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         setLikeAvatars(likesData.slice(0, 3).map(l => l.profiles))
         setLiked(likesData.some(l => l.user_id === currentUserId))
       }
-      const { count } = await supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
+      const { count } = await supabase.from('comments').select('id', { count:'exact', head:true }).eq('post_id', post.id)
       setCommentCount(count || 0)
     }
     fetchCounts()
     const ch = supabase.channel('likes-' + post.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes', filter: `post_id=eq.${post.id}` }, async () => {
+      .on('postgres_changes', { event:'*', schema:'public', table:'likes', filter:`post_id=eq.${post.id}` }, async () => {
         const { data } = await supabase.from('likes').select('user_id, profiles(avatar_url, display_name)').eq('post_id', post.id)
         if (data) {
           setLikeCount(data.length)
@@ -576,14 +451,14 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
   if (deleted) return null
 
-  const photos = parsePhotos(postData.photo_url)
-  const files  = parseFiles(postData.file_url, postData.file_name)
-  const quoted = parseQuoted(postData.quoted_message)
-  const caption = postData.caption || ''
-  const isLong = caption.length > 220
+  const photos    = parsePhotos(postData.photo_url)
+  const files     = parseFiles(postData.file_url, postData.file_name)
+  const quoted    = parseQuoted(postData.quoted_message)
+  const caption   = postData.caption || ''
+  const isLong    = caption.length > 220
   const displayCaption = isLong && !expanded ? caption.slice(0,220)+'…' : caption
 
-  const banner = getBanner(postData.sub_type, postData.post_type)
+  const banner    = getBanner(postData.sub_type, postData.post_type)
   const typeLabel = getTypeLabel(postData.sub_type, postData.post_type)
   const isPastDue = postData.due_date && isPast(
     (() => {
@@ -598,37 +473,37 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
   return (
     <>
-      <article style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6, position:'relative' }}>
+      <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
-        {/* ── Pinned bar ── */}
+        {/* Pinned bar */}
         {postData.is_pinned && (
-          <div style={{ background:'#FFF8E1', padding:'5px 12px', display:'flex', alignItems:'center', gap:6, borderBottom:'1px solid #FFE082' }}>
+          <div style={{ background:'rgba(245,158,11,0.1)',padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid rgba(245,158,11,0.25)` }}>
             <Pin size={11} color="#F59E0B" fill="#F59E0B"/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:11, fontWeight:700, color:'#92400E', letterSpacing:0.3 }}>PINNED POST</span>
+            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#92400E',letterSpacing:0.3 }}>PINNED POST</span>
           </div>
         )}
 
-        {/* ── Official bar ── */}
+        {/* Official bar */}
         {postData.is_official && (
-          <div style={{ background:'#F0FDF4', padding:'5px 12px', display:'flex', alignItems:'center', gap:6, borderBottom:'1px solid #BBF7D0' }}>
+          <div style={{ background:'rgba(22,163,74,0.08)',padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid rgba(22,163,74,0.2)` }}>
             <BadgeCheck size={11} color="#16a34a" fill="#16a34a"/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:11, fontWeight:700, color:'#166534', letterSpacing:0.3 }}>OFFICIAL POST</span>
+            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#166534',letterSpacing:0.3 }}>OFFICIAL POST</span>
           </div>
         )}
 
-        {/* ── Locked bar ── */}
+        {/* Locked bar */}
         {postData.is_locked && (
-          <div style={{ background:'#F8FAFC', padding:'5px 12px', display:'flex', alignItems:'center', gap:6, borderBottom:'1px solid #E2E8F0' }}>
-            <Lock size={11} color="#64748B"/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:11, fontWeight:600, color:'#64748B', letterSpacing:0.3 }}>Comments locked</span>
+          <div style={{ background:colors.surface,padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid ${colors.border}` }}>
+            <Lock size={11} color={colors.textSec}/>
+            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.3 }}>Comments locked</span>
           </div>
         )}
 
-        {/* ── Banner ── */}
+        {/* Banner */}
         {banner && (
-          <div style={{ background:banner.bg, padding:'7px 12px', display:'flex', alignItems:'center', gap:7 }}>
-            <div style={{ width:20, height:20, borderRadius:5, background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>{banner.icon}</div>
-            <span style={{ color:'white', fontSize:11, fontWeight:700, fontFamily:'"Instrument Sans",system-ui', letterSpacing:0.7, textTransform:'uppercase', flex:1 }}>
+          <div style={{ background:banner.bg,padding:'7px 12px',display:'flex',alignItems:'center',gap:7 }}>
+            <div style={{ width:20,height:20,borderRadius:5,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center' }}>{banner.icon}</div>
+            <span style={{ color:'white',fontSize:11,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',letterSpacing:0.7,textTransform:'uppercase',flex:1 }}>
               {banner.label}{postData.announcement_type ? ` · ${postData.announcement_type}` : ''}
             </span>
             {postData.due_date && (
@@ -644,24 +519,24 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         )}
 
-        {/* ── Header ── */}
-        <div style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:9 }}>
+        {/* Header */}
+        <div style={{ padding:'10px 12px 8px',display:'flex',alignItems:'center',gap:9 }}>
           <img
             src={postData.profiles?.avatar_url || dicebearUrl(postData.profiles?.display_name)}
             alt=""
             onClick={() => onUserClick?.(postData.profiles)}
-            style={{ width:40, height:40, borderRadius:10, objectFit:'cover', flexShrink:0, border:'1.5px solid #F0F2F5', cursor: onUserClick ? 'pointer' : 'default' }}
+            style={{ width:40,height:40,borderRadius:10,objectFit:'cover',flexShrink:0,border:`1.5px solid ${colors.border}`,cursor:onUserClick?'pointer':'default' }}
           />
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:5, flexWrap:'wrap' }}>
+          <div style={{ flex:1,minWidth:0 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
               <span
                 onClick={() => onUserClick?.(postData.profiles)}
-                style={{ fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:14, color:'#050505', cursor: onUserClick ? 'pointer' : 'default' }}
+                style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,color:colors.textPri,cursor:onUserClick?'pointer':'default' }}
               >
                 {postData.profiles?.display_name || 'Unknown'}
               </span>
               {canModerate && postData.profiles?.role === 'moderator' && (
-                <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,border:`1px solid #AED6F1`,borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui' }}>
+                <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,border:'1px solid #AED6F1',borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui' }}>
                   <Shield size={9}/> Mod
                 </span>
               )}
@@ -671,57 +546,57 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                 </span>
               )}
               {postData.subjects && (
-                <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,fontSize:10.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',padding:'2px 7px',borderRadius:20,border:'1px solid #D6EAF8' }}>
+                <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'rgba(26,82,118,0.12)',color:BLUE,fontSize:10.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',padding:'2px 7px',borderRadius:20,border:'1px solid rgba(26,82,118,0.2)' }}>
                   <BookOpen size={9}/> {postData.subjects.name}
                 </span>
               )}
             </div>
-            <p style={{ margin:'1px 0 0',fontSize:11.5,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>
+            <p style={{ margin:'1px 0 0',fontSize:11.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
               {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
-              <span style={{margin:'0 4px',color:'#D4D6DA'}}>·</span>
-              <span style={{color:'#BCC0C4'}}>{typeLabel}</span>
-              {postData.is_edited && <><span style={{margin:'0 4px',color:'#D4D6DA'}}>·</span><span style={{color:'#BCC0C4',fontStyle:'italic',fontSize:11}}>Edited</span></>}
+              <span style={{margin:'0 4px',color:colors.border}}>·</span>
+              <span style={{color:colors.textMut}}>{typeLabel}</span>
+              {postData.is_edited && <><span style={{margin:'0 4px',color:colors.border}}>·</span><span style={{color:colors.textMut,fontStyle:'italic',fontSize:11}}>Edited</span></>}
             </p>
           </div>
 
-          {/* ── Menu ── */}
-          <div ref={menuRef} style={{ position:'relative', flexShrink:0 }}>
+          {/* Menu */}
+          <div ref={menuRef} style={{ position:'relative',flexShrink:0 }}>
             <button
               onClick={() => setShowMenu(v => !v)}
-              style={{ width:32,height:32,borderRadius:7,background:showMenu?'#F0F2F5':'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:showMenu?'#65676B':'#BCC0C4',transition:'background 0.12s,color 0.12s' }}
-              onMouseEnter={e=>{e.currentTarget.style.background='#F0F2F5';e.currentTarget.style.color='#65676B'}}
-              onMouseLeave={e=>{if(!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color='#BCC0C4'}}}>
+              style={{ width:32,height:32,borderRadius:7,background:showMenu?colors.surface:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:showMenu?colors.textSec:colors.textMut,transition:'background 0.12s,color 0.12s' }}
+              onMouseEnter={e=>{e.currentTarget.style.background=colors.surface;e.currentTarget.style.color=colors.textSec}}
+              onMouseLeave={e=>{if(!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color=colors.textMut}}}>
               <MoreHorizontal size={17}/>
             </button>
             {showMenu && (
-              <div style={{ position:'absolute',right:0,top:'calc(100% + 4px)',background:'white',borderRadius:10,border:'1px solid #E4E6EB',boxShadow:'0 6px 20px rgba(0,0,0,0.12)',overflow:'hidden',zIndex:20,minWidth:175,animation:'slideDown 0.15s ease' }}>
+              <div style={{ position:'absolute',right:0,top:'calc(100% + 4px)',background:colors.cardBg,borderRadius:10,border:`1px solid ${colors.border}`,boxShadow:'0 6px 20px rgba(0,0,0,0.15)',overflow:'hidden',zIndex:20,minWidth:175,animation:'slideDown 0.15s ease' }}>
                 {isOwn && (
                   <>
-                    <MenuItem icon={<Pencil size={14} color="#65676B"/>} label="Edit post" onClick={() => { setShowMenu(false); setShowEdit(true) }}/>
-                    <MenuDivider/>
-                    <MenuItem icon={<Trash2 size={14} color={RED}/>} label="Delete post" danger onClick={() => { setShowMenu(false); if(window.confirm('Delete this post?')) handleDelete() }}/>
+                    <MenuItem icon={<Pencil size={14} color={colors.textSec}/>} label="Edit post" colors={colors} onClick={() => { setShowMenu(false); setShowEdit(true) }}/>
+                    <MenuDivider colors={colors}/>
+                    <MenuItem icon={<Trash2 size={14} color={RED}/>} label="Delete post" danger colors={colors} onClick={() => { setShowMenu(false); if(window.confirm('Delete this post?')) handleDelete() }}/>
                   </>
                 )}
                 {!isOwn && (
                   <MenuItem
-                    icon={<Bookmark size={14} color={saved?BLUE:'#65676B'} fill={saved?BLUE:'none'}/>}
-                    label={saved ? 'Saved' : 'Save post'}
+                    icon={<Bookmark size={14} color={saved?BLUE:colors.textSec} fill={saved?BLUE:'none'}/>}
+                    label={saved ? 'Saved' : 'Save post'} colors={colors}
                     onClick={() => { toggleSaved(postData.id); setShowMenu(false) }}
                   />
                 )}
                 {canModerate && (
                   <>
-                    <MenuDivider/>
-                    <div style={{ padding:'6px 10px 2px', fontFamily:'"Instrument Sans",system-ui', fontSize:10, fontWeight:700, color:'#8A8D91', textTransform:'uppercase', letterSpacing:0.5 }}>
+                    <MenuDivider colors={colors}/>
+                    <div style={{ padding:'6px 10px 2px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:colors.textSec,textTransform:'uppercase',letterSpacing:0.5 }}>
                       {isSuperadmin ? '👑 Admin' : '🛡️ Mod'}
                     </div>
-                    <MenuItem icon={<Pin size={14} color={postData.is_pinned?'#F59E0B':'#65676B'} fill={postData.is_pinned?'#F59E0B':'none'}/>} label={postData.is_pinned ? 'Unpin post' : 'Pin post'} onClick={() => { setShowMenu(false); handleTogglePin() }}/>
-                    <MenuItem icon={<Lock size={14} color={postData.is_locked?'#64748B':'#65676B'}/>} label={postData.is_locked ? 'Unlock comments' : 'Lock comments'} onClick={() => { setShowMenu(false); handleToggleLock() }}/>
-                    <MenuItem icon={<BadgeCheck size={14} color={postData.is_official?'#16a34a':'#65676B'}/>} label={postData.is_official ? 'Remove official' : 'Mark as official'} onClick={() => { setShowMenu(false); handleToggleOfficial() }}/>
+                    <MenuItem icon={<Pin size={14} color={postData.is_pinned?'#F59E0B':colors.textSec} fill={postData.is_pinned?'#F59E0B':'none'}/>} label={postData.is_pinned?'Unpin post':'Pin post'} colors={colors} onClick={() => { setShowMenu(false); handleTogglePin() }}/>
+                    <MenuItem icon={<Lock size={14} color={postData.is_locked?'#64748B':colors.textSec}/>} label={postData.is_locked?'Unlock comments':'Lock comments'} colors={colors} onClick={() => { setShowMenu(false); handleToggleLock() }}/>
+                    <MenuItem icon={<BadgeCheck size={14} color={postData.is_official?'#16a34a':colors.textSec}/>} label={postData.is_official?'Remove official':'Mark as official'} colors={colors} onClick={() => { setShowMenu(false); handleToggleOfficial() }}/>
                     {!isOwn && (
                       <>
-                        <MenuDivider/>
-                        <MenuItem icon={<Trash2 size={14} color={RED}/>} label="Delete (mod)" danger onClick={() => { setShowMenu(false); handleModDelete() }}/>
+                        <MenuDivider colors={colors}/>
+                        <MenuItem icon={<Trash2 size={14} color={RED}/>} label="Delete (mod)" danger colors={colors} onClick={() => { setShowMenu(false); handleModDelete() }}/>
                       </>
                     )}
                   </>
@@ -731,44 +606,44 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         </div>
 
-        {/* ── Caption + Quoted ── */}
+        {/* Caption + Quoted */}
         {(caption || quoted) && (
           <div style={{ padding:`0 12px ${photos.length>0?'8px':'0'}` }}>
             {caption && (
-              <p style={{ margin:0,fontSize:14.5,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
+              <p style={{ margin:0,fontSize:14.5,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
                 {displayCaption}
                 {isLong && <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>{expanded?'See less':'See more'}</button>}
               </p>
             )}
-            {quoted && <QuotedMessageBlock from={quoted.from} message={quoted.message} subType={postData.sub_type} postType={postData.post_type}/>}
+            {quoted && <QuotedMessageBlock from={quoted.from} message={quoted.message} subType={postData.sub_type} postType={postData.post_type} colors={colors}/>}
           </div>
         )}
 
-        {/* ── Photos ── */}
+        {/* Photos */}
         {photos.length>0 && <div style={{marginTop:caption||quoted?4:8}}><PhotoGrid photos={photos} onPhotoClick={setLightboxIndex}/></div>}
 
-        {/* ── Files ── */}
+        {/* Files */}
         {files.length>0 && (
           <div style={{ padding:'10px 12px 0',display:'flex',flexDirection:'column',gap:6 }}>
             {files.map((file,i) => (
               <a key={i} href={file.url} target="_blank" rel="noopener noreferrer"
-                style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:9,background:'#F7F9FC',border:'1.5px solid #E8EDF5',textDecoration:'none',transition:'all 0.15s' }}
-                onMouseEnter={e=>{e.currentTarget.style.background='#EFF4FF';e.currentTarget.style.borderColor='#C7D9F7'}}
-                onMouseLeave={e=>{e.currentTarget.style.background='#F7F9FC';e.currentTarget.style.borderColor='#E8EDF5'}}>
-                <div style={{ width:36,height:36,borderRadius:8,background:'linear-gradient(135deg,#EBF5FB,#D6EAF8)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid #C3DEF0' }}>
+                style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:9,background:colors.surface,border:`1.5px solid ${colors.border}`,textDecoration:'none',transition:'all 0.15s' }}
+                onMouseEnter={e=>{e.currentTarget.style.background=colors.surfaceHov;e.currentTarget.style.borderColor=colors.borderStrong}}
+                onMouseLeave={e=>{e.currentTarget.style.background=colors.surface;e.currentTarget.style.borderColor=colors.border}}>
+                <div style={{ width:36,height:36,borderRadius:8,background:'rgba(26,82,118,0.12)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',border:`1px solid rgba(26,82,118,0.2)` }}>
                   <FileText size={15} color={BLUE}/>
                 </div>
                 <div style={{ flex:1,minWidth:0 }}>
-                  <p style={{ margin:0,fontSize:13,fontWeight:600,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{file.name}</p>
-                  <p style={{ margin:'1px 0 0',fontSize:11,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>Tap to open</p>
+                  <p style={{ margin:0,fontSize:13,fontWeight:600,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{file.name}</p>
+                  <p style={{ margin:'1px 0 0',fontSize:11,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>Tap to open</p>
                 </div>
-                <Download size={13} color="#BCC0C4"/>
+                <Download size={13} color={colors.textMut}/>
               </a>
             ))}
           </div>
         )}
 
-        {/* ── Likes + comment count ── */}
+        {/* Likes + comment count */}
         {(likeCount > 0 || commentCount > 0) && (
           <div style={{ padding:'8px 12px 0',display:'flex',alignItems:'center',justifyContent:'space-between' }}>
             {likeCount > 0 ? (
@@ -776,37 +651,37 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                 <div style={{ display:'flex' }}>
                   {likeAvatars.map((a,i) => (
                     <img key={i} src={a?.avatar_url||dicebearUrl(a?.display_name)} alt=""
-                      style={{ width:18,height:18,borderRadius:'50%',objectFit:'cover',border:'1.5px solid white',marginLeft:i>0?-5:0 }}/>
+                      style={{ width:18,height:18,borderRadius:'50%',objectFit:'cover',border:`1.5px solid ${colors.cardBg}`,marginLeft:i>0?-5:0 }}/>
                   ))}
                 </div>
-                <div style={{ width:18,height:18,borderRadius:'50%',background:`linear-gradient(135deg,${RED},#E74C3C)`,display:'flex',alignItems:'center',justifyContent:'center',marginLeft:likeAvatars.length>0?-5:0,border:'1.5px solid white' }}>
+                <div style={{ width:18,height:18,borderRadius:'50%',background:`linear-gradient(135deg,${RED},#E74C3C)`,display:'flex',alignItems:'center',justifyContent:'center',marginLeft:likeAvatars.length>0?-5:0,border:`1.5px solid ${colors.cardBg}` }}>
                   <Heart size={9} color="white" fill="white"/>
                 </div>
-                <span style={{ fontSize:12.5,color:'#65676B',fontFamily:'"Instrument Sans",system-ui' }}>{likeCount}</span>
+                <span style={{ fontSize:12.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>{likeCount}</span>
               </div>
             ) : <div/>}
             {commentCount > 0 && (
               <button onClick={() => !postData.is_locked && setShowComments(true)}
-                style={{ background:'none',border:'none',cursor:postData.is_locked?'default':'pointer',fontFamily:'"Instrument Sans",system-ui',fontSize:12.5,color:postData.is_locked?'#BCC0C4':'#65676B',padding:0 }}>
+                style={{ background:'none',border:'none',cursor:postData.is_locked?'default':'pointer',fontFamily:'"Instrument Sans",system-ui',fontSize:12.5,color:postData.is_locked?colors.textMut:colors.textSec,padding:0 }}>
                 {commentCount} comment{commentCount !== 1 ? 's' : ''}{postData.is_locked ? ' · 🔒' : ''}
               </button>
             )}
           </div>
         )}
 
-        <div style={{ height:1,background:'#F0F2F5',margin:'8px 12px 0' }}/>
+        <div style={{ height:1,background:colors.border,margin:'8px 12px 0' }}/>
 
-        {/* ── Actions ── */}
+        {/* Actions */}
         <div style={{ display:'flex',alignItems:'center',padding:'0 6px 2px' }}>
-          <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:'#65676B'}/>} label="Like" active={liked} activeColor={RED}/>
+          <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:colors.textSec}/>} label="Like" active={liked} activeColor={RED} colors={colors}/>
           <ActionBtn
             onClick={() => !postData.is_locked && setShowComments(true)}
-            icon={<MessageCircle size={17} color={postData.is_locked?'#BCC0C4':'#65676B'}/>}
+            icon={<MessageCircle size={17} color={postData.is_locked?colors.textMut:colors.textSec}/>}
             label={postData.is_locked ? 'Locked' : 'Comment'}
-            disabled={postData.is_locked}
+            disabled={postData.is_locked} colors={colors}
           />
-          <div ref={shareRef} style={{ flex:1, position:'relative' }}>
-            <ActionBtn onClick={() => setShowShare(v => !v)} icon={<Share2 size={17} color={showShare?RED:'#65676B'}/>} label="Share" active={showShare} activeColor={RED} noflex/>
+          <div ref={shareRef} style={{ flex:1,position:'relative' }}>
+            <ActionBtn onClick={() => setShowShare(v => !v)} icon={<Share2 size={17} color={showShare?RED:colors.textSec}/>} label="Share" active={showShare} activeColor={RED} noflex colors={colors}/>
             {showShare && <ShareSheet post={postData} onClose={() => setShowShare(false)} anchorRef={shareRef}/>}
           </div>
         </div>
@@ -827,29 +702,29 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   )
 }
 
-function MenuItem({ icon, label, onClick, danger }) {
+function MenuItem({ icon, label, onClick, danger, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 14px',border:'none',cursor:'pointer',background:hovered?(danger?'#FFF5F5':'#F7F8FA'):'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:danger?RED:'#050505',textAlign:'left',transition:'background 0.1s' }}>
+      style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 14px',border:'none',cursor:'pointer',background:hovered?(danger?'rgba(192,57,43,0.1)':colors.surface):'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:danger?RED:colors.textPri,textAlign:'left',transition:'background 0.1s' }}>
       {icon} {label}
     </button>
   )
 }
 
-function MenuDivider() {
-  return <div style={{ height:1,background:'#F0F2F5' }}/>
+function MenuDivider({ colors }) {
+  return <div style={{ height:1,background:colors.border }}/>
 }
 
-function ActionBtn({ onClick, icon, label, active, activeColor, noflex, disabled }) {
+function ActionBtn({ onClick, icon, label, active, activeColor, noflex, disabled, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button onClick={disabled ? undefined : onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
       flex:noflex?'none':1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,
       padding:'8px 4px',border:'none',cursor:disabled?'default':'pointer',
-      background:hovered&&!disabled?'#F5F6F7':'transparent',borderRadius:7,transition:'background 0.12s',
+      background:hovered&&!disabled?colors.surface:'transparent',borderRadius:7,transition:'background 0.12s',
       fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,
-      color:disabled?'#BCC0C4':active?(activeColor||RED):'#65676B',
+      color:disabled?colors.textMut:active?(activeColor||RED):colors.textSec,
       width:noflex?'100%':undefined,
       opacity: disabled ? 0.6 : 1,
     }}>
