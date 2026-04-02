@@ -150,17 +150,10 @@ export default function CodeGatePage() {
     setNameError(''); setGenderError(''); setBdayError('')
 
     // Full name validation
-    if (!fullName.trim()) {
-      setNameError('Full name is required'); ok = false
-    } else if (fullName.trim().length < 2) {
-      setNameError('Name is too short'); ok = false
-    } else if (fullName.trim().length > 50) {
-      setNameError('Name is too long'); ok = false
-    } else if (/\d/.test(fullName.trim())) {
-      setNameError('Name cannot contain numbers'); ok = false
-    } else if (/<|>|script|javascript/i.test(fullName.trim())) {
-      setNameError('Invalid characters in name'); ok = false
-    }
+    if (!fullName.trim()) { setNameError('Full name is required'); ok = false }
+    else if (fullName.trim().length < 2) { setNameError('Name is too short'); ok = false }
+    else if (fullName.trim().length > 50) { setNameError('Name is too long'); ok = false }
+    else if (!/^[a-zA-Z\s\-'.]+$/.test(fullName.trim())) { setNameError('Name can only contain letters, spaces, hyphens, and apostrophes'); ok = false }
 
     if (!gender) { setGenderError('Please select your gender'); ok = false }
 
