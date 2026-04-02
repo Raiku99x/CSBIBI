@@ -151,7 +151,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
           is_edited: true,
         })
         .eq('id', post.id)
-        .select('*, profiles(*), subjects(*)')
+        .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .single()
 
       if (error) throw error
