@@ -33,7 +33,6 @@ export default function FeedPage() {
   const navigate = useNavigate()
   const { effectivelyMuted, getMuteMessage } = useMuteGate()
 
-  // FIX #2: read the ?post= query param so notification clicks work
   const [searchParams, setSearchParams] = useSearchParams()
   const targetPostId = searchParams.get('post')
   const highlightRef = useRef(null)
@@ -66,7 +65,6 @@ export default function FeedPage() {
           .from('posts').select('*, profiles(*), subjects(*)')
           .eq('id', payload.new.id).single()
         if (data) {
-          // FIX #3: don't push future-scheduled posts for non-authors/non-admins
           const isFuture = isScheduledFuture(data)
           const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
           if (canSee) setPosts(prev => [data, ...prev])
@@ -75,11 +73,10 @@ export default function FeedPage() {
     return () => supabase.removeChannel(channel)
   }, [fetchPosts, user?.id, isSuperadmin])
 
-  // FIX #2: scroll to and highlight the target post once posts have loaded
+  // Scroll to and highlight the target post — retries until element is in DOM
   useEffect(() => {
     if (!targetPostId || loading) return
-    // Small delay so the DOM has painted
-let attempts = 0
+    let attempts = 0
     const timer = setInterval(() => {
       const el = document.getElementById('post-' + targetPostId)
       attempts++
@@ -94,24 +91,10 @@ let attempts = 0
           setSearchParams({}, { replace: true })
         }, 2000)
       } else if (attempts > 20) {
-        clearInterval(timer) // give up after 2s
+        clearInterval(timer)
       }
     }, 100)
     return () => clearInterval(timer)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // Flash highlight
-        el.style.outline = '2px solid ' + RED
-        el.style.outlineOffset = '-2px'
-        el.style.transition = 'outline 0.3s'
-        setTimeout(() => {
-          el.style.outline = 'none'
-          // Clean up the query param without navigating
-          setSearchParams({}, { replace: true })
-        }, 2000)
-      }
-    }, 300)
-    return () => clearTimeout(timer)
   }, [targetPostId, loading, setSearchParams])
 
   const visiblePosts = posts.filter(post => {
@@ -200,7 +183,6 @@ let attempts = 0
       ) : (
         <div>
           {visiblePosts.map(post => (
-            // FIX #2: add id on the wrapper so scrollIntoView works
             <div key={post.id} id={'post-' + post.id} style={{ position: 'relative' }}>
               {isScheduledFuture(post) && (post.author_id === user?.id || isSuperadmin) && (
                 <ScheduledBadge scheduledAt={post.scheduled_at} />
