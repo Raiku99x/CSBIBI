@@ -181,7 +181,7 @@ function buildMessengerText(post) {
   }
 
   // ── Link ──
-  lines.push(`🔗 ${shareUrl}`)
+  lines.push(`🔗 ${shareUrl.replace('https://', '')}`)
 
   return lines.join('\n')
 }
