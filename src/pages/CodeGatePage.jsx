@@ -153,7 +153,7 @@ export default function CodeGatePage() {
     if (!fullName.trim()) { setNameError('Full name is required'); ok = false }
     else if (fullName.trim().length < 2) { setNameError('Name is too short'); ok = false }
     else if (fullName.trim().length > 50) { setNameError('Name is too long'); ok = false }
-    else if (!/^[a-zA-Z\s\-'.]+$/.test(fullName.trim())) { setNameError('Name can only contain letters, spaces, hyphens, and apostrophes'); ok = false }
+    else if (!/^[a-zA-Z][a-zA-Z\s\-'.]*[a-zA-Z]$|^[a-zA-Z]$/.test(fullName.trim())) { setNameError('Name must start and end with a letter'); ok = false }
 
     if (!gender) { setGenderError('Please select your gender'); ok = false }
 
