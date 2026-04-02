@@ -12,13 +12,14 @@ import {
   Home, MessageSquare, BookMarked, Grid3X3,
   LogOut, Settings, Check, X, Menu, Search, CalendarClock, Bell,
   Bookmark, Heart, Moon, Sun, Info, MoreHorizontal,
-  EyeOff, Eye, Send, Shield, Crown
+  EyeOff, Eye, Send, Shield, Crown, User, ChevronRight
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import SavedPostsPage from '../pages/SavedPostsPage'
 import LikedPostsPage from '../pages/LikedPostsPage'
 import AboutModal from './AboutModal'
 import AdminDashboard from '../pages/AdminDashboard'
+import UserProfilePage from '../pages/UserProfilePage'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -123,6 +124,8 @@ export default function Layout({ children, onOpenSearch }) {
   const [showAbout,     setShowAbout]     = useState(false)
   const [showDashboard, setShowDashboard] = useState(false)
   const [selfMenuOpen,  setSelfMenuOpen]  = useState(false)
+  // NEW: own profile page state
+  const [showOwnProfile, setShowOwnProfile] = useState(false)
 
   const notifRef    = useRef(null)
   const selfMenuRef = useRef(null)
@@ -131,9 +134,6 @@ export default function Layout({ children, onOpenSearch }) {
 
   useForceLogout(profile, signOut, navigate)
 
-  // ── Auto-mark-all-read when notification panel is opened ──
-  // After 1.5 s of viewing, clear the badge automatically.
-  // This means opening the panel is enough — no "Mark all read" button needed.
   useEffect(() => {
     if (!showNotifs || unreadCount === 0) return
     const t = setTimeout(markAllRead, 1500)
@@ -177,6 +177,11 @@ export default function Layout({ children, onOpenSearch }) {
     navigate('/auth')
   }
 
+  function handleOpenOwnProfile() {
+    setShowDrawer(false)
+    setShowOwnProfile(true)
+  }
+
   const pageBg     = dark ? '#18191A' : '#E9EBEE'
   const cardBg     = dark ? '#242526' : 'white'
   const borderCol  = dark ? '#3A3B3C' : '#E4E6EB'
@@ -197,10 +202,38 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         )}
         <div className="csb-sidebar-scroll" style={{ flex:1,overflowY:'auto',padding:isDesktop?'12px 10px':'8px 10px' }}>
-          {/* Profile card */}
-          <div style={{ padding:'14px 10px',marginBottom:4,display:'flex',alignItems:'center',gap:12 }}>
-            <img src={profile?.avatar_url||dicebearUrl(profile?.display_name)} alt="avatar"
-              style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }}/>
+
+          {/* ── Clickable profile card ── */}
+          <button
+            onClick={handleOpenOwnProfile}
+            style={{
+              width: '100%',
+              padding: '12px 10px',
+              marginBottom: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              border: `1.5px solid ${dark ? '#3A3B3C' : '#E4E6EB'}`,
+              borderRadius: 12,
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.08)' : '#F0F2F5'
+              e.currentTarget.style.borderColor = dark ? '#4A4B4C' : '#CED0D4'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
+              e.currentTarget.style.borderColor = dark ? '#3A3B3C' : '#E4E6EB'
+            }}
+          >
+            <img
+              src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
+              alt="avatar"
+              style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }}
+            />
             <div style={{ minWidth:0,flex:1 }}>
               <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
                 <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
@@ -211,7 +244,8 @@ export default function Layout({ children, onOpenSearch }) {
               </div>
               <p style={{ margin:'2px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:textMut,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{profile?.email}</p>
             </div>
-          </div>
+            <ChevronRight size={14} color={textMut} style={{ flexShrink:0 }}/>
+          </button>
 
           <div style={{ height:1,background:dividerCol,margin:'0 4px 8px' }}/>
 
@@ -304,8 +338,7 @@ export default function Layout({ children, onOpenSearch }) {
           <div onClick={()=>setShowDrawer(false)} style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
         )}
 
-        {/* ── Notification backdrop (mobile) ──
-            Lighter opacity so it doesn't feel as heavy/dim */}
+        {/* Notification backdrop (mobile) */}
         {!isDesktop && showNotifs && (
           <div onClick={()=>setShowNotifs(false)} style={{ position:'fixed',inset:0,zIndex:98,background:'rgba(0,0,0,0.2)',animation:'fadeIn 0.2s ease' }}/>
         )}
@@ -353,7 +386,6 @@ export default function Layout({ children, onOpenSearch }) {
                   )}
                 </button>
 
-                {/* Desktop dropdown — rendered inside the ref div so click-outside works */}
                 {showNotifs&&isDesktop&&(
                   <div style={{ position:'absolute',right:0,top:'calc(100% + 8px)',zIndex:100,animation:'slideDown 0.18s ease' }}>
                     <NotifPanel
@@ -367,18 +399,34 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </div>
 
+              {/* ── Generic person icon (mobile only) — opens own profile ── */}
               {!isDesktop&&(
-                <button onClick={()=>setShowDrawer(true)} style={{ width:36,height:36,borderRadius:9,border:`1.5px solid ${borderCol}`,background:'transparent',cursor:'pointer',padding:0,overflow:'hidden',flexShrink:0 }}>
-                  <img src={profile?.avatar_url||dicebearUrl(profile?.display_name)} alt="avatar" style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }}/>
+                <button
+                  onClick={() => setShowOwnProfile(true)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    border: `1.5px solid ${borderCol}`,
+                    background: surfaceBg,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = dark ? '#4A4B4C' : '#D8DADF'}
+                  onMouseLeave={e => e.currentTarget.style.background = surfaceBg}
+                >
+                  <User size={17} color={textSec}/>
                 </button>
               )}
             </div>
           </div>
         </header>
 
-        {/* ── Mobile notification panel ──
-            Rendered OUTSIDE <header> so it's not trapped in its stacking context.
-            This fixes the "dim" / z-index issue on mobile. */}
+        {/* Mobile notification panel */}
         {showNotifs&&!isDesktop&&(
           <div style={{
             position:'fixed', left:0, right:0, top:52, bottom:0,
@@ -490,6 +538,14 @@ export default function Layout({ children, onOpenSearch }) {
         {showLiked     && <LikedPostsPage onClose={()=>setShowLiked(false)}/>}
         {showAbout     && <AboutModal     onClose={()=>setShowAbout(false)}/>}
         {showDashboard && <AdminDashboard onClose={()=>setShowDashboard(false)}/>}
+
+        {/* Own profile panel */}
+        {showOwnProfile && profile?.id && (
+          <UserProfilePage
+            userId={profile.id}
+            onClose={() => setShowOwnProfile(false)}
+          />
+        )}
 
         <style>{`
           @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
