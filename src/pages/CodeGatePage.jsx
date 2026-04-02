@@ -232,6 +232,7 @@ export default function CodeGatePage() {
       // 4. Update profile
       await updateProfile({
         display_name: fullName.trim(),
+        username:     fullName.trim().toLowerCase().replace(/\s+/g, ''),
         identifier:   codeRow.identifier,
         section:      codeRow.section,
         student_code: codeRow.code,
