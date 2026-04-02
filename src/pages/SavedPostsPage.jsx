@@ -32,7 +32,7 @@ export default function SavedPostsPage({ onClose }) {
       const ids = [...savedIds]
       if (ids.length === 0) { setLoading(false); return }
       const { data } = await supabase
-        .from('posts').select('*, profiles(*), subjects(*)')
+        .from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .in('id', ids).order('created_at', { ascending: false })
       if (data) setPosts(data)
       setLoading(false)
