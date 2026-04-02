@@ -151,14 +151,13 @@ function buildMessengerText(post) {
 
   // ── Quoted message ──
   if (quoted && quoted.message) {
-    lines.push('')
-    const MAX_QUOTE = 200
-    const msgText = quoted.message.length > MAX_QUOTE
-      ? quoted.message.slice(0, MAX_QUOTE).trimEnd() + '...'
-      : quoted.message
+    const msgText = quoted.message
     const fromLabel = quoted.from ? `From ${quoted.from}` : 'Quoted message'
+    const divider = '─'.repeat(39)
+    lines.push(divider)
     lines.push(`💬 ${fromLabel}:`)
     lines.push(`"${msgText}"`)
+    lines.push(divider)
   }
 
   // ── Photos ──
