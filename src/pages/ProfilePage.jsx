@@ -249,7 +249,7 @@ export default function ProfilePage() {
                 ⏳ You can change your name again in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
               </p>
             )}
-            {canChangeName && lastNameChange && (
+            {canChangeName && nameChangedAt && (
               <p style={{ margin:'-10px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#8A8D91' }}>
                 Last changed {daysSinceChange} days ago
               </p>
