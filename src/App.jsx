@@ -17,6 +17,7 @@ import AppsPage from './pages/AppsPage'
 import ProfilePage from './pages/ProfilePage'
 import CodeGatePage from './pages/CodeGatePage'
 import { supabase } from './lib/supabase'
+import { useDeadlineReminders } from './hooks/useDeadlineReminders'
 
 // ── Short link resolver ───────────────────────────────────────
 function ShortLinkResolver() {
@@ -131,6 +132,12 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// Fires deadline reminder notifications once per day on app load
+function DeadlineReminderRunner() {
+  useDeadlineReminders()
+  return null
+}
+
 function AppRoutes() {
   const { user } = useAuth()
   const [showSearch, setShowSearch] = useState(false)
@@ -144,6 +151,9 @@ function AppRoutes() {
 
   return (
     <>
+      {/* Deadline reminders fire on every authenticated session, once per day */}
+      {user && <DeadlineReminderRunner />}
+
       <Routes>
         <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
 
