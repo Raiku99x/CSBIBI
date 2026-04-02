@@ -153,7 +153,7 @@ function buildMessengerText(post) {
   if (quoted && quoted.message) {
     const msgText = quoted.message
     const fromLabel = quoted.from ? `From ${quoted.from}` : 'Quoted message'
-    const divider = '─'.repeat(39)
+    const divider = '─'.repeat(17)
     lines.push(divider)
     lines.push(`💬 ${fromLabel}:`)
     lines.push(`"${msgText}"`)
