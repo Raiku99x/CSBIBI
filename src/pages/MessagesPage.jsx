@@ -32,9 +32,9 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
   const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
-    const { data: dmRows } = await supabase
-      .from('direct_messages')
-      .select('*, sender:profiles!direct_messages_sender_id_fkey(*), receiver:profiles!direct_messages_receiver_id_fkey(*)')
+      const { data: dmRows } = await supabase
+        .from('direct_messages')
+        .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
       .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false })
 
@@ -70,7 +70,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
 
   useEffect(() => {
     refresh()
-    supabase.from('profiles').select('id, display_name, avatar_url, email')
+    supabase.from('profiles').select('id, display_name, avatar_url, email, username')
       .neq('id', currentUserId).then(({ data }) => { if (data) setAllUsers(data) })
 
     const ch = supabase.channel('inbox-' + currentUserId)
