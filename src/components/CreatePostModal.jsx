@@ -313,7 +313,7 @@ export default function CreatePostModal({
           quoted_message: quoted_data,
           scheduled_at: scheduledAt,
         })
-        .select('*, profiles(*), subjects(*)')
+        .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .single()
 
       if (error) throw error
