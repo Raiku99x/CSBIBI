@@ -79,8 +79,25 @@ export default function FeedPage() {
   useEffect(() => {
     if (!targetPostId || loading) return
     // Small delay so the DOM has painted
-    const timer = setTimeout(() => {
+let attempts = 0
+    const timer = setInterval(() => {
       const el = document.getElementById('post-' + targetPostId)
+      attempts++
+      if (el) {
+        clearInterval(timer)
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.style.outline = '2px solid ' + RED
+        el.style.outlineOffset = '-2px'
+        el.style.transition = 'outline 0.3s'
+        setTimeout(() => {
+          el.style.outline = 'none'
+          setSearchParams({}, { replace: true })
+        }, 2000)
+      } else if (attempts > 20) {
+        clearInterval(timer) // give up after 2s
+      }
+    }, 100)
+    return () => clearInterval(timer)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         // Flash highlight
