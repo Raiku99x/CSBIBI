@@ -96,7 +96,7 @@ function buildMessengerText(post) {
   const annType   = post.announcement_type || null
   const dueDate   = post.due_date || null
   const dueTime   = post.due_time || null
-  const shortId  = post.id.replace(/-/g, '').slice(0, 4)
+  const shortId  = post.short_id || post.id.replace(/-/g, '').slice(0, 4)
   const shareUrl = `${window.location.origin}/p/${shortId}`
 
   const photos    = parsePhotos(post.photo_url)
