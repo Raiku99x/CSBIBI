@@ -356,7 +356,7 @@ export default function AnnouncementsPage() {
       const subjectIds = enrolled?.map(e => e.subject_id) || []
 
       let query = supabase
-        .from('posts').select('*, profiles(*), subjects(*)')
+        .from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .eq('post_type', 'announcement')
         .not('due_date', 'is', null)
         .order('due_date', { ascending: true })
