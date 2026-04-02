@@ -511,7 +511,7 @@ function DMConversation({ partner, currentUserId, onBack }) {
         <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} alt="" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.display_name}</p>
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>{partner.email}</p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>@{partner.username || partner.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
         </div>
       </div>
 
