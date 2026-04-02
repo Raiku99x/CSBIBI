@@ -20,6 +20,9 @@ export function useDeadlineReminders() {
 
   useEffect(() => {
     if (!user) return
+    const key = `csb_reminders_${new Date().toISOString().split('T')[0]}_${user.id}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
 
     async function checkAndNotify() {
       // 1. Get user's enrolled subjects
