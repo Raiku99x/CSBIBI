@@ -324,10 +324,15 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
               </div>
 
               <div style={{ marginTop:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
                   <span style={{ fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:20, color:'#050505' }}>
                     {profile.display_name}
                   </span>
+                  {profile.username && (
+                    <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#8A8D91' }}>
+                      @{profile.username}
+                    </span>
+                  )}
                   <RoleBadge role={profile.role}/>
                   {profile.is_banned && (
                     <span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#FEE2E2',color:RED,border:'1px solid #FECACA',borderRadius:12,padding:'3px 8px',fontSize:11,fontWeight:700,fontFamily:'"Instrument Sans",system-ui' }}>
