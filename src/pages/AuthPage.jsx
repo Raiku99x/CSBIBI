@@ -14,7 +14,6 @@ const FEATURES = [
   { icon: <FileText size={15} />,    text: 'File & media sharing'            },
 ]
 
-// Google SVG icon
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -27,34 +26,37 @@ function GoogleIcon() {
 }
 
 export default function AuthPage() {
-  // step: 'choose' | 'otp-email' | 'otp-verify'
-  const [step, setStep]       = useState('choose')
-  const [email, setEmail]     = useState('')
-  const [otp, setOtp]         = useState(['', '', '', '', '', ''])
-  const [loading, setLoading] = useState(false)
+  const [step, setStep]           = useState('choose')
+  const [email, setEmail]         = useState('')
+  const [otp, setOtp]             = useState(['', '', '', '', '', ''])
+  const [loading, setLoading]     = useState(false)
+  const [otpAttempts, setOtpAttempts] = useState(0)
   const { signInWithGoogle, signInWithOTP, verifyOTP } = useAuth()
 
-  // ── Google ────────────────────────────────────────────────
   async function handleGoogle() {
     setLoading(true)
     try {
       await signInWithGoogle()
-      // Supabase redirects back — no further action needed here
     } catch (err) {
       toast.error(err.message || 'Google sign-in failed')
       setLoading(false)
     }
   }
 
-  // ── Send OTP ──────────────────────────────────────────────
   async function handleSendOTP(e) {
     e.preventDefault()
     if (!email.trim()) { toast.error('Enter your email'); return }
+    // Basic email format check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error('Enter a valid email address')
+      return
+    }
     setLoading(true)
     try {
       await signInWithOTP(email.trim().toLowerCase())
       toast.success('Code sent! Check your email.')
       setStep('otp-verify')
+      setOtpAttempts(0)
     } catch (err) {
       toast.error(err.message || 'Failed to send code')
     } finally {
@@ -62,24 +64,36 @@ export default function AuthPage() {
     }
   }
 
-  // ── Verify OTP ────────────────────────────────────────────
   async function handleVerifyOTP(e) {
     e.preventDefault()
     const token = otp.join('')
     if (token.length !== 6) { toast.error('Enter the full 6-digit code'); return }
+
+    // Block after 5 failed attempts
+    if (otpAttempts >= 5) {
+      toast.error('Too many failed attempts. Request a new code.', { duration: 5000 })
+      setStep('otp-email')
+      setOtpAttempts(0)
+      setOtp(['','','','','',''])
+      return
+    }
+
     setLoading(true)
     try {
       await verifyOTP(email.trim().toLowerCase(), token)
-      // AuthContext will update — App.jsx will route to CodeGatePage
     } catch (err) {
-      toast.error(err.message || 'Invalid or expired code')
+      const attemptsLeft = 4 - otpAttempts
+      setOtpAttempts(a => a + 1)
+      toast.error(attemptsLeft > 0
+        ? `Invalid code. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`
+        : 'Last attempt failed. Request a new code.'
+      )
       setOtp(['', '', '', '', '', ''])
     } finally {
       setLoading(false)
     }
   }
 
-  // ── OTP box input handler ─────────────────────────────────
   function handleOtpChange(idx, val) {
     if (!/^\d?$/.test(val)) return
     const next = [...otp]
@@ -161,13 +175,10 @@ export default function AuthPage() {
       `}</style>
 
       <div className="auth-page">
-
-        {/* ── Left panel ── */}
         <div className="auth-left">
           <div className="auth-left-dots"/>
           <div style={{ position:'absolute',top:-80,right:-60,width:280,height:280,borderRadius:'50%',background:'rgba(255,255,255,0.06)',filter:'blur(45px)',pointerEvents:'none' }}/>
           <div style={{ position:'absolute',bottom:-60,left:-40,width:240,height:240,borderRadius:'50%',background:'rgba(26,82,118,0.35)',filter:'blur(55px)',pointerEvents:'none' }}/>
-
           <div style={{ position:'relative',zIndex:1 }}>
             <div style={{ display:'flex',alignItems:'center',gap:16,marginBottom:44 }}>
               <div style={{ width:62,height:62,borderRadius:16,overflow:'hidden',flexShrink:0,border:'2.5px solid rgba(255,255,255,0.3)',boxShadow:'0 4px 20px rgba(0,0,0,0.25)' }}>
@@ -178,14 +189,12 @@ export default function AuthPage() {
                 <div style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:10.5,color:'rgba(255,255,255,0.6)',letterSpacing:'1.8px',textTransform:'uppercase',marginTop:3 }}>Computer Science Board</div>
               </div>
             </div>
-
             <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:21,fontWeight:700,color:'white',lineHeight:1.45,margin:'0 0 10px' }}>
               Your official hub for CS class coordination.
             </p>
             <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:'rgba(255,255,255,0.6)',lineHeight:1.65,margin:'0 0 40px',fontWeight:400 }}>
               Announcements, deadlines, materials, and class chat — all in one place.
             </p>
-
             <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
               {FEATURES.map((f, i) => (
                 <div key={i} style={{ display:'flex',alignItems:'center',gap:13,padding:'12px 16px',borderRadius:12,background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.15)' }}>
@@ -197,12 +206,10 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* ── Right panel ── */}
         <div className="auth-right">
           <div className="blob-1"/><div className="blob-2"/>
           <div className="blob-3"/><div className="blob-4"/>
 
-          {/* Mobile logo */}
           <div className="auth-mobile-logo" style={{ flexDirection:'column',alignItems:'center',gap:8,marginBottom:28,position:'relative',zIndex:1 }}>
             <div style={{ width:72,height:72,borderRadius:18,overflow:'hidden',border:'3px solid white',boxShadow:'0 4px 20px rgba(192,57,43,0.25)' }}>
               <img src="/announce.png" alt="CSB" style={{ width:'100%',height:'100%',objectFit:'cover' }}/>
@@ -213,10 +220,8 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* ── Card ── */}
           <div className="auth-card" style={{ width:'100%',maxWidth:420,background:'rgba(255,255,255,0.88)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderRadius:20,padding:'32px 30px',boxShadow:'0 16px 56px rgba(0,0,0,0.14),0 2px 12px rgba(0,0,0,0.08)',border:'1px solid rgba(255,255,255,0.95)' }}>
 
-            {/* ── STEP: choose ── */}
             {step === 'choose' && (
               <>
                 <div style={{ textAlign:'center',marginBottom:28 }}>
@@ -228,32 +233,24 @@ export default function AuthPage() {
                   </p>
                 </div>
 
-                {/* Google button */}
-                <button
-                  onClick={handleGoogle}
-                  disabled={loading}
+                <button onClick={handleGoogle} disabled={loading}
                   style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px 0',borderRadius:11,border:'1.5px solid #E4E6EB',background:'white',cursor:loading?'not-allowed':'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,color:'#050505',marginBottom:12,transition:'all 0.15s',boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}
                   onMouseEnter={e => { if(!loading){e.currentTarget.style.background='#F7F8FA';e.currentTarget.style.borderColor='#CED0D4'}}}
-                  onMouseLeave={e => { e.currentTarget.style.background='white';e.currentTarget.style.borderColor='#E4E6EB' }}
-                >
+                  onMouseLeave={e => { e.currentTarget.style.background='white';e.currentTarget.style.borderColor='#E4E6EB' }}>
                   {loading ? <Loader2 size={17} style={{ animation:'spin 0.8s linear infinite' }}/> : <GoogleIcon/>}
                   Continue with Google
                 </button>
 
-                {/* Divider */}
                 <div style={{ display:'flex',alignItems:'center',gap:12,margin:'8px 0' }}>
                   <div style={{ flex:1,height:1,background:'#EAECEF' }}/>
                   <span style={{ color:'#BCC0C4',fontSize:12,fontFamily:'"Instrument Sans",system-ui' }}>or</span>
                   <div style={{ flex:1,height:1,background:'#EAECEF' }}/>
                 </div>
 
-                {/* Email OTP button */}
-                <button
-                  onClick={() => setStep('otp-email')}
+                <button onClick={() => setStep('otp-email')}
                   style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px 0',borderRadius:11,border:'none',background:RED,cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,color:'white',marginTop:8,transition:'all 0.15s',boxShadow:'0 4px 16px rgba(192,57,43,0.32)' }}
                   onMouseEnter={e => e.currentTarget.style.background=DARK}
-                  onMouseLeave={e => e.currentTarget.style.background=RED}
-                >
+                  onMouseLeave={e => e.currentTarget.style.background=RED}>
                   <Mail size={17}/>
                   Continue with Email
                 </button>
@@ -265,13 +262,11 @@ export default function AuthPage() {
               </>
             )}
 
-            {/* ── STEP: otp-email ── */}
             {step === 'otp-email' && (
               <>
                 <button onClick={() => setStep('choose')} style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
                   <ChevronLeft size={15}/> Back
                 </button>
-
                 <div style={{ marginBottom:24 }}>
                   <div style={{ width:44,height:44,borderRadius:12,background:'#FADBD8',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14 }}>
                     <Mail size={20} color={RED}/>
@@ -283,23 +278,15 @@ export default function AuthPage() {
                     We'll send a 6-digit code to sign you in.
                   </p>
                 </div>
-
                 <form onSubmit={handleSendOTP}>
                   <div style={{ display:'flex',alignItems:'center',gap:10,padding:'0 14px',height:52,borderRadius:11,border:`1.5px solid #E4E6EB`,background:'#F7F8FA',marginBottom:14,transition:'all 0.15s' }}
                     onFocusCapture={e => e.currentTarget.style.borderColor=RED}
                     onBlurCapture={e => e.currentTarget.style.borderColor='#E4E6EB'}>
                     <Mail size={16} color="#BCC0C4"/>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      required
-                      autoFocus
-                      style={{ flex:1,border:'none',background:'transparent',outline:'none',fontSize:15,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui' }}
-                    />
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                      placeholder="your@email.com" required autoFocus maxLength={100}
+                      style={{ flex:1,border:'none',background:'transparent',outline:'none',fontSize:15,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui' }}/>
                   </div>
-
                   <button type="submit" disabled={loading || !email.trim()}
                     style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'13px 0',borderRadius:11,border:'none',background:email.trim()?RED:'#E4E6EB',color:email.trim()?'white':'#BCC0C4',cursor:email.trim()?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,transition:'all 0.15s',boxShadow:email.trim()?'0 4px 16px rgba(192,57,43,0.32)':'none' }}
                     onMouseEnter={e => { if(email.trim()) e.currentTarget.style.background=DARK }}
@@ -310,13 +297,12 @@ export default function AuthPage() {
               </>
             )}
 
-            {/* ── STEP: otp-verify ── */}
             {step === 'otp-verify' && (
               <>
-                <button onClick={() => { setStep('otp-email'); setOtp(['','','','','','']) }} style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
+                <button onClick={() => { setStep('otp-email'); setOtp(['','','','','','']); setOtpAttempts(0) }}
+                  style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
                   <ChevronLeft size={15}/> Back
                 </button>
-
                 <div style={{ marginBottom:24 }}>
                   <div style={{ width:44,height:44,borderRadius:12,background:'#FADBD8',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14 }}>
                     <span style={{ fontSize:22 }}>📬</span>
@@ -330,33 +316,34 @@ export default function AuthPage() {
                   </p>
                 </div>
 
+                {/* Attempts warning */}
+                {otpAttempts >= 3 && (
+                  <div style={{ display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:9,marginBottom:14 }}>
+                    <span style={{ fontSize:14 }}>⚠️</span>
+                    <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:600,color:'#C2410C' }}>
+                      {5 - otpAttempts} attempt{5 - otpAttempts !== 1 ? 's' : ''} remaining before lockout
+                    </p>
+                  </div>
+                )}
+
                 <form onSubmit={handleVerifyOTP}>
-                  {/* OTP boxes */}
                   <div style={{ display:'flex',gap:8,justifyContent:'center',marginBottom:20 }} onPaste={handleOtpPaste}>
                     {otp.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        id={`otp-${idx}`}
-                        className="otp-input"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
+                      <input key={idx} id={`otp-${idx}`} className="otp-input"
+                        type="text" inputMode="numeric" maxLength={1} value={digit}
                         onChange={e => handleOtpChange(idx, e.target.value)}
                         onKeyDown={e => handleOtpKeyDown(idx, e)}
                         autoFocus={idx === 0}
-                        style={{ width:46,height:54,borderRadius:12,border:'1.5px solid #E4E6EB',background:'#F7F8FA',textAlign:'center',fontSize:22,fontWeight:800,fontFamily:'"Bricolage Grotesque",system-ui',color:'#050505',outline:'none',transition:'all 0.15s',caretColor:RED }}
-                      />
+                        style={{ width:46,height:54,borderRadius:12,border:'1.5px solid #E4E6EB',background:'#F7F8FA',textAlign:'center',fontSize:22,fontWeight:800,fontFamily:'"Bricolage Grotesque",system-ui',color:'#050505',outline:'none',transition:'all 0.15s',caretColor:RED }}/>
                     ))}
                   </div>
-
                   <button type="submit" disabled={loading || otp.join('').length !== 6}
                     style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'13px 0',borderRadius:11,border:'none',background:otp.join('').length===6?RED:'#E4E6EB',color:otp.join('').length===6?'white':'#BCC0C4',cursor:otp.join('').length===6?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,transition:'all 0.15s',boxShadow:otp.join('').length===6?'0 4px 16px rgba(192,57,43,0.32)':'none' }}>
                     {loading ? <Loader2 size={17} style={{ animation:'spin 0.8s linear infinite' }}/> : 'Verify & Continue'}
                   </button>
                 </form>
 
-                <button onClick={handleSendOTP} disabled={loading}
+                <button onClick={e => { setOtpAttempts(0); handleSendOTP(e) }} disabled={loading}
                   style={{ width:'100%',marginTop:12,padding:'10px',borderRadius:10,border:'none',background:'transparent',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:'#65676B',transition:'color 0.12s' }}
                   onMouseEnter={e => e.currentTarget.style.color=RED}
                   onMouseLeave={e => e.currentTarget.style.color='#65676B'}>
@@ -364,7 +351,6 @@ export default function AuthPage() {
                 </button>
               </>
             )}
-
           </div>
 
           <p style={{ textAlign:'center',fontSize:11.5,color:'rgba(100,100,120,0.6)',marginTop:24,fontFamily:'"Instrument Sans",system-ui',position:'relative',zIndex:1 }}>
