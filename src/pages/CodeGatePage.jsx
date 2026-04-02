@@ -81,9 +81,10 @@ export default function CodeGatePage() {
   // Step 1 — code verification
   const [code, setCode]         = useState('')
   const [codeRow, setCodeRow]   = useState(null) // verified code data
+  const [codeError, setCodeError] = useState('') // 'invalid' | 'used' | ''
 
   // Step 2 — basic info
-  const [fullName, setFullName]     = useState('')
+  const [fullName, setFullName]     = useState('')  // always blank — user picks their name
   const [gender, setGender]         = useState('')
   const [birthday, setBirthday]     = useState('')
   const [nameError, setNameError]   = useState('')
@@ -117,25 +118,41 @@ export default function CodeGatePage() {
   async function handleVerify(e) {
     e.preventDefault()
     const trimmed = code.trim().toLowerCase()
-    if (!trimmed) { toast.error('Enter your student code'); return }
+    if (!trimmed) { setCodeError('invalid'); return }
     setLoading(true)
+    setCodeError('')
     try {
-      const { data: row, error } = await supabase
+      // First check if code exists at all
+      const { data: anyRow } = await supabase
         .from('allowed_codes')
-        .select('*')
+        .select('id, is_used')
         .eq('code', trimmed)
-        .eq('is_used', false)
         .single()
 
-      if (error || !row) {
-        toast.error('Invalid or already used code. Contact your admin.')
+      if (!anyRow) {
+        // Code doesn't exist
+        setCodeError('invalid')
         setLoading(false)
         return
       }
 
+      if (anyRow.is_used) {
+        // Code exists but already claimed
+        setCodeError('used')
+        setLoading(false)
+        return
+      }
+
+      // Code is valid and unused — fetch full row
+      const { data: row } = await supabase
+        .from('allowed_codes')
+        .select('*')
+        .eq('code', trimmed)
+        .single()
+
       setCodeRow(row)
-      // Pre-fill name from code if available
-      if (row.name) setFullName(row.name)
+      // Do NOT pre-fill name — let user choose
+      setFullName('')
       setStep(2)
     } catch (err) {
       toast.error(err.message || 'Something went wrong')
@@ -315,11 +332,36 @@ export default function CodeGatePage() {
                   </div>
                 </div>
 
+                {/* ── Error banners — separated ── */}
+                {codeError === 'invalid' && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 13px', background: '#FEF2F2', border: '1.5px solid #FECACA', borderLeft: `4px solid ${RED}`, borderRadius: '0 10px 10px 0', marginBottom: 14, animation: 'stepIn 0.2s ease' }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>❌</span>
+                    <div>
+                      <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: RED }}>Invalid code</p>
+                      <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#B91C1C', lineHeight: 1.4 }}>
+                        This code doesn't exist. Double-check your CSPC email or contact your admin.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {codeError === 'used' && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 13px', background: '#FFF7ED', border: '1.5px solid #FED7AA', borderLeft: '4px solid #C2410C', borderRadius: '0 10px 10px 0', marginBottom: 14, animation: 'stepIn 0.2s ease' }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+                    <div>
+                      <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13, color: '#C2410C' }}>Code already used</p>
+                      <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#92400E', lineHeight: 1.4 }}>
+                        This code has already been claimed by someone. Contact your admin if you think this is a mistake.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <Field label="Enter your code" required>
                   <div style={{ position: 'relative' }}>
                     <Mail size={15} color="#BCC0C4" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}/>
-                    <input className="csb-input" style={{ paddingLeft: 38 }} type="text" value={code}
-                      onChange={e => setCode(e.target.value.toLowerCase())}
+                    <input className="csb-input" style={{ paddingLeft: 38, borderColor: codeError ? RED : undefined }} type="text" value={code}
+                      onChange={e => { setCode(e.target.value.toLowerCase()); setCodeError('') }}
                       placeholder="yourname@my.cspc.edu.ph"
                       maxLength={60} autoFocus spellCheck={false} autoComplete="off" autoCapitalize="none" inputMode="email"/>
                   </div>
@@ -329,11 +371,6 @@ export default function CodeGatePage() {
                   style={{ background: code.trim() ? RED : '#E4E6EB', color: code.trim() ? 'white' : '#BCC0C4', cursor: code.trim() ? 'pointer' : 'not-allowed', marginTop: 16, boxShadow: code.trim() ? '0 6px 20px rgba(192,57,43,0.26)' : 'none' }}>
                   {loading ? <><Loader2 size={16} style={{ animation: 'spin 0.8s linear infinite' }}/> Verifying…</> : <><span>Verify Code</span><ArrowRight size={15}/></>}
                 </button>
-
-                <div style={{ marginTop: 13, padding: '10px 13px', background: '#EBF5FB', borderRadius: 10, border: '1px solid #AED6F1', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>ℹ️</span>
-                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: BLUE, lineHeight: 1.5 }}>Each code is <strong>unique</strong> and can only be used once.</p>
-                </div>
               </div>
             )}
 
