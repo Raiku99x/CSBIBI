@@ -286,7 +286,7 @@ export default function FeedPage() {
       {showCreate && (
         <CreatePostModal
           onClose={handleModalClose}
-          onCreated={fetchInitial}
+          onCreated={() => {}}
           subjects={subjects}
           defaultType={createType}
           defaultSubType={createSubType}
