@@ -18,6 +18,13 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+function genShortId() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let id = ''
+  for (let i = 0; i < 4; i++) id += chars[Math.floor(Math.random() * chars.length)]
+  return id
+}
+
 const MAX_PHOTOS = 20
 const MAX_FILES = 10
 
@@ -293,6 +300,7 @@ export default function CreatePostModal({
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
+          short_id: genShortId(),
           author_id: user.id,
           subject_id: form.subject_id || null,
           caption: form.caption.trim(),
