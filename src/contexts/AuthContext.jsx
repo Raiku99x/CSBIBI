@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
   async function fetchProfile(userId) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at, is_verified, student_code, identifier, section, force_logout_at')
+      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at, is_verified, student_code, identifier, section, force_logout_at, username')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -98,7 +98,7 @@ export function AuthProvider({ children }) {
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at, is_verified, student_code, identifier, section, force_logout_at')
+      .select('id, email, display_name, avatar_url, role, is_banned, is_muted, muted_until, banned_at, banned_reason, created_at, is_verified, student_code, identifier, section, force_logout_at, username')
       .single()
     if (error) throw error
     setProfile(data)
