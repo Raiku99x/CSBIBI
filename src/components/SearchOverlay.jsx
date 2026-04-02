@@ -69,7 +69,7 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    supabase.from("posts").select("*, profiles(*), subjects(*)")
+    supabase.from("posts").select("*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)")
       .order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => { if (data) setPosts(data); setPostsLoading(false); });
   }, []);
