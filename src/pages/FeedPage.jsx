@@ -21,6 +21,7 @@ function dicebearUrl(name = '') {
 }
 
 const RED = '#C0392B'
+const PAGE_SIZE = 20
 
 function isScheduledFuture(post) {
   if (!post.scheduled_at) return false
@@ -35,11 +36,12 @@ export default function FeedPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const targetPostId = searchParams.get('post')
-  const highlightRef = useRef(null)
 
   const [posts, setPosts]               = useState([])
   const [subjects, setSubjects]         = useState([])
   const [loading, setLoading]           = useState(true)
+  const [loadingMore, setLoadingMore]   = useState(false)
+  const [hasMore, setHasMore]           = useState(true)
   const [showCreate, setShowCreate]     = useState(false)
   const [createType, setCreateType]     = useState('status')
   const [createSubType, setCreateSubType] = useState('')
@@ -47,16 +49,72 @@ export default function FeedPage() {
   const [autoOpenFile, setAutoOpenFile]   = useState(false)
   const [viewingUserId, setViewingUserId] = useState(null)
 
-  const fetchPosts = useCallback(async () => {
+  const sentinelRef = useRef(null)
+  const oldestCreatedAt = useRef(null)
+  const loadingMoreRef = useRef(false)
+  const hasMoreRef = useRef(true)
+
+  // ── Initial load ──────────────────────────────────────────
+  const fetchInitial = useCallback(async () => {
+    setLoading(true)
     const { data } = await supabase
-      .from('posts').select('*, profiles(*), subjects(*)')
-      .order('created_at', { ascending: false }).limit(50)
-    if (data) setPosts(data)
+      .from('posts')
+      .select('*, profiles(*), subjects(*)')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+    if (data) {
+      setPosts(data)
+      const more = data.length === PAGE_SIZE
+      setHasMore(more)
+      hasMoreRef.current = more
+      if (data.length > 0) oldestCreatedAt.current = data[data.length - 1].created_at
+    }
     setLoading(false)
   }, [])
 
+  // ── Load more ─────────────────────────────────────────────
+  const fetchMore = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMoreRef.current || !oldestCreatedAt.current) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    const { data } = await supabase
+      .from('posts')
+      .select('*, profiles(*), subjects(*)')
+      .order('created_at', { ascending: false })
+      .lt('created_at', oldestCreatedAt.current)
+      .limit(PAGE_SIZE)
+    if (data && data.length > 0) {
+      setPosts(prev => {
+        const existingIds = new Set(prev.map(p => p.id))
+        return [...prev, ...data.filter(p => !existingIds.has(p.id))]
+      })
+      const more = data.length === PAGE_SIZE
+      setHasMore(more)
+      hasMoreRef.current = more
+      oldestCreatedAt.current = data[data.length - 1].created_at
+    } else {
+      setHasMore(false)
+      hasMoreRef.current = false
+    }
+    loadingMoreRef.current = false
+    setLoadingMore(false)
+  }, [])
+
+  // ── IntersectionObserver ──────────────────────────────────
   useEffect(() => {
-    fetchPosts()
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) fetchMore() },
+      { rootMargin: '300px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [fetchMore, loading])
+
+  // ── Realtime new posts ────────────────────────────────────
+  useEffect(() => {
+    fetchInitial()
     supabase.from('subjects').select('*').order('name').then(({ data }) => { if (data) setSubjects(data) })
 
     const channel = supabase.channel('feed-posts')
@@ -71,9 +129,9 @@ export default function FeedPage() {
         }
       }).subscribe()
     return () => supabase.removeChannel(channel)
-  }, [fetchPosts, user?.id, isSuperadmin])
+  }, [fetchInitial, user?.id, isSuperadmin])
 
-  // Scroll to and highlight the target post — retries until element is in DOM
+  // ── Scroll to highlighted post ────────────────────────────
   useEffect(() => {
     if (!targetPostId) return
     let attempts = 0
@@ -95,7 +153,7 @@ export default function FeedPage() {
       }
     }, 100)
     return () => clearInterval(timer)
-  }, [targetPostId, loading, setSearchParams])
+  }, [targetPostId, setSearchParams])
 
   const visiblePosts = posts.filter(post => {
     if (!isScheduledFuture(post)) return true
@@ -196,18 +254,32 @@ export default function FeedPage() {
               />
             </div>
           ))}
-          <div style={{ padding:'16px 0 8px', textAlign:'center' }}>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>
-              · {visiblePosts.length} posts · You're all caught up ·
-            </span>
-          </div>
+
+          {/* Sentinel div — IntersectionObserver watches this */}
+          {hasMore && (
+            <div ref={sentinelRef} style={{ padding:'20px 0', display:'flex', justifyContent:'center', alignItems:'center', gap:8 }}>
+              {loadingMore && <>
+                <div style={{ width:18, height:18, borderRadius:'50%', border:`2.5px solid #E4E6EB`, borderTopColor:RED, animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>Loading more…</span>
+              </>}
+            </div>
+          )}
+
+          {/* End of feed */}
+          {!hasMore && (
+            <div style={{ padding:'16px 0 8px', textAlign:'center' }}>
+              <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>
+                · {visiblePosts.length} posts · You're all caught up ·
+              </span>
+            </div>
+          )}
         </div>
       )}
 
       {showCreate && (
         <CreatePostModal
           onClose={handleModalClose}
-          onCreated={fetchPosts}
+          onCreated={fetchInitial}
           subjects={subjects}
           defaultType={createType}
           defaultSubType={createSubType}
@@ -223,6 +295,8 @@ export default function FeedPage() {
           onSendDM={handleSendDM}
         />
       )}
+
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
