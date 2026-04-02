@@ -125,7 +125,14 @@ export default function FeedPage() {
         if (data) {
           const isFuture = isScheduledFuture(data)
           const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
-          if (canSee) setPosts(prev => [data, ...prev])
+          if (canSee) {
+            // ── FIX: deduplicate before prepending ──
+            // fetchInitial() and the realtime event both fire when you create a post.
+            // Without this check, whichever arrives second adds a duplicate.
+            setPosts(prev =>
+              prev.some(p => p.id === data.id) ? prev : [data, ...prev]
+            )
+          }
         }
       }).subscribe()
     return () => supabase.removeChannel(channel)
