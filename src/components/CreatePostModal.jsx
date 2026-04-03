@@ -15,7 +15,7 @@ import {
   X, Image, Paperclip, ChevronDown, Loader2,
   Plus, MessageSquareQuote, Eye, EyeOff,
   ClipboardPaste, Trash2, Clock, FileText,
-  Users, Globe, Search
+  Users, Globe, Search, Check
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -89,13 +89,18 @@ export default function CreatePostModal({
   })
 
   // ── Visibility / Group state ──
-  const [visibility, setVisibility]         = useState('class') // 'class' | 'group'
-  const [groupMembers, setGroupMembers]     = useState([])      // array of {id, display_name, avatar_url}
+  const [visibility, setVisibility]         = useState('class')
+  const [groupMembers, setGroupMembers]     = useState([])
   const [memberSearch, setMemberSearch]     = useState('')
   const [searchResults, setSearchResults]   = useState([])
   const [searchLoading, setSearchLoading]   = useState(false)
   const [groupError, setGroupError]         = useState(false)
+  const [showVisibilityDropdown, setShowVisibilityDropdown] = useState(false)
+  const [showMemberPanel, setShowMemberPanel] = useState(false)
+  const [pendingMembers, setPendingMembers] = useState([]) // temp selection in panel
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
   const searchTimeout                       = useRef(null)
+  const visibilityDropdownRef               = useRef(null)
 
   const [photoFiles, setPhotoFiles]         = useState([])
   const [photoPreviews, setPhotoPreviews]   = useState([])
@@ -118,6 +123,17 @@ export default function CreatePostModal({
     if (autoOpenPhoto) { const t = setTimeout(() => photoRef.current?.click(), 150); return () => clearTimeout(t) }
     if (autoOpenFile)  { const t = setTimeout(() => fileRef.current?.click(),  150); return () => clearTimeout(t) }
   }, [autoOpenPhoto, autoOpenFile])
+
+  // Close visibility dropdown on outside click
+  useEffect(() => {
+    function h(e) {
+      if (visibilityDropdownRef.current && !visibilityDropdownRef.current.contains(e.target)) {
+        setShowVisibilityDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const isAnnouncement   = selectedType?.post_type === 'announcement'
@@ -142,9 +158,60 @@ export default function CreatePostModal({
     set('announcement_type', '')
   }
 
-  // ── Member search ──
+  // Handle close with discard check
+  function handleClose() {
+    if (visibility === 'group' && groupMembers.length > 0) {
+      setDiscardDialogOpen(true)
+    } else {
+      onClose()
+    }
+  }
+
+  // ── Visibility change ──
+  function switchToClass() {
+    setVisibility('class')
+    setGroupMembers([])
+    setGroupError(false)
+    setShowVisibilityDropdown(false)
+  }
+
+  function switchToGroup() {
+    setVisibility('group')
+    setGroupError(false)
+    setShowVisibilityDropdown(false)
+  }
+
+  // ── Member panel ──
+  function openMemberPanel() {
+    setPendingMembers([...groupMembers])
+    setMemberSearch('')
+    setSearchResults([])
+    setShowMemberPanel(true)
+  }
+
+  function closeMemberPanelSafe() {
+    // If pending differs from committed, warn
+    const changed = pendingMembers.length !== groupMembers.length ||
+      pendingMembers.some(m => !groupMembers.find(g => g.id === m.id))
+    if (changed && pendingMembers.length > 0) {
+      if (!window.confirm('Discard member selection changes?')) return
+    }
+    setShowMemberPanel(false)
+    setMemberSearch('')
+    setSearchResults([])
+  }
+
+  function doneMemberPanel() {
+    setGroupMembers([...pendingMembers])
+    setGroupError(false)
+    setShowMemberPanel(false)
+    setMemberSearch('')
+    setSearchResults([])
+  }
+
+  // ── Member search (searches pendingMembers while panel is open) ──
   useEffect(() => {
-    if (visibility !== 'group') return
+    if (!showMemberPanel) return
     if (!memberSearch.trim()) { setSearchResults([]); return }
     clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(async () => {
@@ -155,9 +222,8 @@ export default function CreatePostModal({
           .select('id, display_name, avatar_url')
           .neq('id', user.id)
           .ilike('display_name', `%${memberSearch.trim()}%`)
-          .limit(10)
+          .limit(20)
 
-        // If subject selected, filter to enrolled users only
         if (form.subject_id) {
           const { data: enrolled } = await supabase
             .from('user_subjects')
@@ -173,21 +239,21 @@ export default function CreatePostModal({
         }
 
         const { data } = await query
-        const alreadyAdded = new Set(groupMembers.map(m => m.id))
-        setSearchResults((data || []).filter(u => !alreadyAdded.has(u.id)))
+        setSearchResults(data || [])
       } catch {
         setSearchResults([])
       }
       setSearchLoading(false)
     }, 300)
     return () => clearTimeout(searchTimeout.current)
-  }, [memberSearch, visibility, form.subject_id, user.id, groupMembers])
+  }, [memberSearch, showMemberPanel, form.subject_id, user.id])
 
-  function addMember(member) {
-    setGroupMembers(prev => [...prev, member])
-    setMemberSearch('')
-    setSearchResults([])
-    setGroupError(false)
+  function togglePendingMember(member) {
+    setPendingMembers(prev => {
+      const exists = prev.find(m => m.id === member.id)
+      if (exists) return prev.filter(m => m.id !== member.id)
+      return [...prev, member]
+    })
   }
 
   function removeMember(id) {
@@ -363,13 +429,144 @@ export default function CreatePostModal({
     return new Date(`${form.scheduled_date}T${time}:00`).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   }
 
+  // ── Visibility label for subtitle ──
+  function visibilityLabel() {
+    if (visibility === 'group') return `👥 Group${groupMembers.length > 0 ? ` (${groupMembers.length})` : ''}`
+    return '🌐 Class'
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+
+      {/* ── MEMBER PANEL (full-screen overlay) ── */}
+      {showMemberPanel && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
+          {/* Panel header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
+            <div>
+              <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505' }}>Select Members</span>
+              {pendingMembers.length > 0 && (
+                <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 10, background: '#7C3AED', color: 'white', fontSize: 11, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', padding: '0 5px' }}>
+                  {pendingMembers.length}
+                </span>
+              )}
+            </div>
+            <button onClick={closeMemberPanelSafe} style={{ width: 34, height: 34, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={16} color="#050505" />
+            </button>
+          </div>
+
+          {/* Info tip */}
+          <div style={{ margin: '10px 16px 0', padding: '9px 11px', background: '#EDE9FE', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
+            <span style={{ fontSize: 13 }}>💡</span>
+            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
+              {form.subject_id
+                ? "Showing only users enrolled in the selected subject. Can't find someone? They may not be enrolled in this subject."
+                : 'No subject selected — you can add anyone. Select a subject in the post to filter by enrolled users.'}
+            </p>
+          </div>
+
+          {/* Search */}
+          <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1.5px solid #DDD6FE', background: '#F9F7FF' }}>
+              <Search size={14} color="#8A8D91" />
+              <input
+                autoFocus
+                type="text"
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                placeholder="Search by name…"
+                style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', background: 'transparent' }}
+              />
+              {searchLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+              {memberSearch && !searchLoading && <button type="button" onClick={() => { setMemberSearch(''); setSearchResults([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}><X size={13} color="#8A8D91" /></button>}
+            </div>
+          </div>
+
+          {/* Member list */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
+            {searchResults.length > 0 ? (
+              searchResults.map(u => {
+                const checked = !!pendingMembers.find(m => m.id === u.id)
+                return (
+                  <button key={u.id} type="button" onClick={() => togglePendingMember(u)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', border: 'none', background: checked ? '#F5F3FF' : 'white', cursor: 'pointer', borderRadius: 10, marginBottom: 2, textAlign: 'left', transition: 'background 0.1s' }}
+                    onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#FAFAFA' }}
+                    onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'white' }}>
+                    <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #E4E6EB' }} alt="" />
+                    <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
+                    <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checked ? '#7C3AED' : '#CED0D4'}`, background: checked ? '#7C3AED' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                      {checked && <Check size={12} color="white" strokeWidth={3} />}
+                    </div>
+                  </button>
+                )
+              })
+            ) : memberSearch.trim() && !searchLoading ? (
+              <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>
+                  No results for "{memberSearch}"
+                  {form.subject_id && <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>They may not be enrolled in this subject</span>}
+                </p>
+              </div>
+            ) : !memberSearch.trim() && pendingMembers.length === 0 ? (
+              <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>Search for classmates to add</p>
+              </div>
+            ) : null}
+
+            {/* Selected members shown at bottom when not searching */}
+            {!memberSearch.trim() && pendingMembers.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5 }}>Selected ({pendingMembers.length})</p>
+                {pendingMembers.map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', borderRadius: 10, background: '#F5F3FF', marginBottom: 2 }}>
+                    <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #DDD6FE' }} alt="" />
+                    <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{m.display_name}</span>
+                    <button type="button" onClick={() => togglePendingMember(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}>
+                      <X size={14} color="#7C3AED" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Done button */}
+          <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))', borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
+            <button type="button" onClick={doneMemberPanel}
+              style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
+              {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── DISCARD DIALOG ── */}
+      {discardDialogOpen && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '22px 20px', maxWidth: 300, width: '100%', boxShadow: '0 16px 48px rgba(0,0,0,0.18)', animation: 'expandIn 0.16s ease' }}>
+            <p style={{ margin: '0 0 6px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505' }}>Discard changes?</p>
+            <p style={{ margin: '0 0 18px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#65676B', lineHeight: 1.5 }}>
+              You've selected {groupMembers.length} group member{groupMembers.length !== 1 ? 's' : ''}. Closing will discard these.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={() => setDiscardDialogOpen(false)}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid #E4E6EB', background: 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, color: '#050505' }}>
+                Stay
+              </button>
+              <button type="button" onClick={() => { setDiscardDialogOpen(false); onClose() }}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: '#E41E3F', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, color: 'white' }}>
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505' }}>Create Post</span>
-        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        <button onClick={handleClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
           onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}>
           <X size={18} color="#050505" />
@@ -384,11 +581,89 @@ export default function CreatePostModal({
           <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E4E6EB' }} alt="" />
           <div>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>{profile?.display_name}</p>
-            <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType ? selectedType.activeColor : '#8A8D91' }}>
-              {selectedType ? `${selectedType.emoji} ${selectedType.label} · ${visibility === 'group' ? `Group (${groupMembers.length})` : 'Class'}` : 'Select a type below to continue'}
-            </p>
+
+            {/* Inline visibility control */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, position: 'relative' }} ref={visibilityDropdownRef}>
+              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType ? selectedType.activeColor : '#8A8D91' }}>
+                {selectedType ? `${selectedType.emoji} ${selectedType.label}` : 'Select a type below'}
+              </p>
+              {selectedType && (
+                <>
+                  <span style={{ fontSize: 12, color: '#CED0D4', margin: '0 1px' }}>·</span>
+                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: visibility === 'group' ? '#7C3AED' : '#0D7377', fontWeight: 600 }}>
+                    {visibilityLabel()}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#CED0D4', margin: '0 1px' }}>·</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVisibilityDropdown(v => !v)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2 }}>
+                    change
+                  </button>
+
+                  {/* Inline dropdown */}
+                  {showVisibilityDropdown && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 20, marginTop: 5, background: 'white', borderRadius: 10, border: '1.5px solid #E4E6EB', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: 160, animation: 'expandIn 0.14s ease' }}>
+                      <button type="button" onClick={switchToClass}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px', border: 'none', background: visibility === 'class' ? '#E6F4F4' : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'class' ? 700 : 500, fontSize: 13, color: visibility === 'class' ? '#0D7377' : '#050505', transition: 'background 0.1s' }}
+                        onMouseEnter={e => { if (visibility !== 'class') e.currentTarget.style.background = '#F7F8FA' }}
+                        onMouseLeave={e => { if (visibility !== 'class') e.currentTarget.style.background = 'white' }}>
+                        <Globe size={14} color={visibility === 'class' ? '#0D7377' : '#65676B'} />
+                        🌐 Class
+                        {visibility === 'class' && <Check size={12} color="#0D7377" style={{ marginLeft: 'auto' }} />}
+                      </button>
+                      <div style={{ height: 1, background: '#F0F2F5' }} />
+                      <button type="button" onClick={switchToGroup}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px', border: 'none', background: visibility === 'group' ? '#F5F3FF' : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'group' ? 700 : 500, fontSize: 13, color: visibility === 'group' ? '#7C3AED' : '#050505', transition: 'background 0.1s' }}
+                        onMouseEnter={e => { if (visibility !== 'group') e.currentTarget.style.background = '#F7F8FA' }}
+                        onMouseLeave={e => { if (visibility !== 'group') e.currentTarget.style.background = 'white' }}>
+                        <Users size={14} color={visibility === 'group' ? '#7C3AED' : '#65676B'} />
+                        👥 Group
+                        {visibility === 'group' && <Check size={12} color="#7C3AED" style={{ marginLeft: 'auto' }} />}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* ── GROUP MEMBER BUTTON (when group selected) ── */}
+        {selectedType && visibility === 'group' && (
+          <div style={{ marginBottom: 14, animation: 'expandIn 0.18s ease' }}>
+            <button type="button" onClick={openMemberPanel}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 11, border: `1.5px solid ${groupError ? '#E41E3F' : groupMembers.length > 0 ? '#DDD6FE' : '#E4E6EB'}`, background: groupMembers.length > 0 ? '#F5F3FF' : '#FAFAFA', cursor: 'pointer', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#7C3AED'; e.currentTarget.style.background = '#F5F3FF' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = groupError ? '#E41E3F' : groupMembers.length > 0 ? '#DDD6FE' : '#E4E6EB'; e.currentTarget.style.background = groupMembers.length > 0 ? '#F5F3FF' : '#FAFAFA' }}>
+              <Users size={16} color={groupError ? '#E41E3F' : '#7C3AED'} />
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                {groupMembers.length > 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {groupMembers.slice(0, 4).map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px 2px 4px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE' }}>
+                        <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, fontWeight: 600, color: '#5B21B6' }}>{m.display_name.split(' ')[0]}</span>
+                      </div>
+                    ))}
+                    {groupMembers.length > 4 && (
+                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, fontWeight: 600, color: '#7C3AED' }}>+{groupMembers.length - 4} more</span>
+                    )}
+                  </div>
+                ) : (
+                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, fontWeight: 600, color: groupError ? '#E41E3F' : '#7C3AED' }}>
+                    {groupError ? '⚠️ Add at least one member' : 'Select group members →'}
+                  </span>
+                )}
+              </div>
+              {groupMembers.length > 0 && (
+                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED', flexShrink: 0 }}>
+                  {groupMembers.length} selected · Edit
+                </span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* ── PILL CHIPS ── */}
         <div ref={typePickerRef} style={{ marginBottom: 16, padding: typeError ? '10px' : '0', borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s' }}>
@@ -411,15 +686,15 @@ export default function CreatePostModal({
           </div>
         </div>
 
-        {/* Textarea — always visible */}
+        {/* Textarea */}
         <div style={{ background: '#F7F8FA', borderRadius: 12, padding: '12px 14px', marginBottom: 12, border: '1.5px solid #E4E6EB' }}>
           <textarea autoFocus
             placeholder={
               !selectedType ? `What's on your mind, ${profile?.display_name?.split(' ')[0] || 'there'}?`
-              : isDeadline ? "Describe this deadline…"
+              : isDeadline ? 'Describe this deadline…'
               : selectedType.sub_type === 'reminder' ? "What's the reminder about?"
               : isAnnouncement ? "What's the announcement about?"
-              : isMaterial ? "Add a description for this material…"
+              : isMaterial ? 'Add a description for this material…'
               : `What's on your mind, ${profile?.display_name?.split(' ')[0] || 'there'}?`
             }
             rows={5} value={form.caption} onChange={e => set('caption', e.target.value)}
@@ -427,7 +702,7 @@ export default function CreatePostModal({
           />
         </div>
 
-        {/* Announcement category — only when type selected */}
+        {/* Announcement category */}
         {isAnnouncement && (
           <div style={{ position: 'relative', marginBottom: 12 }}>
             <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
@@ -439,7 +714,7 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Subject — always visible */}
+        {/* Subject */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <select value={form.subject_id} onChange={e => { set('subject_id', e.target.value); setGroupMembers([]); setMemberSearch(''); setSearchResults([]) }}
             style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
@@ -449,102 +724,7 @@ export default function CreatePostModal({
           <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
         </div>
 
-        {/* ── VISIBILITY TOGGLE ── */}
-        <div style={{ marginBottom: 12 }}>
-          <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>Who can see this?</p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {/* Class */}
-            <button type="button" onClick={() => { setVisibility('class'); setGroupMembers([]); setGroupError(false) }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${visibility === 'class' ? '#0D7377' : '#E4E6EB'}`, background: visibility === 'class' ? '#E6F4F4' : '#F7F8FA', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'class' ? 700 : 500, fontSize: 14, color: visibility === 'class' ? '#0D7377' : '#65676B', transition: 'all 0.15s' }}>
-              <Globe size={16} color={visibility === 'class' ? '#0D7377' : '#8A8D91'} />
-              Class
-            </button>
-            {/* Group */}
-            <button type="button" onClick={() => { setVisibility('group'); setGroupError(false) }}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#E4E6EB'}`, background: visibility === 'group' ? (groupError ? '#FFF0F0' : '#F5F3FF') : '#F7F8FA', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'group' ? 700 : 500, fontSize: 14, color: visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#65676B', transition: 'all 0.15s' }}>
-              <Users size={16} color={visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#8A8D91'} />
-              Group
-            </button>
-          </div>
-        </div>
-
-        {/* ── GROUP MEMBER PICKER ── */}
-        {visibility === 'group' && (
-          <div style={{ marginBottom: 12, padding: '12px', background: '#FAFAFA', borderRadius: 12, border: `1.5px solid ${groupError ? '#E41E3F' : '#DDD6FE'}`, animation: 'expandIn 0.18s ease' }}>
-
-            {/* Info tip */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 10, padding: '8px 10px', background: '#EDE9FE', borderRadius: 8 }}>
-              <span style={{ fontSize: 13 }}>💡</span>
-              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
-                {form.subject_id
-                  ? "Showing only users enrolled in the selected subject. Can't find someone? They may not be enrolled in this subject."
-                  : 'No subject selected — you can add anyone. Select a subject above to filter by enrolled users.'}
-              </p>
-            </div>
-
-            {/* Selected chips */}
-            {groupMembers.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                {groupMembers.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px 4px 5px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE' }}>
-                    <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} alt="" />
-                    <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#5B21B6' }}>{m.display_name}</span>
-                    <button type="button" onClick={() => removeMember(m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, marginLeft: 2 }}>
-                      <X size={11} color="#7C3AED" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Search input */}
-            <div style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${groupError ? '#E41E3F' : '#DDD6FE'}`, background: 'white' }}>
-                <Search size={14} color="#8A8D91" />
-                <input
-                  type="text"
-                  value={memberSearch}
-                  onChange={e => { setMemberSearch(e.target.value); setGroupError(false) }}
-                  placeholder="Search by name…"
-                  style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'transparent' }}
-                />
-                {searchLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
-              </div>
-
-              {/* Dropdown results */}
-              {searchResults.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4, background: 'white', borderRadius: 10, border: '1.5px solid #DDD6FE', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-                  {searchResults.map(u => (
-                    <button key={u.id} type="button" onClick={() => addMember(u)}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: 'none', background: 'white', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#F5F3FF'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                      <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
-                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
-                      <Plus size={14} color="#7C3AED" style={{ marginLeft: 'auto' }} />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* No results */}
-              {memberSearch.trim() && !searchLoading && searchResults.length === 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4, background: 'white', borderRadius: 10, border: '1.5px solid #DDD6FE', padding: '12px', textAlign: 'center' }}>
-                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
-                    No results for "{memberSearch}"
-                    {form.subject_id && <span style={{ display: 'block', marginTop: 3, color: '#C0392B', fontWeight: 600 }}>They may not be enrolled in this subject</span>}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {groupError && (
-              <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#E41E3F' }}>⚠️ Add at least one member to post as Group</p>
-            )}
-          </div>
-        )}
-
-        {/* Due date — only when type selected */}
+        {/* Due date */}
         {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
           <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
             <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
@@ -560,7 +740,7 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Quoted message — always visible */}
+        {/* Quoted message */}
         <div style={{ marginBottom: 12 }}>
           <button type="button" onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showQuoteSection ? accent.border : '#E4E6EB'}`, background: showQuoteSection ? accent.bg : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showQuoteSection ? accent.color : '#65676B' }}>
@@ -699,7 +879,7 @@ export default function CreatePostModal({
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
       <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
 
-      {/* Footer — always shown */}
+      {/* Footer */}
       <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
