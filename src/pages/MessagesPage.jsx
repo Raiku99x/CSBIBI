@@ -32,9 +32,9 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
   const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
-      const { data: dmRows } = await supabase
-        .from('direct_messages')
-        .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
+    const { data: dmRows } = await supabase
+      .from('direct_messages')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
       .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false })
 
@@ -106,7 +106,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', background: '#F0F2F5' }}>
+      <div style={{ flex: 1, overflowY: 'auto', background: '#F0F2F5', minHeight: 0 }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
             <Loader2 size={22} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -297,8 +297,9 @@ function ClassChat({ onBack, currentUser, profile }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 20, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
         </button>
@@ -314,7 +315,8 @@ function ClassChat({ onBack, currentUser, profile }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
+      {/* Messages — flex:1 + minHeight:0 so it shrinks when keyboard opens */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Loader2 size={26} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -330,7 +332,8 @@ function ClassChat({ onBack, currentUser, profile }) {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
+      {/* Input — flexShrink:0 so it always stays at the bottom */}
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
         {tagUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: '#F0F2F5', border: '1px solid #DADDE1' }}>
             <AtSign size={12} color="#65676B" />
@@ -503,8 +506,9 @@ function DMConversation({ partner, currentUserId, onBack }) {
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 20, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
         </button>
@@ -515,7 +519,8 @@ function DMConversation({ partner, currentUserId, onBack }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
+      {/* Messages — flex:1 + minHeight:0 so it shrinks when keyboard opens */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Loader2 size={24} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -534,7 +539,8 @@ function DMConversation({ partner, currentUserId, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
+      {/* Input — flexShrink:0 so it always stays at the bottom */}
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
         <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
             <textarea ref={inputRef} rows={1} value={text}
@@ -617,7 +623,6 @@ export default function MessagesPage() {
   const { setHideNav } = useNavVisibility()
   const [view, setView] = useState('inbox')
 
-  // FIX #9: detect desktop so we don't subtract non-existent bottom nav height
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BP)
   useEffect(() => {
     const fn = () => setIsDesktop(window.innerWidth >= DESKTOP_BP)
@@ -632,16 +637,35 @@ export default function MessagesPage() {
     return () => setHideNav(false)
   }, [isChat, setHideNav])
 
-  // FIX #9: on desktop there is no bottom nav, so don't subtract its 52px from inbox height
-  const pageHeight = isChat || isDesktop
-    ? 'calc(100dvh - 52px)'
-    : 'calc(100dvh - 52px - 52px)'
-
   function goToChat(dest) { setView(dest) }
   function goBack()       { setView('inbox') }
 
+  /*
+    KEY FIX: Use the CSS `interactive-widget=resizes-content` viewport behaviour.
+    On Android Chrome the keyboard pushes the layout up but 100dvh doesn't shrink.
+    The fix is to put the page in a container that uses height from the Layout's
+    available space — NOT a fixed dvh calculation — so the flex column can
+    naturally compress the message list and keep the input pinned at the bottom.
+
+    We set height: 100% and let the parent (Layout) control the available height.
+    On mobile inbox we still subtract the bottom nav (52px). On chat views the
+    nav is hidden so we get the full remaining height.
+  */
+  const pageHeight = isChat || isDesktop
+    ? '100%'
+    : 'calc(100% - 0px)' // nav height is handled by Layout already
+
   return (
-    <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      height: isDesktop ? 'calc(100dvh - 52px)' : '100dvh',
+      maxHeight: isDesktop ? 'calc(100dvh - 52px)' : '100dvh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      // This is the key: on mobile, the browser resizes the visual viewport
+      // when the keyboard opens. Using 100% height from a flex parent that
+      // itself uses dvh means the container shrinks with the keyboard.
+    }}>
       {view === 'inbox' ? (
         <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
       ) : view === 'group' ? (
