@@ -92,8 +92,8 @@ export default function CreatePostModal({
   const [visibility, setVisibility]         = useState('class')
   const [groupMembers, setGroupMembers]     = useState([])
   const [memberSearch, setMemberSearch]     = useState('')
-  const [allUsers, setAllUsers]             = useState([])        // full list loaded on panel open
-  const [filteredUsers, setFilteredUsers]   = useState([])        // filtered by search
+  const [allUsers, setAllUsers]             = useState([])
+  const [filteredUsers, setFilteredUsers]   = useState([])
   const [allUsersLoading, setAllUsersLoading] = useState(false)
   const [groupError, setGroupError]         = useState(false)
   const [showVisibilityDropdown, setShowVisibilityDropdown] = useState(false)
@@ -181,6 +181,16 @@ export default function CreatePostModal({
     setShowVisibilityDropdown(false)
   }
 
+  // ── Subject change handler — clears group members with toast ──
+  function handleSubjectChange(newSubjectId) {
+    set('subject_id', newSubjectId)
+    setMemberSearch('')
+    if (visibility === 'group' && groupMembers.length > 0) {
+      setGroupMembers([])
+      toast('Members cleared — subject changed', { icon: '🔄', duration: 3000 })
+    }
+  }
+
   // ── Load all users when panel opens ──
   async function loadAllUsers() {
     setAllUsersLoading(true)
@@ -259,7 +269,7 @@ export default function CreatePostModal({
     return () => clearTimeout(searchTimeout.current)
   }, [memberSearch, allUsers, showMemberPanel])
 
-  // Reload users when subject changes while panel would re-open
+  // Reload users when subject changes while panel is open
   useEffect(() => {
     if (showMemberPanel) {
       setAllUsers([])
@@ -449,7 +459,6 @@ export default function CreatePostModal({
     return '🌐 Class'
   }
 
-  // List to show in panel: filtered or full
   const displayList = memberSearch.trim() ? filteredUsers : allUsers
 
   return (
@@ -552,7 +561,7 @@ export default function CreatePostModal({
             )}
           </div>
 
-          {/* Done button */}
+          {/* Done button — not sticky, natural flex bottom */}
           <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))', borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
             <button type="button" onClick={doneMemberPanel}
               style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
@@ -600,7 +609,7 @@ export default function CreatePostModal({
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E4E6EB' }} alt="" />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>{profile?.display_name}</p>
 
             {/* Inline visibility control */}
@@ -657,19 +666,22 @@ export default function CreatePostModal({
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 11, border: `1.5px solid ${groupError ? '#E41E3F' : groupMembers.length > 0 ? '#DDD6FE' : '#E4E6EB'}`, background: groupMembers.length > 0 ? '#F5F3FF' : '#FAFAFA', cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#7C3AED'; e.currentTarget.style.background = '#F5F3FF' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = groupError ? '#E41E3F' : groupMembers.length > 0 ? '#DDD6FE' : '#E4E6EB'; e.currentTarget.style.background = groupMembers.length > 0 ? '#F5F3FF' : '#FAFAFA' }}>
-              <Users size={16} color={groupError ? '#E41E3F' : '#7C3AED'} />
-              <div style={{ flex: 1, textAlign: 'left' }}>
+              <Users size={16} color={groupError ? '#E41E3F' : '#7C3AED'} style={{ flexShrink: 0 }} />
+
+              <div style={{ flex: 1, minWidth: 0 }}>
                 {groupMembers.length > 0 ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {groupMembers.slice(0, 4).map(m => (
-                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px 2px 4px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE' }}>
-                        <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover' }} alt="" />
-                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, fontWeight: 600, color: '#5B21B6' }}>{m.display_name.split(' ')[0]}</span>
+                  /* ── Horizontal scrollable chip row ── */
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    // hide scrollbar on webkit
+                    className="hide-scrollbar"
+                  >
+                    {groupMembers.map(m => (
+                      <div key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE', flexShrink: 0 }}>
+                        <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
+                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#5B21B6', whiteSpace: 'nowrap' }}>{m.display_name.split(' ')[0]}</span>
                       </div>
                     ))}
-                    {groupMembers.length > 4 && (
-                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, fontWeight: 600, color: '#7C3AED' }}>+{groupMembers.length - 4} more</span>
-                    )}
                   </div>
                 ) : (
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, fontWeight: 600, color: groupError ? '#E41E3F' : '#7C3AED' }}>
@@ -677,29 +689,33 @@ export default function CreatePostModal({
                   </span>
                 )}
               </div>
-              {groupMembers.length > 0 && (
-                <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED', flexShrink: 0 }}>
-                  {groupMembers.length} selected · Edit
-                </span>
-              )}
+
+              {/* Count + Edit badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, marginLeft: 4 }}>
+                {groupMembers.length > 0 && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 8px', borderRadius: 20, border: '1px solid #DDD6FE', whiteSpace: 'nowrap' }}>
+                    ({groupMembers.length}) Edit
+                  </span>
+                )}
+              </div>
             </button>
           </div>
         )}
 
-        {/* ── PILL CHIPS ── */}
+        {/* ── PILL CHIPS — smaller to fit 2 rows on mobile ── */}
         <div ref={typePickerRef} style={{ marginBottom: 16, padding: typeError ? '10px' : '0', borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s' }}>
           <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>
             What are you posting?{typeError && <span style={{ marginLeft: 6, fontWeight: 700 }}>← Pick a type first</span>}
           </p>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             {POST_TYPES.map(type => {
               const isActive = selectedType?.sub_type === type.sub_type
               return (
                 <button key={type.sub_type} type="button" onClick={() => handleSelectType(type)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 13.5, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 12.5, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}
                   onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = type.activeBorder; e.currentTarget.style.background = type.activeBg + '80' } }}
                   onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#E4E6EB'; e.currentTarget.style.background = 'white' } }}>
-                  <span style={{ fontSize: 15 }}>{type.emoji}</span>
+                  <span style={{ fontSize: 13 }}>{type.emoji}</span>
                   {type.label}
                 </button>
               )
@@ -735,9 +751,9 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Subject */}
+        {/* Subject — uses handleSubjectChange instead of inline set */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
-          <select value={form.subject_id} onChange={e => { set('subject_id', e.target.value); setGroupMembers([]); setMemberSearch('') }}
+          <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)}
             style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
             <option value="">No subject (General)</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -900,7 +916,7 @@ export default function CreatePostModal({
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
       <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
 
-      {/* Footer */}
+      {/* Footer — normal flex child, NOT sticky above keyboard */}
       <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
@@ -931,6 +947,7 @@ export default function CreatePostModal({
         @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes expandIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   )
