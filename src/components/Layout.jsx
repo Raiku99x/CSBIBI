@@ -426,13 +426,31 @@ export default function Layout({ children, onOpenSearch }) {
             </aside>
           </div>
         ) : (
-          /* MOBILE: flex:1 + minHeight:0 so it fills remaining space after header */
-          <main style={{ flex:1,minHeight:0,display:'flex',flexDirection:'column',overflow:'hidden',maxWidth:680,margin:'0 auto',width:'100%' }}>
+          /*
+           * MOBILE LAYOUT FIX:
+           * - overflow:hidden so nothing bleeds out
+           * - flex:1 + minHeight:0 fills exactly the space between header and bottom of viewport
+           * - paddingBottom reserves space for the fixed bottom nav (52px) + safe area
+           *   when nav is visible; zero when nav is hidden (chat view)
+           * - Children (MessagesPage) get height:100% which resolves correctly
+           *   because the parent has a concrete computed height
+           */
+          <main style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            maxWidth: 680,
+            margin: '0 auto',
+            width: '100%',
+            paddingBottom: hideNav ? 0 : 'calc(52px + env(safe-area-inset-bottom))',
+          }}>
             {children}
           </main>
         )}
 
-        {/* Mobile bottom nav — fixed, does NOT affect layout flow */}
+        {/* Mobile bottom nav — position:fixed, does NOT affect layout flow */}
         {!isDesktop&&!hideNav&&(
           <nav style={{ position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
