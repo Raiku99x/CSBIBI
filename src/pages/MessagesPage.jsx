@@ -258,11 +258,8 @@ function ClassChat({ onBack, currentUser, profile }) {
       const older = [...data].reverse()
       setMessages(prev => [...older, ...prev])
       setHasMore(data.length === PAGE_SIZE)
-      // Restore scroll position so user doesn't jump
       requestAnimationFrame(() => {
-        if (scrollEl) {
-          scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight
-        }
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight
       })
     } else {
       setHasMore(false)
@@ -289,14 +286,10 @@ function ClassChat({ onBack, currentUser, profile }) {
     return () => supabase.removeChannel(ch)
   }, [fetchInitial, currentUser.id])
 
-  // Scroll to bottom on initial load only
   useEffect(() => {
-    if (!loading) {
-      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
-    }
+    if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [loading])
 
-  // Scroll to bottom when new message arrives (only if already near bottom)
   useEffect(() => {
     if (loading) return
     const el = scrollRef.current
@@ -305,13 +298,10 @@ function ClassChat({ onBack, currentUser, profile }) {
     if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Infinite scroll — load more when scrolled near top
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    function onScroll() {
-      if (el.scrollTop < 80) loadMore()
-    }
+    function onScroll() { if (el.scrollTop < 80) loadMore() }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [loadMore])
@@ -363,7 +353,6 @@ function ClassChat({ onBack, currentUser, profile }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      {/* Header — fixed at top */}
       <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
@@ -380,9 +369,7 @@ function ClassChat({ onBack, currentUser, profile }) {
         </div>
       </div>
 
-      {/* Messages — scrollable, flex:1 */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
-        {/* Load more indicator */}
         {loadingMore && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
             <Loader2 size={16} color="#8A8D91" style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -393,7 +380,6 @@ function ClassChat({ onBack, currentUser, profile }) {
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>Beginning of conversation</span>
           </div>
         )}
-
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Loader2 size={26} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -409,7 +395,6 @@ function ClassChat({ onBack, currentUser, profile }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input — fixed at bottom */}
       <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
         {tagUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: '#F0F2F5', border: '1px solid #DADDE1' }}>
@@ -444,7 +429,6 @@ function ClassChat({ onBack, currentUser, profile }) {
               )}
             </div>
           </div>
-
           <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
             <textarea ref={inputRef} rows={1} value={text}
               onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px' }}
@@ -454,7 +438,6 @@ function ClassChat({ onBack, currentUser, profile }) {
               style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block' }}
             />
           </div>
-
           <button type="submit" disabled={sending || !text.trim()}
             style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: text.trim() ? '#0084FF' : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s' }}
             onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
@@ -589,12 +572,10 @@ function DMConversation({ partner, currentUserId, onBack }) {
     return () => supabase.removeChannel(ch)
   }, [fetchInitial, currentUserId, partner.id])
 
-  // Scroll to bottom on initial load
   useEffect(() => {
     if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [loading])
 
-  // Scroll to bottom on new message only if near bottom
   useEffect(() => {
     if (loading) return
     const el = scrollRef.current
@@ -603,13 +584,10 @@ function DMConversation({ partner, currentUserId, onBack }) {
     if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // Infinite scroll
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    function onScroll() {
-      if (el.scrollTop < 80) loadMore()
-    }
+    function onScroll() { if (el.scrollTop < 80) loadMore() }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, [loadMore])
@@ -644,7 +622,6 @@ function DMConversation({ partner, currentUserId, onBack }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      {/* Header — fixed at top */}
       <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
           <ArrowLeft size={20} />
@@ -656,7 +633,6 @@ function DMConversation({ partner, currentUserId, onBack }) {
         </div>
       </div>
 
-      {/* Messages — scrollable, flex:1 */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
         {loadingMore && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
@@ -668,7 +644,6 @@ function DMConversation({ partner, currentUserId, onBack }) {
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>Beginning of conversation</span>
           </div>
         )}
-
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Loader2 size={24} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
@@ -687,7 +662,6 @@ function DMConversation({ partner, currentUserId, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input — fixed at bottom */}
       <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
         <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
@@ -770,6 +744,7 @@ export default function MessagesPage() {
   const { user, profile } = useAuth()
   const { setHideNav } = useNavVisibility()
   const [view, setView] = useState('inbox')
+  const [inboxKey, setInboxKey] = useState(0)
 
   const isChat = view !== 'inbox'
 
@@ -778,17 +753,20 @@ export default function MessagesPage() {
     return () => setHideNav(false)
   }, [isChat, setHideNav])
 
-  // On mobile, inbox needs padding for bottom nav (52px) + safe area
-  // On chat, nav is hidden so no padding needed
-  // Layout handles height — we just fill it
+  // goBack forces Inbox to remount so unread counts re-fetch after reading a DM
+  function goBack() {
+    setView('inbox')
+    setInboxKey(k => k + 1)
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingBottom: isChat ? 0 : 'calc(52px + env(safe-area-inset-bottom))' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {view === 'inbox' ? (
-        <Inbox currentUserId={user.id} onOpenGroup={() => setView('group')} onOpenDM={partner => setView({ type: 'dm', partner })} />
+        <Inbox key={inboxKey} currentUserId={user.id} onOpenGroup={() => setView('group')} onOpenDM={partner => setView({ type: 'dm', partner })} />
       ) : view === 'group' ? (
-        <ClassChat onBack={() => setView('inbox')} currentUser={user} profile={profile} />
+        <ClassChat onBack={goBack} currentUser={user} profile={profile} />
       ) : (
-        <DMConversation partner={view.partner} currentUserId={user.id} onBack={() => setView('inbox')} />
+        <DMConversation partner={view.partner} currentUserId={user.id} onBack={goBack} />
       )}
     </div>
   )
