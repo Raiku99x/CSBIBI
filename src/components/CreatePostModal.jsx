@@ -480,17 +480,16 @@ export default function CreatePostModal({
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
           {/* Panel header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
-            <div>
-              <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505' }}>Select Members</span>
-              {pendingMembers.length > 0 && (
-                <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 10, background: '#7C3AED', color: 'white', fontSize: 11, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', padding: '0 5px' }}>
-                  {pendingMembers.length}
-                </span>
-              )}
+            <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505', flex: 1 }}>Select Members</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button type="button" onClick={doneMemberPanel}
+                style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, transition: 'background 0.15s', whiteSpace: 'nowrap' }}>
+                {pendingMembers.length > 0 ? `Done (${pendingMembers.length})` : 'Done'}
+              </button>
+              <button onClick={closeMemberPanelSafe} style={{ width: 34, height: 34, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <X size={16} color="#050505" />
+              </button>
             </div>
-            <button onClick={closeMemberPanelSafe} style={{ width: 34, height: 34, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={16} color="#050505" />
-            </button>
           </div>
 
           {/* Info tip */}
@@ -572,13 +571,6 @@ export default function CreatePostModal({
             )}
           </div>
 
-          {/* ── Done button — fixed at bottom, keyboard can overlap it ── */}
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 61, padding: '10px 16px 16px', background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
-            <button type="button" onClick={doneMemberPanel}
-              style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
-              {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
-            </button>
-          </div>
         </div>
       )}
 
@@ -606,12 +598,19 @@ export default function CreatePostModal({
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
-        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505' }}>Create Post</span>
-        <button onClick={handleClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
-          onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}>
-          <X size={18} color="#050505" />
-        </button>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505', flex: 1 }}>Create Post</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={handleSubmit} disabled={loading}
+            style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType ? selectedType.btnColor : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s', whiteSpace: 'nowrap' }}>
+            {loading && <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} />}
+            {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule' : selectedType ? `Post ${selectedType.emoji}` : 'Post'}
+          </button>
+          <button onClick={handleClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
+            onMouseLeave={e => e.currentTarget.style.background = '#E4E6EB'}>
+            <X size={18} color="#050505" />
+          </button>
+        </div>
       </div>
 
       {/* Scrollable body — paddingBottom clears the fixed footer */}
@@ -918,9 +917,9 @@ export default function CreatePostModal({
 
       </div>{/* end scrollable body */}
 
-      {/* ── FIXED FOOTER — hidden when keyboard is open ── */}
+      {/* ── FIXED FOOTER — Add to your post only, hidden when keyboard is open ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
-        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
+        <div style={{ padding: '8px 16px 12px', display: 'flex', alignItems: 'center' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
           <div style={{ display: 'flex', gap: 4 }}>
             <MediaBtn icon={<Image size={22} color="#45BD62" />} title="Photos" onClick={() => photoRef.current.click()} badge={photoFiles.length > 0 ? photoFiles.length : null} />
@@ -930,19 +929,10 @@ export default function CreatePostModal({
           </div>
         </div>
         {!isMaterial && !isAnnouncement && (
-          <p style={{ margin: 0, padding: '6px 16px 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
+          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
             💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
           </p>
         )}
-        <div style={{ padding: '10px 16px 16px' }}>
-          <button onClick={handleSubmit} disabled={loading}
-            style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType ? selectedType.btnColor : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
-            onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.985)' }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}>
-            {loading && <Loader2 size={17} style={{ animation: 'spin 0.8s linear infinite' }} />}
-            {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule Post' : selectedType ? `Post ${selectedType.emoji}` : 'Post'}
-          </button>
-        </div>
       </div>
 
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
