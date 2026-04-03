@@ -462,11 +462,11 @@ export default function CreatePostModal({
   const displayList = memberSearch.trim() ? filteredUsers : allUsers
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', height: '100dvh', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
 
       {/* ── MEMBER PANEL (full-screen overlay) ── */}
       {showMemberPanel && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', height: '100%', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
           {/* Panel header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
             <div>
@@ -513,8 +513,8 @@ export default function CreatePostModal({
             </div>
           </div>
 
-          {/* Member list */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
+          {/* Member list — flex: 1 1 0 + minHeight: 0 so it shrinks with keyboard */}
+          <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
             {allUsersLoading ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
                 <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2.5px solid #DDD6FE', borderTopColor: '#7C3AED', animation: 'spin 0.7s linear infinite', margin: '0 auto 8px' }} />
@@ -561,8 +561,8 @@ export default function CreatePostModal({
             )}
           </div>
 
-          {/* Done button — not sticky, natural flex bottom */}
-          <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))', borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
+          {/* Done button — natural flex bottom */}
+          <div style={{ padding: '10px 16px', borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
             <button type="button" onClick={doneMemberPanel}
               style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
               {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
@@ -603,8 +603,8 @@ export default function CreatePostModal({
         </button>
       </div>
 
-      {/* Scrollable body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 0' }}>
+      {/* Scrollable body — flex: 1 1 0 + minHeight: 0 lets it shrink when keyboard appears */}
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 0' }}>
 
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -702,20 +702,20 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* ── PILL CHIPS — smaller to fit 2 rows on mobile ── */}
-        <div ref={typePickerRef} style={{ marginBottom: 16, padding: typeError ? '10px' : '0', borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s' }}>
-          <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-            What are you posting?{typeError && <span style={{ marginLeft: 6, fontWeight: 700 }}>← Pick a type first</span>}
+        {/* ── PILL CHIPS — compact enough to fit 2 rows on smallest screens ── */}
+        <div ref={typePickerRef} style={{ marginBottom: 16, borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s', padding: typeError ? '8px' : '0' }}>
+          <p style={{ margin: '0 0 7px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            {typeError ? '⚠️ Pick a type first' : 'What are you posting?'}
           </p>
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {POST_TYPES.map(type => {
               const isActive = selectedType?.sub_type === type.sub_type
               return (
                 <button key={type.sub_type} type="button" onClick={() => handleSelectType(type)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 12.5, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 12, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', whiteSpace: 'nowrap' }}
                   onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = type.activeBorder; e.currentTarget.style.background = type.activeBg + '80' } }}
                   onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#E4E6EB'; e.currentTarget.style.background = 'white' } }}>
-                  <span style={{ fontSize: 13 }}>{type.emoji}</span>
+                  <span style={{ fontSize: 12 }}>{type.emoji}</span>
                   {type.label}
                 </button>
               )
@@ -932,7 +932,7 @@ export default function CreatePostModal({
             💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
           </p>
         )}
-        <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+        <div style={{ padding: '10px 16px' }}>
           <button onClick={handleSubmit} disabled={loading}
             style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType ? selectedType.btnColor : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
             onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.985)' }}
