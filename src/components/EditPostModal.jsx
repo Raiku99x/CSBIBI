@@ -85,15 +85,6 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     set('announcement_type', '')
   }
 
-  function handlePasteAreaKeyDown(e) {
-    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v'
-    const isSelectAll = (e.ctrlKey || e.metaKey) && e.key === 'a'
-    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c'
-    if (!isPaste && !isSelectAll && !isCopy && !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault()
-  }
-  function handlePasteAreaBeforeInput(e) {
-    if (e.inputType !== 'insertFromPaste' && e.inputType !== 'insertFromPasteAsQuotation') e.preventDefault()
-  }
   async function handlePasteButton() {
     setPastingMsg(true)
     try {
@@ -274,12 +265,11 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                     </div>
                   </div>
                   <textarea ref={pasteAreaRef} value={form.quoted_message} onChange={e => set('quoted_message', e.target.value)}
-                    onKeyDown={handlePasteAreaKeyDown} onBeforeInput={handlePasteAreaBeforeInput}
                     placeholder="Paste the exact message here…" rows={3}
                     style={{ flex: 1, padding: '8px 9px', borderRadius: 8, border: `1.5px solid ${form.quoted_message ? accent.color : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', resize: 'vertical', lineHeight: 1.45, minHeight: 70 }}
                     onFocus={e => e.currentTarget.style.borderColor = accent.color}
                     onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'} />
-                  <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: '#BCC0C4' }}>🔒 Paste-only — Ctrl+V / ⌘V</p>
+                  <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: '#BCC0C4' }}>Ctrl+V / ⌘V or long-press to paste</p>
                 </div>
               </div>
               {(form.quoted_from || form.quoted_message) && (
