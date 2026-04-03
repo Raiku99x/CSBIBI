@@ -119,6 +119,19 @@ export default function CreatePostModal({
   const pasteAreaRef  = useRef()
   const typePickerRef = useRef()
 
+  // Track visual viewport so keyboard never covers the footer
+  const [vpHeight, setVpHeight] = useState(() =>
+    typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : 700
+  )
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setVpHeight(vv.height)
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
   useEffect(() => {
     if (autoOpenPhoto) { const t = setTimeout(() => photoRef.current?.click(), 150); return () => clearTimeout(t) }
@@ -462,11 +475,11 @@ export default function CreatePostModal({
   const displayList = memberSearch.trim() ? filteredUsers : allUsers
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', height: '100dvh', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', height: vpHeight, overflow: 'hidden', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
 
       {/* ── MEMBER PANEL (full-screen overlay) ── */}
       {showMemberPanel && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', height: '100%', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
           {/* Panel header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
             <div>
