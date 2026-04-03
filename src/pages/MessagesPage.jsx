@@ -1,25 +1,13 @@
-import { APP_VERSION, APP_COHORT } from '../version'
-import { useState, useRef, useEffect, createContext, useContext } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { useNotifications } from '../hooks/useNotifications'
-import { useDarkMode } from '../contexts/DarkModeContext'
-import { usePresence } from '../hooks/usePresence'
-import { useRole } from '../hooks/useRole'
-import { useModMode } from '../hooks/useModMode'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import {
-  Home, MessageSquare, BookMarked, Grid3X3,
-  LogOut, Settings, Check, X, Menu, Search, CalendarClock, Bell,
-  Bookmark, Heart, Moon, Sun, Info, MoreHorizontal,
-  EyeOff, Eye, Send, Shield, Crown, User, ChevronRight
-} from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { useNavVisibility } from '../components/Layout'
 import { formatDistanceToNow } from 'date-fns'
-import SavedPostsPage from '../pages/SavedPostsPage'
-import LikedPostsPage from '../pages/LikedPostsPage'
-import AboutModal from './AboutModal'
-import AdminDashboard from '../pages/AdminDashboard'
-import UserProfilePage from '../pages/UserProfilePage'
+import {
+  Send, Trash2, AtSign, Loader2,
+  ArrowLeft, Search, X, Check, CheckCheck, Users, Plus
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -31,563 +19,755 @@ function dicebearUrl(name = '') {
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 const DESKTOP_BP = 1024
+const PAGE_SIZE = 50
 
-export const NavVisibilityContext = createContext({ hideNav: false, setHideNav: () => {} })
-export function useNavVisibility() { return useContext(NavVisibilityContext) }
+const isTouchDevice = () => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
-function useIsDesktop() {
-  const [v, setV] = useState(() => window.innerWidth >= DESKTOP_BP)
+// ── Inbox ─────────────────────────────────────────────────────────────────
+function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
+  const [dmConvos, setDmConvos]       = useState([])
+  const [allUsers, setAllUsers]       = useState([])
+  const [latestGroup, setLatestGroup] = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [search, setSearch]           = useState('')
+  const [showNew, setShowNew]         = useState(false)
+
+  const refresh = useCallback(async () => {
+    const { data: dmRows } = await supabase
+      .from('direct_messages')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .order('created_at', { ascending: false })
+
+    const seen = new Map()
+    for (const msg of dmRows || []) {
+      const pid = msg.sender_id === currentUserId ? msg.receiver_id : msg.sender_id
+      if (!seen.has(pid)) seen.set(pid, msg)
+    }
+
+    const { data: unread } = await supabase
+      .from('direct_messages').select('sender_id')
+      .eq('receiver_id', currentUserId).eq('is_read', false)
+    const unreadMap = {}
+    for (const r of unread || []) unreadMap[r.sender_id] = (unreadMap[r.sender_id] || 0) + 1
+
+    setDmConvos(
+      Array.from(seen.entries()).map(([pid, msg]) => ({
+        partnerId: pid,
+        partner: msg.sender_id === currentUserId ? msg.receiver : msg.sender,
+        lastMsg: msg,
+        unread: unreadMap[pid] || 0,
+      }))
+    )
+
+    const { data: gc } = await supabase
+      .from('chat')
+      .select('*, sender:profiles!chat_sender_id_fkey(*)')
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (gc?.[0]) setLatestGroup(gc[0])
+    setLoading(false)
+  }, [currentUserId])
+
   useEffect(() => {
-    const fn = () => setV(window.innerWidth >= DESKTOP_BP)
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
-  }, [])
-  return v
-}
+    refresh()
+    supabase.from('profiles').select('id, display_name, avatar_url, email, username')
+      .neq('id', currentUserId).then(({ data }) => { if (data) setAllUsers(data) })
 
-function useForceLogout(profile, signOut, navigate) {
-  useEffect(() => {
-    if (!profile?.id) return
-    let channel = null
-    supabase.auth.getSession().then(({ data }) => {
-      const sessionCreatedAt = data?.session?.created_at
-        ? new Date(data.session.created_at)
-        : new Date(0)
-      channel = supabase
-        .channel('force-logout-' + profile.id)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` },
-          async (payload) => {
-            const flaggedAt = payload.new?.force_logout_at
-            const previousFlaggedAt = payload.old?.force_logout_at
-            if (!flaggedAt || flaggedAt === previousFlaggedAt) return
-            const flagTime = new Date(flaggedAt)
-            if (flagTime > sessionCreatedAt) {
-              await supabase.auth.signOut()
-              navigate('/auth')
-            }
-          }
-        )
-        .subscribe()
-    })
-    return () => { if (channel) supabase.removeChannel(channel) }
-  }, [profile?.id, signOut, navigate])
-}
+    const ch = supabase.channel('inbox-' + currentUserId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, refresh)
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [refresh, currentUserId])
 
-function getNavItems(dmUnread) {
-  return [
-    { to: '/',              icon: Home,          label: 'Feed',      exact: true },
-    { to: '/messages',      icon: MessageSquare, label: 'Messages',  badge: dmUnread },
-    { to: '/announcements', icon: CalendarClock, label: 'Deadlines' },
-    { to: '/subjects',      icon: BookMarked,    label: 'Subjects'  },
-    { to: '/apps',          icon: Grid3X3,       label: 'Apps'      },
-  ]
-}
+  const q = search.toLowerCase()
+  const filteredDMs  = dmConvos.filter(c => c.partner?.display_name?.toLowerCase().includes(q))
+  const newableUsers = allUsers.filter(u =>
+    u.display_name?.toLowerCase().includes(q) && !dmConvos.find(c => c.partnerId === u.id)
+  )
+  const groupVisible = !search || 'class chat'.includes(q)
 
-function ModChip({ isSuperadmin }) {
   return (
-    <div style={{ display:'inline-flex',alignItems:'center',gap:4,padding:'3px 9px',borderRadius:20,background:isSuperadmin?'linear-gradient(135deg,#F4C430,#E6A817)':'linear-gradient(135deg,#1A5276,#0D7377)',boxShadow:isSuperadmin?'0 2px 8px rgba(244,196,48,0.4)':'0 2px 8px rgba(13,115,119,0.35)' }}>
-      {isSuperadmin ? <Crown size={11} color="white"/> : <Shield size={11} color="white"/>}
-      <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:10.5,color:'white',letterSpacing:0.4 }}>
-        {isSuperadmin ? 'ADMIN' : 'MOD'}
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
+        <button onClick={() => setShowNew(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s' }}>
+          {showNew ? <X size={14} color={RED} /> : <Plus size={14} color="#65676B" strokeWidth={2.5} />}
+          <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: showNew ? RED : '#65676B' }}>New</span>
+        </button>
+      </div>
+
+      <div style={{ padding: '10px 12px 6px', background: 'white', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F0F2F5', borderRadius: 20, padding: '0 12px', height: 36 }}>
+          <Search size={14} color="#8A8D91" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search messages…"
+            style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#050505' }} />
+          {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={13} color="#8A8D91" /></button>}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', background: '#F0F2F5', minHeight: 0 }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+            <Loader2 size={22} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : (
+          <>
+            {showNew && newableUsers.length > 0 && (
+              <div>
+                <SectionLabel label="Start a conversation" />
+                {newableUsers.map(u => (
+                  <ConvoRow key={u.id} avatar={u.avatar_url || dicebearUrl(u.display_name)} name={u.display_name} preview="Tap to message" onClick={() => onOpenDM(u)} />
+                ))}
+                <Divider />
+              </div>
+            )}
+            {groupVisible && (
+              <>
+                <SectionLabel label="Group" />
+                <button onClick={onOpenGroup} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: 'white', borderBottom: '1px solid #F0F2F5', transition: 'background 0.12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F7F8FA'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'linear-gradient(135deg, #0084FF 0%, #0D7377 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,132,255,0.2)' }}>
+                    <Users size={20} color="white" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>Class Chat</span>
+                      {latestGroup && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4', flexShrink: 0 }}>{formatDistanceToNow(new Date(latestGroup.created_at), { addSuffix: false })}</span>}
+                    </div>
+                    <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {latestGroup ? (latestGroup.sender_id === currentUserId ? `You: ${latestGroup.content}` : `${latestGroup.sender?.display_name}: ${latestGroup.content}`) : 'Group chat for the whole class'}
+                    </p>
+                  </div>
+                </button>
+                <Divider />
+              </>
+            )}
+            {filteredDMs.length > 0 && <SectionLabel label="Direct Messages" />}
+            {filteredDMs.map(c => (
+              <ConvoRow key={c.partnerId}
+                avatar={c.partner?.avatar_url || dicebearUrl(c.partner?.display_name)}
+                name={c.partner?.display_name}
+                preview={c.lastMsg ? (c.lastMsg.sender_id === currentUserId ? `You: ${c.lastMsg.content}` : c.lastMsg.content) : ''}
+                timestamp={c.lastMsg?.created_at}
+                unread={c.unread}
+                onClick={() => onOpenDM(c.partner)}
+              />
+            ))}
+            {!showNew && filteredDMs.length === 0 && !groupVisible && (
+              <div style={{ padding: '56px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
+                <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505', margin: '0 0 4px' }}>No conversations</p>
+                <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#65676B', margin: 0 }}>Tap + to start a new message</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
 
-export default function Layout({ children, onOpenSearch }) {
-  const { profile, signOut } = useAuth()
-  const navigate = useNavigate()
-  const isDesktop = useIsDesktop()
-  const { dark, toggle: toggleDark, colors } = useDarkMode()
-  const { isModerator, isSuperadmin } = useRole()
-  const { modMode, toggleModMode } = useModMode()
-  const [hideNav, setHideNav] = useState(false)
+function SectionLabel({ label }) {
+  return (
+    <div style={{ padding: '8px 14px 4px' }}>
+      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</span>
+    </div>
+  )
+}
+function Divider() { return <div style={{ height: 6, background: '#E9EBEE' }} /> }
 
-  const [appearOffline, setAppearOffline] = useState(() => {
-    try { return localStorage.getItem('csb_appear_offline') === 'true' } catch { return false }
-  })
-  function toggleAppearOffline() {
-    setAppearOffline(v => {
-      const next = !v
-      try { localStorage.setItem('csb_appear_offline', next) } catch {}
-      return next
-    })
-  }
+function ConvoRow({ avatar, name, preview, timestamp, unread = 0, onClick }) {
+  return (
+    <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', background: 'white', borderBottom: '1px solid #F0F2F5', transition: 'background 0.12s' }}
+      onMouseEnter={e => e.currentTarget.style.background = '#F7F8FA'}
+      onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <img src={avatar} style={{ width: 46, height: 46, borderRadius: 14, objectFit: 'cover', display: 'block' }} alt="" />
+        {unread > 0 && (
+          <div style={{ position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, background: RED, color: 'white', fontSize: 10, fontWeight: 700, fontFamily: '"Instrument Sans", system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid white' }}>
+            {unread > 9 ? '9+' : unread}
+          </div>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: unread > 0 ? 700 : 600, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+          {timestamp && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4', flexShrink: 0 }}>{formatDistanceToNow(new Date(timestamp), { addSuffix: false })}</span>}
+        </div>
+        {preview && (
+          <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: unread > 0 ? '#1c1e21' : '#8A8D91', fontWeight: unread > 0 ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {preview}
+          </p>
+        )}
+      </div>
+    </button>
+  )
+}
 
-  const { onlineUsers } = usePresence(profile?.id, profile, appearOffline)
+// ── ClassChat ─────────────────────────────────────────────────────────────
+function ClassChat({ onBack, currentUser, profile }) {
+  const [messages, setMessages]       = useState([])
+  const [users, setUsers]             = useState([])
+  const [text, setText]               = useState('')
+  const [tagUser, setTagUser]         = useState(null)
+  const [tagPublic, setTagPublic]     = useState(true)
+  const [showTagMenu, setShowTagMenu] = useState(false)
+  const [sending, setSending]         = useState(false)
+  const [loading, setLoading]         = useState(true)
+  const [hasMore, setHasMore]         = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  const [showDrawer,    setShowDrawer]    = useState(false)
-  const [showNotifs,    setShowNotifs]    = useState(false)
-  const [dmUnread,      setDmUnread]      = useState(0)
-  const [showSaved,     setShowSaved]     = useState(false)
-  const [showLiked,     setShowLiked]     = useState(false)
-  const [showAbout,     setShowAbout]     = useState(false)
-  const [showDashboard, setShowDashboard] = useState(false)
-  const [selfMenuOpen,  setSelfMenuOpen]  = useState(false)
-  const [showOwnProfile, setShowOwnProfile] = useState(false)
+  const scrollRef  = useRef()
+  const bottomRef  = useRef()
+  const tagMenuRef = useRef()
+  const inputRef   = useRef()
 
-  const notifRef    = useRef(null)
-  const selfMenuRef = useRef(null)
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
-  const navItems = getNavItems(dmUnread)
-
-  useForceLogout(profile, signOut, navigate)
-
-  useEffect(() => {
-    if (!showNotifs || unreadCount === 0) return
-    const t = setTimeout(markAllRead, 1500)
-    return () => clearTimeout(t)
-  }, [showNotifs]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    function h(e) {
-      if (notifRef.current    && !notifRef.current.contains(e.target))    setShowNotifs(false)
-      if (selfMenuRef.current && !selfMenuRef.current.contains(e.target)) setSelfMenuOpen(false)
+  const fetchInitial = useCallback(async () => {
+    const { data } = await supabase
+      .from('chat')
+      .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+    if (data) {
+      const sorted = [...data].reverse()
+      setMessages(sorted)
+      setHasMore(data.length === PAGE_SIZE)
     }
+    setLoading(false)
+  }, [])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return
+    setLoadingMore(true)
+    const oldest = messages[0].created_at
+    const scrollEl = scrollRef.current
+    const prevScrollHeight = scrollEl?.scrollHeight || 0
+
+    const { data } = await supabase
+      .from('chat')
+      .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+
+    if (data && data.length > 0) {
+      const older = [...data].reverse()
+      setMessages(prev => [...older, ...prev])
+      setHasMore(data.length === PAGE_SIZE)
+      requestAnimationFrame(() => {
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight
+      })
+    } else {
+      setHasMore(false)
+    }
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, messages])
+
+  useEffect(() => {
+    fetchInitial()
+    supabase.from('profiles').select('id, display_name, avatar_url')
+      .neq('id', currentUser.id).then(({ data }) => { if (data) setUsers(data) })
+
+    const ch = supabase.channel('class-chat-msg')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, async (payload) => {
+        const { data } = await supabase.from('chat')
+          .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
+          .eq('id', payload.new.id).single()
+        if (data) setMessages(prev => [...prev, data])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat' },
+        (payload) => setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+      )
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [fetchInitial, currentUser.id])
+
+  useEffect(() => {
+    if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [loading])
+
+  useEffect(() => {
+    if (loading) return
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onScroll() { if (el.scrollTop < 80) loadMore() }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [loadMore])
+
+  useEffect(() => {
+    function h(e) { if (tagMenuRef.current && !tagMenuRef.current.contains(e.target)) setShowTagMenu(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  useEffect(() => {
-    const lock = !isDesktop && (showDrawer || showNotifs)
-    document.body.style.overflow = lock ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [showDrawer, showNotifs, isDesktop])
+  async function send(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    setSending(true)
+    try {
+      const { data: inserted, error } = await supabase.from('chat').insert({
+        sender_id: currentUser.id,
+        content: text.trim(),
+        is_whisper: false,
+        is_deleted: false,
+        receiver_id: null,
+        tag_user_id: tagUser ? tagUser.id : null,
+        tag_public: tagUser ? tagPublic : null,
+      }).select('id').single()
+      if (error) throw error
 
-  useEffect(() => {
-    if (!profile) return
-    supabase.from('direct_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('receiver_id', profile.id).eq('is_read', false)
-      .then(({ count }) => setDmUnread(count || 0))
-    const ch = supabase.channel('dm-badge-' + profile.id)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${profile.id}` }, () => setDmUnread(c => c + 1))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${profile.id}` }, async () => {
-        const { count } = await supabase.from('direct_messages').select('id', { count: 'exact', head: true }).eq('receiver_id', profile.id).eq('is_read', false)
-        setDmUnread(count || 0)
-      })
-      .subscribe()
-    return () => supabase.removeChannel(ch)
-  }, [profile])
-
-  async function handleSignOut() {
-    setShowDrawer(false)
-    await signOut()
-    navigate('/auth')
+      if (tagUser && tagPublic) {
+        await supabase.from('notifications').insert({ user_id: tagUser.id, chat_message_id: inserted.id, type: 'tag', message: `🏷️ ${profile?.display_name} mentioned you in chat`, is_read: false })
+      }
+      setText('')
+      setTagUser(null)
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSending(false)
+    }
   }
 
-  function handleOpenOwnProfile() {
-    setShowDrawer(false)
-    setShowOwnProfile(true)
+  async function deleteMessage(id) {
+    await supabase.from('chat').update({ is_deleted: true }).eq('id', id).eq('sender_id', currentUser.id)
   }
 
-  const pageBg     = colors.pageBg
-  const cardBg     = colors.cardBg
-  const borderCol  = colors.border
-  const textPri    = colors.textPri
-  const textSec    = colors.textSec
-  const textMut    = colors.textMut
-  const surfaceBg  = colors.surface
-  const dividerCol = colors.divider
+  const grouped = messages.map((msg, i) => ({
+    ...msg,
+    isFirst: i === 0 || messages[i - 1].sender_id !== msg.sender_id,
+    isLast: i === messages.length - 1 || messages[i + 1].sender_id !== msg.sender_id,
+  }))
 
-  function LeftSidebar({ onClose }) {
-    return (
-      <div style={{ display:'flex',flexDirection:'column',height:'100%' }}>
-        {!isDesktop && (
-          <div style={{ display:'flex',justifyContent:'flex-end',padding:'12px 12px 0' }}>
-            <button onClick={onClose} style={{ width:32,height:32,borderRadius:'50%',background:surfaceBg,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
-              <X size={16} color={textSec}/>
-            </button>
-          </div>
-        )}
-        <div className="csb-sidebar-scroll" style={{ flex:1,overflowY:'auto',padding:isDesktop?'12px 10px':'8px 10px' }}>
-          <button
-            onClick={handleOpenOwnProfile}
-            style={{ width:'100%',padding:'12px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:12,background:dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',border:`1.5px solid ${borderCol}`,borderRadius:12,cursor:'pointer',textAlign:'left',transition:'background 0.15s, border-color 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = dark?'rgba(255,255,255,0.08)':'#F0F2F5'; e.currentTarget.style.borderColor = dark?'#4A4B4C':'#CED0D4' }}
-            onMouseLeave={e => { e.currentTarget.style.background = dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = borderCol }}
-          >
-            <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }} />
-            <div style={{ minWidth:0,flex:1 }}>
-              <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
-                <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{profile?.display_name}</p>
-                {profile?.role==='superadmin'&&<span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#FEF9C3',color:'#92400E',border:'1px solid #FDE68A',borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',flexShrink:0 }}><Crown size={9}/> Admin</span>}
-                {profile?.role==='moderator'&&<span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,border:'1px solid #AED6F1',borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',flexShrink:0 }}><Shield size={9}/> Mod</span>}
-              </div>
-              <p style={{ margin:'2px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:textMut,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{profile?.email}</p>
-            </div>
-            <ChevronRight size={14} color={textMut} style={{ flexShrink:0 }}/>
-          </button>
-
-          <div style={{ height:1,background:dividerCol,margin:'0 4px 8px' }}/>
-
-          {isDesktop && (
-            <>
-              <div style={{ marginBottom:4 }}>
-                {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
-                  <NavLink key={to} to={to} end={exact} style={{ textDecoration:'none' }}>
-                    {({ isActive }) => (
-                      <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2,cursor:'pointer',background:isActive?(dark?'rgba(192,57,43,0.15)':'#FFF0EF'):'transparent',transition:'background 0.12s' }}
-                        onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)' }}
-                        onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.background='transparent' }}>
-                        <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:isActive?'#FADBD8':surfaceBg,display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.12s' }}>
-                          <Icon size={16} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
-                        </div>
-                        <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:isActive?700:600,fontSize:14,color:isActive?RED:textPri }}>{label}</span>
-                        {badge>0&&<span style={{ minWidth:18,height:18,borderRadius:9,background:RED,color:'white',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px' }}>{badge>9?'9+':badge}</span>}
-                      </div>
-                    )}
-                  </NavLink>
-                ))}
-              </div>
-              <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
-            </>
-          )}
-
-          <div style={{ marginBottom:4 }}>
-            <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>Personal</p>
-            <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Settings size={16} color={textSec}/>} label="Profile Settings" onClick={()=>{ onClose?.(); navigate('/profile') }}/>
-            <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Bookmark size={16} color={BLUE} fill={BLUE}/>} label="Saved Posts" onClick={()=>{ onClose?.(); setShowSaved(true) }}/>
-            <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Heart size={16} color={RED} fill={RED}/>} label="Liked Posts" onClick={()=>{ onClose?.(); setShowLiked(true) }}/>
-          </div>
-
-          <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
-
-          {(isModerator||isSuperadmin)&&(
-            <>
-              <div style={{ marginBottom:4 }}>
-                <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>{isSuperadmin?'Admin':'Moderator'}</p>
-                <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2 }}>
-                  <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:modMode?(isSuperadmin?'#FEF9C3':'#EBF5FB'):surfaceBg,display:'flex',alignItems:'center',justifyContent:'center' }}>
-                    {isSuperadmin?<Crown size={16} color={modMode?'#92400E':textSec}/>:<Shield size={16} color={modMode?BLUE:textSec}/>}
-                  </div>
-                  <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>{modMode?'Mod Mode ON':'Mod Mode OFF'}</span>
-                  <button onClick={toggleModMode} style={{ width:40,height:22,borderRadius:11,border:'none',background:modMode?(isSuperadmin?'#F4C430':BLUE):'#CED0D4',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0 }}>
-                    <div style={{ position:'absolute',top:3,left:modMode?21:3,width:16,height:16,borderRadius:'50%',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.2)',transition:'left 0.2s' }}/>
-                  </button>
-                </div>
-                {modMode&&<p style={{ margin:'0 10px 6px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:isSuperadmin?'#92400E':BLUE,lineHeight:1.4 }}>{isSuperadmin?'👑 Admin controls active':'🛡️ Mod controls active'}</p>}
-                {modMode&&<SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={isSuperadmin?<Crown size={16} color="#92400E"/>:<Shield size={16} color={BLUE}/>} label={isSuperadmin?'Admin Dashboard':'Mod Dashboard'} onClick={()=>{ onClose?.(); setShowDashboard(true) }}/>}
-              </div>
-              <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
-            </>
-          )}
-
-          <div style={{ marginBottom:4 }}>
-            <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>Preferences</p>
-            <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2 }}>
-              <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:surfaceBg,display:'flex',alignItems:'center',justifyContent:'center' }}>
-                {dark?<Sun size={16} color="#F4C430"/>:<Moon size={16} color={textSec}/>}
-              </div>
-              <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>{dark ? 'Dark Mode' : 'Light Mode'}</span>
-              <button onClick={toggleDark} style={{ width:40,height:22,borderRadius:11,border:'none',background:dark?RED:'#CED0D4',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0 }}>
-                <div style={{ position:'absolute',top:3,left:dark?21:3,width:16,height:16,borderRadius:'50%',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.2)',transition:'left 0.2s' }}/>
-              </button>
-            </div>
-            <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Info size={16} color="#0D7377"/>} label="About CSB" onClick={()=>{ onClose?.(); setShowAbout(true) }}/>
-          </div>
-
-          <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
-          <div style={{ marginBottom:8 }}>
-            <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<LogOut size={16} color={RED}/>} label="Log Out" onClick={handleSignOut} danger/>
-          </div>
-          <p style={{ margin:'4px 0 12px',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:textMut,textAlign:'center' }}>
-            CSB · {APP_VERSION} · {APP_COHORT}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
+          <ArrowLeft size={20} />
+        </button>
+        <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, #0084FF 0%, #0D7377 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Users size={18} color="white" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>Class Chat</p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+            {users.length + 1} members · Live
           </p>
         </div>
       </div>
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
+        {loadingMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+            <Loader2 size={16} color="#8A8D91" style={{ animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        )}
+        {!hasMore && !loading && messages.length > 0 && (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>Beginning of conversation</span>
+          </div>
+        )}
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Loader2 size={26} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : grouped.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <div style={{ fontSize: 44 }}>💬</div>
+            <p style={{ fontFamily: '"Instrument Sans", system-ui', color: '#65676B', fontSize: 14, margin: 0 }}>No messages yet — say hello!</p>
+          </div>
+        ) : grouped.map(m => (
+          <GroupBubble key={m.id} msg={m} currentUserId={currentUser.id} onDelete={deleteMessage} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
+        {tagUser && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, marginBottom: 8, background: '#F0F2F5', border: '1px solid #DADDE1' }}>
+            <AtSign size={12} color="#65676B" />
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#050505', flex: 1 }}>Tagging @{tagUser.display_name}</span>
+            <button onClick={() => setTagPublic(p => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#65676B', fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>{tagPublic ? 'Public' : 'Private'}</button>
+            <button onClick={() => setTagUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={13} color="#65676B" /></button>
+          </div>
+        )}
+        <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 7 }}>
+          <div style={{ display: 'flex', gap: 2, flexShrink: 0, paddingBottom: 5 }}>
+            <div ref={tagMenuRef} style={{ position: 'relative' }}>
+              <IconBtn active={!!tagUser} onClick={() => setShowTagMenu(t => !t)} title="Tag someone">
+                <AtSign size={19} />
+              </IconBtn>
+              {showTagMenu && (
+                <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: 230, background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 50, animation: 'slideUp 0.18s ease' }}>
+                  <p style={{ margin: 0, padding: '10px 14px 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tag someone</p>
+                  {users.length === 0
+                    ? <p style={{ margin: 0, padding: '10px 14px 12px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No other members yet</p>
+                    : users.map(u => (
+                      <button key={u.id} type="button" onClick={() => { setTagUser(u); setShowTagMenu(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', border: 'none', cursor: 'pointer', background: 'transparent', textAlign: 'left', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#050505', transition: 'background 0.1s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#F0F2F5'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} alt="" />
+                        <span style={{ fontWeight: 600 }}>{u.display_name}</span>
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
+            <textarea ref={inputRef} rows={1} value={text}
+              onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px' }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) { e.preventDefault(); send(e) } }}
+              onFocus={() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300) }}
+              placeholder="Message the class…"
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block' }}
+            />
+          </div>
+          <button type="submit" disabled={sending || !text.trim()}
+            style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: text.trim() ? '#0084FF' : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s' }}
+            onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
+            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+            {sending ? <Loader2 size={16} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
+          </button>
+        </form>
+      </div>
+      <style>{`
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
+    </div>
+  )
+}
+
+function GroupBubble({ msg, currentUserId, onDelete }) {
+  const [hovered, setHovered] = useState(false)
+  if (msg.is_deleted) {
+    return (
+      <div style={{ display: 'flex', justifyContent: msg.sender_id === currentUserId ? 'flex-end' : 'flex-start', padding: '1px 0' }}>
+        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', fontStyle: 'italic', background: 'rgba(255,255,255,0.7)', padding: '5px 12px', borderRadius: 16 }}>
+          {msg.sender_id === currentUserId ? 'You' : msg.sender?.display_name} deleted a message
+        </span>
+      </div>
     )
   }
-
+  const isOwn = msg.sender_id === currentUserId
   return (
-    <NavVisibilityContext.Provider value={{ hideNav, setHideNav }}>
-      {/* KEY: full viewport height, flex column, no overflow at root */}
-      <div style={{ height:'100dvh',background:pageBg,display:'flex',flexDirection:'column',overflow:'hidden' }}>
-
-        {!isDesktop && showDrawer && (
-          <div onClick={()=>setShowDrawer(false)} style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
-        )}
-        {!isDesktop && showNotifs && (
-          <div onClick={()=>setShowNotifs(false)} style={{ position:'fixed',inset:0,zIndex:98,background:'rgba(0,0,0,0.2)',animation:'fadeIn 0.2s ease' }}/>
-        )}
-        {!isDesktop && (
-          <div style={{ position:'fixed',top:0,left:0,bottom:0,width:300,zIndex:90,background:colors.sidebarBg,boxShadow:'4px 0 24px rgba(0,0,0,0.15)',transform:showDrawer?'translateX(0)':'translateX(-100%)',transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)' }}>
-            <LeftSidebar onClose={()=>setShowDrawer(false)}/>
+    <div style={{ display: 'flex', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 5, padding: '1px 0', marginTop: msg.isFirst ? 10 : 0 }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {!isOwn && (
+        <div style={{ width: 26, flexShrink: 0 }}>
+          {msg.isLast && <img src={msg.sender?.avatar_url || dicebearUrl(msg.sender?.display_name)} style={{ width: 26, height: 26, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />}
+        </div>
+      )}
+      <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start', gap: 2 }}>
+        {!isOwn && msg.isFirst && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 600, color: '#65676B', marginLeft: 10 }}>{msg.sender?.display_name}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+          <div style={{ padding: '8px 13px', background: isOwn ? '#0084FF' : 'white', color: isOwn ? 'white' : '#050505', borderRadius: isOwn ? `18px ${msg.isFirst ? 18 : 4}px ${msg.isLast ? 4 : 18}px 18px` : `${msg.isFirst ? 18 : 4}px 18px 18px ${msg.isLast ? 4 : 18}px`, boxShadow: isOwn ? 'none' : '0 1px 2px rgba(0,0,0,0.08)', border: !isOwn ? '1px solid #E4E6EB' : 'none' }}>
+            {msg.tag_user_id && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 700, color: isOwn ? 'rgba(255,255,255,0.85)' : '#0D7377', marginRight: 4 }}>@{msg.tagged?.display_name}</span>}
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, lineHeight: 1.4, wordBreak: 'break-word' }}>{msg.content}</span>
           </div>
-        )}
-
-        {/* Header — flex-shrink:0 so it never squishes */}
-        <header style={{ flexShrink:0,position:'sticky',top:0,zIndex:40,background:colors.headerBg,borderBottom:`1px solid ${borderCol}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)' }}>
-          <div style={{ height:52,padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8 }}>
-            <div style={{ display:'flex',alignItems:'center',gap:8,flexShrink:0 }}>
-              {!isDesktop&&(
-                <button onClick={()=>setShowDrawer(true)} style={{ width:36,height:36,borderRadius:9,background:surfaceBg,border:`1.5px solid ${borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                  <Menu size={17} color={textSec}/>
-                </button>
-              )}
-              <div style={{ display:'flex',alignItems:'center',gap:8,cursor:'pointer' }} onClick={()=>navigate('/')}>
-                <div style={{ width:34,height:34,borderRadius:8,overflow:'hidden',flexShrink:0,boxShadow:'0 2px 6px rgba(192,57,43,0.2)' }}>
-                  <img src="/announce.png" alt="CSB" style={{ width:'100%',height:'100%',objectFit:'cover' }}/>
-                </div>
-                <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:19,color:RED,letterSpacing:'-0.5px',lineHeight:1 }}>CSB</span>
-              </div>
-              {modMode&&<ModChip isSuperadmin={isSuperadmin}/>}
-            </div>
-            <div style={{ display:'flex',alignItems:'center',gap:6,flexShrink:0 }}>
-              <button onClick={onOpenSearch} style={{ width:36,height:36,borderRadius:9,background:surfaceBg,border:`1.5px solid ${borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                <Search size={17} color={textSec}/>
-              </button>
-              <div ref={notifRef} style={{ position:'relative' }}>
-                <button onClick={()=>setShowNotifs(v=>!v)} style={{ width:36,height:36,borderRadius:9,background:showNotifs?'#FADBD8':surfaceBg,border:`1.5px solid ${showNotifs?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'all 0.15s' }}>
-                  <Bell size={17} color={showNotifs?RED:textSec} strokeWidth={showNotifs?2.5:2}/>
-                  {unreadCount>0&&(
-                    <span style={{ position:'absolute',top:-4,right:-4,minWidth:17,height:17,borderRadius:9,background:RED,color:'white',fontSize:9.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'2px solid white' }}>
-                      {unreadCount>9?'9+':unreadCount}
-                    </span>
-                  )}
-                </button>
-                {showNotifs&&isDesktop&&(
-                  <div style={{ position:'absolute',right:0,top:'calc(100% + 8px)',zIndex:100,animation:'slideDown 0.18s ease' }}>
-                    <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={()=>setShowNotifs(false)} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg}/>
-                  </div>
-                )}
-              </div>
-              {!isDesktop&&(
-                <button onClick={() => setShowOwnProfile(true)} style={{ width:36,height:36,borderRadius:9,border:`1.5px solid ${borderCol}`,background:surfaceBg,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = dark ? '#4A4B4C' : '#D8DADF'}
-                  onMouseLeave={e => e.currentTarget.style.background = surfaceBg}>
-                  <User size={17} color={textSec}/>
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {showNotifs&&!isDesktop&&(
-          <div style={{ position:'fixed',left:0,right:0,top:52,bottom:0,zIndex:99,display:'flex',flexDirection:'column',animation:'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
-            <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={()=>setShowNotifs(false)} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg} mobile/>
-          </div>
-        )}
-
-        {/* Body — takes remaining height after header */}
-        {isDesktop ? (
-          <div style={{ display:'flex',flex:1,minHeight:0,width:'100%',maxWidth:1400,margin:'0 auto',overflow:'hidden' }}>
-            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,height:'100%',background:colors.sidebarBg,overflowY:'auto' }}>
-              <LeftSidebar/>
-            </aside>
-            {/* CENTER COLUMN: flex column, fills height, children scroll inside */}
-            <main style={{ flex:1,minWidth:0,minHeight:0,display:'flex',flexDirection:'column',overflow:'hidden',background:pageBg }}>
-              <div style={{ flex:1,minHeight:0,display:'flex',flexDirection:'column',maxWidth:680,margin:'0 auto',width:'100%' }}>
-                {children}
-              </div>
-            </main>
-            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,height:'100%',background:pageBg,overflowY:'auto',paddingTop:12 }}>
-              <div style={{ padding:'0 10px' }}>
-                <div style={{ display:'flex',alignItems:'center',gap:7,padding:'4px 4px 10px' }}>
-                  <div style={{ width:8,height:8,borderRadius:'50%',background:colors.online,boxShadow:`0 0 0 2px ${colors.online}40`,flexShrink:0 }}/>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12,color:textSec,textTransform:'uppercase',letterSpacing:0.6 }}>ONLINE</span>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:11,color:textMut }}>· {onlineUsers.length+(appearOffline?0:1)}</span>
-                </div>
-                <OnlineRow avatar={profile?.avatar_url||dicebearUrl(profile?.display_name)} name={profile?.display_name}
-                  sublabel={appearOffline?'Appearing offline':'Online'} sublabelColor={appearOffline?textMut:colors.online} dotColor={appearOffline?colors.textMut:colors.online}
-                  isSelf dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
-                  rightSlot={
-                    <div ref={selfMenuRef} style={{ position:'relative' }}>
-                      <button onClick={()=>setSelfMenuOpen(v=>!v)} style={{ width:28,height:28,borderRadius:7,background:selfMenuOpen?surfaceBg:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.12s' }}
-                        onMouseEnter={e=>e.currentTarget.style.background=surfaceBg}
-                        onMouseLeave={e=>{ if(!selfMenuOpen) e.currentTarget.style.background='transparent' }}>
-                        <MoreHorizontal size={15} color={textSec}/>
-                      </button>
-                      {selfMenuOpen&&(
-                        <div style={{ position:'absolute',right:0,top:'calc(100% + 4px)',width:190,background:cardBg,borderRadius:10,border:`1px solid ${borderCol}`,boxShadow:'0 6px 20px rgba(0,0,0,0.13)',overflow:'hidden',zIndex:50,animation:'slideDown 0.15s ease' }}>
-                          <button onClick={()=>{ toggleAppearOffline(); setSelfMenuOpen(false) }} style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 13px',border:'none',cursor:'pointer',background:'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:textPri,textAlign:'left' }}
-                            onMouseEnter={e=>e.currentTarget.style.background=surfaceBg}
-                            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                            {appearOffline?<><Eye size={14} color={colors.online}/> Show as online</>:<><EyeOff size={14} color={textSec}/> Appear offline</>}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
-                {onlineUsers.length>0&&<div style={{ height:1,background:dividerCol,margin:'8px 4px' }}/>}
-                {onlineUsers.length===0
-                  ?<div style={{ padding:'20px 4px',textAlign:'center' }}><p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:textMut }}>No one else online</p></div>
-                  :onlineUsers.map(u=>(
-                    <OnlineRow key={u.id} avatar={u.avatar_url||dicebearUrl(u.display_name)} name={u.display_name}
-                      sublabel="Online" sublabelColor={colors.online} dotColor={colors.online}
-                      dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
-                      rightSlot={<DMBtn onClick={()=>navigate('/messages',{state:{openDM:u.id}})} surfaceBg={surfaceBg}/>}
-                    />
-                  ))
-                }
-                <p style={{ margin:'16px 4px 0',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:textMut }}>Only active users shown</p>
-              </div>
-            </aside>
-          </div>
-        ) : (
-          /*
-           * MOBILE LAYOUT FIX:
-           * - overflow:hidden so nothing bleeds out
-           * - flex:1 + minHeight:0 fills exactly the space between header and bottom of viewport
-           * - paddingBottom reserves space for the fixed bottom nav (52px) + safe area
-           *   when nav is visible; zero when nav is hidden (chat view)
-           * - Children (MessagesPage) get height:100% which resolves correctly
-           *   because the parent has a concrete computed height
-           */
-          <main style={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            maxWidth: 680,
-            margin: '0 auto',
-            width: '100%',
-            paddingBottom: hideNav ? 0 : 'calc(52px + env(safe-area-inset-bottom))',
-          }}>
-            {children}
-          </main>
-        )}
-
-        {/* Mobile bottom nav — position:fixed, does NOT affect layout flow */}
-        {!isDesktop&&!hideNav&&(
-          <nav style={{ position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
-            <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
-              {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
-                <NavLink key={to} to={to} end={exact} style={{ flex:1,textDecoration:'none' }}>
-                  {({ isActive }) => (
-                    <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}>
-                      {isActive&&<div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
-                      <div style={{ position:'relative' }}>
-                        <div style={{ width:34,height:26,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:7,background:isActive?'#FADBD8':'transparent',transition:'background 0.15s' }}>
-                          <Icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
-                        </div>
-                        {badge>0&&(
-                          <div style={{ position:'absolute',top:-4,right:-5,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
-                            {badge>9?'9+':badge}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{label}</span>
-                    </div>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </nav>
-        )}
-
-        {showSaved     && <SavedPostsPage onClose={()=>setShowSaved(false)}/>}
-        {showLiked     && <LikedPostsPage onClose={()=>setShowLiked(false)}/>}
-        {showAbout     && <AboutModal     onClose={()=>setShowAbout(false)}/>}
-        {showDashboard && <AdminDashboard onClose={()=>setShowDashboard(false)}/>}
-        {showOwnProfile && profile?.id && (
-          <UserProfilePage userId={profile.id} onClose={() => setShowOwnProfile(false)}/>
-        )}
-
-        <style>{`
-          @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
-          @keyframes slideDown      { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }
-          @keyframes slideDownSheet { from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)} }
-          .csb-sidebar-scroll::-webkit-scrollbar { width:4px; }
-          .csb-sidebar-scroll::-webkit-scrollbar-track { background:transparent; }
-          .csb-sidebar-scroll::-webkit-scrollbar-thumb { background:#C8CAD0; border-radius:4px; }
-          .csb-sidebar-scroll::-webkit-scrollbar-thumb:hover { background:#B0B3B8; }
-          .csb-sidebar-scroll { scrollbar-width:thin; scrollbar-color:#C8CAD0 transparent; }
-        `}</style>
+          {isOwn && hovered && (
+            <button onClick={() => onDelete(msg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BCC0C4', display: 'flex', padding: 3, transition: 'color 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.color = RED} onMouseLeave={e => e.currentTarget.style.color = '#BCC0C4'}>
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
+        {msg.isLast && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 10, color: '#BCC0C4', marginLeft: isOwn ? 0 : 10, marginRight: isOwn ? 3 : 0 }}>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}</span>}
       </div>
-    </NavVisibilityContext.Provider>
-  )
-}
-
-function OnlineRow({ avatar, name, sublabel, sublabelColor, dotColor, isSelf, dark, colors, textPri, textMut, surfaceBg, pageBg, rightSlot }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <div style={{ display:'flex',alignItems:'center',gap:10,padding:'7px 6px',borderRadius:10,marginBottom:2,background:hovered?surfaceBg:'transparent',transition:'background 0.12s' }}
-      onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
-      <div style={{ position:'relative',flexShrink:0 }}>
-        <img src={avatar} style={{ width:36,height:36,borderRadius:10,objectFit:'cover',display:'block' }} alt=""/>
-        <div style={{ position:'absolute',bottom:-1,right:-1,width:11,height:11,borderRadius:'50%',background:dotColor,border:`2px solid ${hovered?surfaceBg:pageBg}` }}/>
-      </div>
-      <div style={{ flex:1,minWidth:0 }}>
-        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-          {name}{isSelf&&<span style={{ fontWeight:500,fontSize:10.5,color:textMut,marginLeft:5 }}>You</span>}
-        </p>
-        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,fontWeight:600,color:sublabelColor }}>{sublabel}</p>
-      </div>
-      {rightSlot}
     </div>
   )
 }
 
-function DMBtn({ onClick, surfaceBg }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <button onClick={onClick} style={{ width:30,height:30,borderRadius:8,background:hovered?'#FADBD8':surfaceBg,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.12s' }}
-      onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
-      <Send size={13} color={hovered?RED:'#8A8D91'}/>
-    </button>
-  )
-}
+// ── DMConversation ────────────────────────────────────────────────────────
+function DMConversation({ partner, currentUserId, onBack }) {
+  const [messages, setMessages] = useState([])
+  const [text, setText]         = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [sending, setSending]   = useState(false)
+  const [hasMore, setHasMore]   = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-function SidebarBtn({ icon, label, onClick, danger, dark, surfaceBg, textPri }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <button onClick={onClick} onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
-      style={{ width:'100%',display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'none',cursor:'pointer',textAlign:'left',background:hovered?(danger?(dark?'rgba(192,57,43,0.12)':'#FFF5F5'):'rgba(0,0,0,0.05)'):'transparent',color:danger?RED:textPri,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,borderRadius:10,transition:'background 0.12s',marginBottom:2 }}>
-      <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:hovered?(danger?(dark?'rgba(192,57,43,0.2)':'#FADBD8'):(dark?'rgba(255,255,255,0.08)':'#D8DADF')):surfaceBg,display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.12s' }}>
-        {icon}
-      </div>
-      {label}
-    </button>
-  )
-}
+  const scrollRef = useRef()
+  const bottomRef = useRef()
+  const inputRef  = useRef()
 
-function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose, navigate, dark, cardBg, borderCol, textPri, textSec, textMut, surfaceBg, mobile }) {
-  return (
-    <div style={{ background:cardBg,borderRadius:mobile?'0':13,border:mobile?'none':`1px solid ${borderCol}`,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',overflow:'hidden',width:mobile?'100%':310,height:mobile?'100%':undefined,maxHeight:mobile?'100%':380,display:'flex',flexDirection:'column' }}>
-      <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:mobile?'14px 16px 12px':'11px 14px 10px',borderBottom:`1px solid ${borderCol}`,flexShrink:0 }}>
-        <div style={{ display:'flex',alignItems:'center',gap:7 }}>
-          <Bell size={15} color={RED} strokeWidth={2.5}/>
-          <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:700,fontSize:14,color:textPri }}>Notifications</span>
-          {unreadCount>0&&<span style={{ background:RED,color:'white',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:10,padding:'1px 6px',borderRadius:10 }}>{unreadCount}</span>}
-        </div>
-        <div style={{ display:'flex',gap:5 }}>
-          {unreadCount>0&&<button onClick={markAllRead} style={{ background:surfaceBg,border:'none',cursor:'pointer',color:textSec,fontSize:11,fontWeight:600,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',gap:3,padding:'4px 9px',borderRadius:6 }}><Check size={10}/> All read</button>}
-          <button onClick={onClose} style={{ width:24,height:24,borderRadius:6,background:surfaceBg,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={12} color={textSec}/></button>
-        </div>
-      </div>
-      <div style={{ overflowY:'auto',flex:1 }}>
-        {notifications.length===0
-          ?<div style={{ padding:'32px 16px',textAlign:'center',color:textSec,fontSize:13,fontFamily:'"Instrument Sans",system-ui' }}><div style={{ fontSize:28,marginBottom:6 }}>🔔</div>You're all caught up!</div>
-          :notifications.map(n=><NotifItem key={n.id} notif={n} onRead={markRead} onClose={onClose} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} surfaceBg={surfaceBg}/>)
+  const fetchInitial = useCallback(async () => {
+    const { data } = await supabase
+      .from('direct_messages')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(*)')
+      .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${partner.id}),and(sender_id.eq.${partner.id},receiver_id.eq.${currentUserId})`)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+    if (data) {
+      setMessages([...data].reverse())
+      setHasMore(data.length === PAGE_SIZE)
+    }
+    setLoading(false)
+    await supabase.from('direct_messages').update({ is_read: true })
+      .eq('sender_id', partner.id).eq('receiver_id', currentUserId).eq('is_read', false)
+  }, [currentUserId, partner.id])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return
+    setLoadingMore(true)
+    const oldest = messages[0].created_at
+    const scrollEl = scrollRef.current
+    const prevScrollHeight = scrollEl?.scrollHeight || 0
+
+    const { data } = await supabase
+      .from('direct_messages')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(*)')
+      .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${partner.id}),and(sender_id.eq.${partner.id},receiver_id.eq.${currentUserId})`)
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE)
+
+    if (data && data.length > 0) {
+      const older = [...data].reverse()
+      setMessages(prev => [...older, ...prev])
+      setHasMore(data.length === PAGE_SIZE)
+      requestAnimationFrame(() => {
+        if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight
+      })
+    } else {
+      setHasMore(false)
+    }
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, messages, currentUserId, partner.id])
+
+  useEffect(() => {
+    fetchInitial()
+    const ch = supabase.channel(`dm-${[currentUserId, partner.id].sort().join('-')}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
+        const msg = payload.new
+        const relevant = (msg.sender_id === currentUserId && msg.receiver_id === partner.id) || (msg.sender_id === partner.id && msg.receiver_id === currentUserId)
+        if (!relevant) return
+        const { data } = await supabase.from('direct_messages').select('*, sender:profiles!direct_messages_sender_id_fkey(*)').eq('id', msg.id).single()
+        if (data) {
+          setMessages(prev => [...prev, data])
+          if (data.receiver_id === currentUserId)
+            await supabase.from('direct_messages').update({ is_read: true }).eq('id', data.id)
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages' },
+        (payload) => setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+      )
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [fetchInitial, currentUserId, partner.id])
+
+  useEffect(() => {
+    if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [loading])
+
+  useEffect(() => {
+    if (loading) return
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    function onScroll() { if (el.scrollTop < 80) loadMore() }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [loadMore])
+
+  async function send(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    setSending(true)
+    const content = text.trim()
+    setText('')
+    try {
+      const { error } = await supabase.from('direct_messages').insert({ sender_id: currentUserId, receiver_id: partner.id, content, is_read: false })
+      if (error) throw error
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    } catch (err) {
+      toast.error(err.message)
+      setText(content)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function deleteMsg(id) {
+    await supabase.from('direct_messages').update({ is_deleted: true }).eq('id', id).eq('sender_id', currentUserId)
+  }
+
+  const grouped = messages.map((msg, i) => ({
+    ...msg,
+    isFirst: i === 0 || messages[i - 1].sender_id !== msg.sender_id,
+    isLast: i === messages.length - 1 || messages[i + 1].sender_id !== msg.sender_id,
+  }))
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, background: 'white', borderBottom: '1px solid #E4E6EB', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: RED, padding: '4px 4px 4px 0' }}>
+          <ArrowLeft size={20} />
+        </button>
+        <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} alt="" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.display_name}</p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>@{partner.username || partner.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
+        </div>
       </div>
-      {mobile&&<div style={{ height:'env(safe-area-inset-bottom)',flexShrink:0 }}/>}
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE', minHeight: 0 }}>
+        {loadingMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+            <Loader2 size={16} color="#8A8D91" style={{ animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        )}
+        {!hasMore && !loading && messages.length > 0 && (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4' }}>Beginning of conversation</span>
+          </div>
+        )}
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Loader2 size={24} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
+          </div>
+        ) : grouped.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 60, height: 60, borderRadius: 18, objectFit: 'cover' }} alt="" />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505' }}>{partner.display_name}</p>
+              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#8A8D91' }}>Send a message to start chatting</p>
+            </div>
+          </div>
+        ) : grouped.map(msg => (
+          <DMBubble key={msg.id} msg={msg} isOwn={msg.sender_id === currentUserId} onDelete={deleteMsg} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px', paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
+        <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
+            <textarea ref={inputRef} rows={1} value={text}
+              onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) { e.preventDefault(); send(e) } }}
+              onFocus={() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300) }}
+              placeholder={`Message ${partner.display_name}…`}
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 120, overflow: 'hidden', display: 'block' }}
+            />
+          </div>
+          <button type="submit" disabled={sending || !text.trim()}
+            style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: text.trim() ? RED : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s', boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none' }}
+            onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
+            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+            {sending ? <Loader2 size={17} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
+          </button>
+        </form>
+      </div>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
 
-function NotifItem({ notif, onRead, onClose, navigate, cardBg, textPri, textSec, surfaceBg }) {
+function DMBubble({ msg, isOwn, onDelete }) {
   const [hovered, setHovered] = useState(false)
-  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨', like:'❤️', comment:'💬', deadline:'📅', reminder:'🔔', material:'📁', mute:'🔇', ban:'🚫', role:'🛡️' }
-  function handleClick() {
-    onRead(notif.id)
-    onClose()
-    if (notif.post_id) navigate(`/?post=${notif.post_id}`)
+  if (msg.is_deleted) {
+    return (
+      <div style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', padding: '1px 0' }}>
+        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', fontStyle: 'italic', background: 'rgba(255,255,255,0.7)', padding: '5px 12px', borderRadius: 16 }}>
+          {isOwn ? 'You deleted a message' : 'Message deleted'}
+        </span>
+      </div>
+    )
   }
   return (
-    <button onClick={handleClick} onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
-      style={{ width:'100%',display:'flex',alignItems:'flex-start',gap:10,padding:'10px 14px',border:'none',cursor:'pointer',textAlign:'left',background:hovered?surfaceBg:notif.is_read?cardBg:'rgba(192,57,43,0.06)',borderLeft:notif.is_read?'3px solid transparent':`3px solid ${RED}`,transition:'background 0.12s' }}>
-      <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:notif.is_read?surfaceBg:'rgba(192,57,43,0.12)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15 }}>
-        {icons[notif.type]||'🔔'}
+    <div style={{ display: 'flex', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 5, padding: '1px 0', marginTop: msg.isFirst ? 8 : 0 }}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      {!isOwn && (
+        <div style={{ width: 26, flexShrink: 0 }}>
+          {msg.isLast && <img src={msg.sender?.avatar_url || dicebearUrl(msg.sender?.display_name)} style={{ width: 26, height: 26, borderRadius: 8, objectFit: 'cover', display: 'block' }} alt="" />}
+        </div>
+      )}
+      <div style={{ maxWidth: '72%', display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start', gap: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+          <div style={{ padding: '9px 13px', background: isOwn ? RED : 'white', color: isOwn ? 'white' : '#050505', borderRadius: isOwn ? `18px ${msg.isFirst ? 18 : 4}px ${msg.isLast ? 4 : 18}px 18px` : `${msg.isFirst ? 18 : 4}px 18px 18px ${msg.isLast ? 4 : 18}px`, boxShadow: isOwn ? '0 2px 8px rgba(192,57,43,0.22)' : '0 1px 2px rgba(0,0,0,0.08)', border: !isOwn ? '1px solid #E4E6EB' : 'none' }}>
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, lineHeight: 1.45, wordBreak: 'break-word' }}>{msg.content}</span>
+          </div>
+          {isOwn && hovered && (
+            <button onClick={() => onDelete(msg.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#BCC0C4', display: 'flex', padding: 3 }}
+              onMouseEnter={e => e.currentTarget.style.color = RED} onMouseLeave={e => e.currentTarget.style.color = '#BCC0C4'}>
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+        {msg.isLast && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: isOwn ? 0 : 10, marginRight: isOwn ? 2 : 0 }}>
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 10, color: '#BCC0C4' }}>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}</span>
+            {isOwn && (msg.is_read ? <CheckCheck size={12} color={BLUE} /> : <Check size={12} color="#BCC0C4" />)}
+          </div>
+        )}
       </div>
-      <div style={{ flex:1,minWidth:0 }}>
-        <p style={{ margin:0,fontSize:12.5,color:textPri,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.4,fontWeight:notif.is_read?400:600 }}>{notif.message}</p>
-        <p style={{ margin:'2px 0 0',fontSize:10.5,color:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{formatDistanceToNow(new Date(notif.created_at),{addSuffix:true})}</p>
-      </div>
-      {!notif.is_read&&<div style={{ width:7,height:7,borderRadius:'50%',background:RED,flexShrink:0,marginTop:7 }}/>}
+    </div>
+  )
+}
+
+function IconBtn({ onClick, active, children, title }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button type="button" onClick={onClick} title={title}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer', background: active ? '#E6F4F4' : hovered ? '#F0F2F5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: active ? '#0D7377' : '#65676B', transition: 'background 0.12s, color 0.12s' }}>
+      {children}
     </button>
+  )
+}
+
+// ── Main export ───────────────────────────────────────────────────────────
+export default function MessagesPage() {
+  const { user, profile } = useAuth()
+  const { setHideNav } = useNavVisibility()
+  const [view, setView] = useState('inbox')
+  const [inboxKey, setInboxKey] = useState(0)
+
+  const isChat = view !== 'inbox'
+
+  useEffect(() => {
+    setHideNav(isChat)
+    return () => setHideNav(false)
+  }, [isChat, setHideNav])
+
+  // goBack forces Inbox to remount so unread counts re-fetch after reading a DM
+  function goBack() {
+    setView('inbox')
+    setInboxKey(k => k + 1)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {view === 'inbox' ? (
+        <Inbox key={inboxKey} currentUserId={user.id} onOpenGroup={() => setView('group')} onOpenDM={partner => setView({ type: 'dm', partner })} />
+      ) : view === 'group' ? (
+        <ClassChat onBack={goBack} currentUser={user} profile={profile} />
+      ) : (
+        <DMConversation partner={view.partner} currentUserId={user.id} onBack={goBack} />
+      )}
+    </div>
   )
 }
