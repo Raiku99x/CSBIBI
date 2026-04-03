@@ -437,8 +437,8 @@ export default function Layout({ children, onOpenSearch }) {
             <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,position:'sticky',top:52,height:'calc(100vh - 52px)',background:colors.sidebarBg,overflowY:'auto' }}>
               <LeftSidebar/>
             </aside>
-            <main style={{ flex:1,minWidth:0,background:pageBg,paddingBottom:32 }}>
-              <div style={{ maxWidth:680,margin:'0 auto' }}>{children}</div>
+            <main style={{ flex:1,minWidth:0,background:pageBg,display:'flex',flexDirection:'column' }}>
+              <div style={{ flex:1,maxWidth:680,margin:'0 auto',width:'100%',paddingBottom:32,display:'flex',flexDirection:'column' }}>{children}</div>
             </main>
             <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,position:'sticky',top:52,height:'calc(100vh - 52px)',background:pageBg,overflowY:'auto',paddingTop:12 }}>
               <div style={{ padding:'0 10px' }}>
@@ -487,9 +487,9 @@ export default function Layout({ children, onOpenSearch }) {
             </aside>
           </div>
         ) : (
-          <main style={{ height: hideNav ? 'calc(100dvh - 52px)' : 'calc(100dvh - 104px)', maxWidth:680, margin:'0 auto', width:'100%', overflow:'hidden' }}>
-            {children}
-          </main>
+            <main style={{ height: hideNav ? 'calc(100dvh - 52px)' : 'calc(100dvh - 104px)', maxWidth:680, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
+              {children}
+            </main>
         )}
 
         {/* Mobile bottom nav */}
