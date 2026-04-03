@@ -9,7 +9,7 @@ import {
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
   MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2,
   Link, MessageSquare, Check, Shield, Crown, Pin, Lock, BadgeCheck,
-  MessageCircleMore
+  MessageCircleMore, Users
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
@@ -36,7 +36,7 @@ function formatTime12(timeStr) {
 }
 
 function getBanner(subType, postType) {
-  if (subType === 'deadline')      return { bg: `linear-gradient(90deg,#B03A2E,#922B21)`,    label: 'DEADLINE',      icon: <Clock size={12} color="white" /> }
+  if (subType === 'deadline')      return { bg: 'linear-gradient(90deg,#B03A2E,#922B21)',    label: 'DEADLINE',      icon: <Clock size={12} color="white" /> }
   if (subType === 'reminder')      return { bg: `linear-gradient(90deg,${RED},#A93226)`,      label: 'REMINDER',      icon: <Bell size={12} color="white" /> }
   if (subType === 'material')      return { bg: `linear-gradient(90deg,${BLUE},#154360)`,     label: 'MATERIAL',      icon: <FileText size={12} color="white" /> }
   if (subType === 'announcement')  return { bg: `linear-gradient(90deg,${RED},${BLUE})`,      label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
@@ -126,7 +126,7 @@ function buildMessengerText(post) {
     const timeStr = dueTime ? ` · ${formatTime12(dueTime)}` : ''
     lines.push(`⏰ Due: ${formatted}${timeStr}`)
   }
-  if (isPastDue) lines.push(`⚠️ PAST DUE`)
+  if (isPastDue) lines.push('⚠️ PAST DUE')
   if (caption.trim()) { lines.push(''); lines.push(caption.trim()) }
   if (quoted && quoted.message) {
     const divider = '─'.repeat(17)
@@ -311,6 +311,64 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   )
 }
 
+// ── Group Members Mini Modal ──
+function GroupMembersModal({ memberIds, onClose, colors }) {
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const modalRef = useRef()
+
+  useEffect(() => {
+    async function fetchMembers() {
+      if (!memberIds || memberIds.length === 0) { setLoading(false); return }
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', memberIds)
+      setMembers(data || [])
+      setLoading(false)
+    }
+    fetchMembers()
+  }, [memberIds])
+
+  useEffect(() => {
+    function h(e) {
+      if (modalRef.current && !modalRef.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [onClose])
+
+  return (
+    <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
+      <div ref={modalRef} style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:300,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden',animation:'expandIn 0.16s ease' }}>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 14px 10px',borderBottom:`1px solid ${colors.border}` }}>
+          <div style={{ display:'flex',alignItems:'center',gap:7 }}>
+            <Users size={14} color="#7C3AED"/>
+            <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:colors.textPri }}>Group Members</span>
+          </div>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',display:'flex',padding:3,borderRadius:6 }}>
+            <X size={14} color={colors.textSec}/>
+          </button>
+        </div>
+        <div style={{ padding:'6px 0', maxHeight:280, overflowY:'auto' }}>
+          {loading ? (
+            <div style={{ padding:'20px 0',textAlign:'center' }}>
+              <div style={{ width:18,height:18,borderRadius:'50%',border:'2.5px solid #DDD6FE',borderTopColor:'#7C3AED',animation:'spin 0.7s linear infinite',margin:'0 auto' }}/>
+            </div>
+          ) : members.length === 0 ? (
+            <p style={{ margin:0,padding:'16px 14px',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:colors.textSec,textAlign:'center' }}>No members found</p>
+          ) : members.map(m => (
+            <div key={m.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'9px 14px' }}>
+              <img src={m.avatar_url||dicebearUrl(m.display_name)} style={{ width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:`1.5px solid ${colors.border}` }} alt=""/>
+              <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13.5,color:colors.textPri }}>{m.display_name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PostCard({ post, currentUserId, subjects = [], profile, onUserClick }) {
   const { colors } = useDarkMode()
   const [liked, setLiked]             = useState(false)
@@ -328,12 +386,17 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [showShare, setShowShare]     = useState(false)
   const [deleted, setDeleted]         = useState(false)
   const [postData, setPostData]       = useState(post)
+  const [showMembersModal, setShowMembersModal] = useState(false)
   const menuRef  = useRef(null)
   const shareRef = useRef(null)
 
   const { isModerator, isSuperadmin } = useRole()
   const { modMode } = useModMode()
   const canModerate = (isModerator || isSuperadmin) && modMode
+
+  const isGroupPost = postData.visibility === 'group'
+  const groupMemberIds = postData.group_members || []
+  const groupCount = groupMemberIds.length
 
   async function handleDelete() {
     try {
@@ -551,12 +614,42 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                 </span>
               )}
             </div>
-            <p style={{ margin:'1px 0 0',fontSize:11.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
-              {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
-              <span style={{margin:'0 4px',color:colors.border}}>·</span>
-              <span style={{color:colors.textMut}}>{typeLabel}</span>
-              {postData.is_edited && <><span style={{margin:'0 4px',color:colors.border}}>·</span><span style={{color:colors.textMut,fontStyle:'italic',fontSize:11}}>Edited</span></>}
-            </p>
+
+            {/* Timestamp row — now includes group info inline */}
+            <div style={{ display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',marginTop:1 }}>
+              <span style={{ fontSize:11.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
+                {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
+              </span>
+              <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
+              <span style={{ fontSize:11.5,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui' }}>{typeLabel}</span>
+              {postData.is_edited && (
+                <>
+                  <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
+                  <span style={{ fontSize:11,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>Edited</span>
+                </>
+              )}
+              {/* ── Inline group info ── */}
+              {isGroupPost && (
+                <>
+                  <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
+                  <span style={{ fontSize:11.5,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',display:'inline-flex',alignItems:'center',gap:3 }}>
+                    <Users size={10} color="#7C3AED"/>
+                    Group ·{' '}
+                    <button
+                      onClick={() => setShowMembersModal(true)}
+                      style={{ background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'"Instrument Sans",system-ui',fontSize:11.5,fontWeight:700,color:'#7C3AED',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:2 }}>
+                      {groupCount} {groupCount === 1 ? 'member' : 'members'}
+                    </button>
+                  </span>
+                  {isSuperadmin && !isOwn && (
+                    <>
+                      <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
+                      <span style={{ fontSize:11,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>via superadmin</span>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Menu */}
@@ -630,7 +723,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                 style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:9,background:colors.surface,border:`1.5px solid ${colors.border}`,textDecoration:'none',transition:'all 0.15s' }}
                 onMouseEnter={e=>{e.currentTarget.style.background=colors.surfaceHov;e.currentTarget.style.borderColor=colors.borderStrong}}
                 onMouseLeave={e=>{e.currentTarget.style.background=colors.surface;e.currentTarget.style.borderColor=colors.border}}>
-                <div style={{ width:36,height:36,borderRadius:8,background:'rgba(26,82,118,0.12)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',border:`1px solid rgba(26,82,118,0.2)` }}>
+                <div style={{ width:36,height:36,borderRadius:8,background:'rgba(26,82,118,0.12)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid rgba(26,82,118,0.2)' }}>
                   <FileText size={15} color={BLUE}/>
                 </div>
                 <div style={{ flex:1,minWidth:0 }}>
@@ -694,9 +787,14 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       {showComments && !postData.is_locked && (
         <CommentsSheet postId={postData.id} onClose={() => setShowComments(false)} onCommentCountChange={setCommentCount}/>
       )}
+      {showMembersModal && (
+        <GroupMembersModal memberIds={groupMemberIds} onClose={() => setShowMembersModal(false)} colors={colors}/>
+      )}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes expandIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       `}}/>
     </>
   )
