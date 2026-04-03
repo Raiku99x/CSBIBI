@@ -656,16 +656,13 @@ export default function MessagesPage() {
     : 'calc(100% - 0px)' // nav height is handled by Layout already
 
   return (
-    <div style={{
-      height: isDesktop ? 'calc(100dvh - 52px)' : '100dvh',
-      maxHeight: isDesktop ? 'calc(100dvh - 52px)' : '100dvh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      // This is the key: on mobile, the browser resizes the visual viewport
-      // when the keyboard opens. Using 100% height from a flex parent that
-      // itself uses dvh means the container shrinks with the keyboard.
-    }}>
+      <div style={{
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}>
       {view === 'inbox' ? (
         <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
       ) : view === 'group' ? (
