@@ -19,12 +19,8 @@ const POST_TYPES = [
   { sub_type: 'deadline',     post_type: 'announcement', emoji: '📅', label: 'Deadline',     btnColor: '#922B21', activeColor: '#922B21', activeBg: '#FFF5F5', activeBorder: '#F5B7B1' },
 ]
 
-function getQuoteAccent(subType) {
-  if (subType === 'deadline')      return { color: '#922B21', bg: '#FFF5F5', light: '#FADBD8', border: '#F5B7B1' }
-  if (subType === 'reminder')      return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
-  if (subType === 'announcement')  return { color: '#C0392B', bg: '#FFF8F8', light: '#FADBD8', border: '#F5B7B1' }
-  if (subType === 'material')      return { color: '#1A5276', bg: '#EBF5FB', light: '#D6EAF8', border: '#AED6F1' }
-  return                                  { color: '#65676B', bg: '#F7F8FA', light: '#E4E6EB', border: '#DADDE1' }
+function getQuoteAccent() {
+  return { color: '#0D7377', bg: '#E6F4F4', light: '#B2DFDF', border: '#80C7C9' }
 }
 
 function parseQuoted(raw) {
@@ -74,7 +70,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const isAnnouncement = selectedType?.post_type === 'announcement'
   const isDeadline     = selectedType?.sub_type === 'deadline'
-  const accent         = getQuoteAccent(selectedType?.sub_type)
+  const accent         = getQuoteAccent()
   const showDueDate    = isDeadline || (isAnnouncement && selectedType?.sub_type === 'announcement')
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
