@@ -161,15 +161,15 @@ function ShareOption({ icon, label, sublabel, onClick, success }) {
   )
 }
 
-
+// ── ShareSheet — dropup on both mobile & desktop, same style as the ... menu ──
 function ShareSheet({ post, onClose, anchorRef }) {
   const [copiedLink, setCopiedLink]           = useState(false)
   const [copiedMessenger, setCopiedMessenger] = useState(false)
   const { colors } = useDarkMode()
   const sheetRef = useRef()
   const shareUrl = `${window.location.origin}/?post=${post.id}`
-  const isMobile = window.innerWidth < 640
- 
+
+  // Close on outside click
   useEffect(() => {
     function h(e) {
       if (sheetRef.current && !sheetRef.current.contains(e.target) &&
@@ -180,11 +180,11 @@ function ShareSheet({ post, onClose, anchorRef }) {
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [onClose])
- 
+
   async function handleNativeShare() {
     try { await navigator.share({ title:'CSB Post', text:post.caption||'', url:shareUrl }); onClose() } catch {}
   }
- 
+
   async function handleCopyLink() {
     try { await navigator.clipboard.writeText(shareUrl) } catch {
       const ta = document.createElement('textarea'); ta.value = shareUrl
@@ -193,7 +193,7 @@ function ShareSheet({ post, onClose, anchorRef }) {
     setCopiedLink(true)
     setTimeout(() => { setCopiedLink(false); onClose() }, 1400)
   }
- 
+
   async function handleCopyMessenger() {
     const text = buildMessengerText(post)
     try { await navigator.clipboard.writeText(text) } catch {
@@ -204,59 +204,53 @@ function ShareSheet({ post, onClose, anchorRef }) {
     toast.success('Copied! Paste it in Messenger 💬', { duration: 2500 })
     setTimeout(() => { setCopiedMessenger(false); onClose() }, 1600)
   }
- 
-  const content = (
-    <>
+
+  // Dropup — same look as the ... menu but opens UPWARD (bottom: calc(100% + 4px))
+  // Works identically on mobile and desktop
+  return (
+    <div ref={sheetRef} style={{
+      position: 'absolute',
+      bottom: 'calc(100% + 4px)',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 230,
+      background: colors.cardBg,
+      borderRadius: 10,
+      border: `1px solid ${colors.border}`,
+      boxShadow: '0 -6px 20px rgba(0,0,0,0.15)',
+      overflow: 'hidden',
+      zIndex: 30,
+      animation: 'shareDropUp 0.15s ease',
+    }}>
+      {/* Header */}
       <div style={{ padding:'11px 14px 8px',borderBottom:`1px solid ${colors.border}`,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
         <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>Share post</span>
         <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',display:'flex',padding:2 }}>
           <X size={13} color={colors.textSec} />
         </button>
       </div>
+
+      {/* Options */}
       <div style={{ padding:6,display:'flex',flexDirection:'column',gap:2 }}>
         {!!navigator.share && (
           <ShareOption icon={<Share2 size={16} color={colors.textSec}/>} label="More options…" onClick={handleNativeShare}/>
         )}
-        <ShareOption icon={copiedLink?<Check size={16} color="#16a34a"/>:<Link size={16} color={colors.textSec}/>} label={copiedLink?'Link copied!':'Copy link'} sublabel="Share anywhere" onClick={handleCopyLink} success={copiedLink}/>
+        <ShareOption
+          icon={copiedLink ? <Check size={16} color="#16a34a"/> : <Link size={16} color={colors.textSec}/>}
+          label={copiedLink ? 'Link copied!' : 'Copy link'}
+          sublabel="Share anywhere"
+          onClick={handleCopyLink}
+          success={copiedLink}
+        />
         <div style={{ height:1,background:colors.border,margin:'2px 0' }}/>
         <ShareOption
-          icon={copiedMessenger?<Check size={16} color="#16a34a"/>:<MessageCircleMore size={16} color="#0084FF"/>}
-          label={copiedMessenger?'Copied!':'Copy for Messenger'} sublabel="Formatted text + link"
-          onClick={handleCopyMessenger} success={copiedMessenger}
+          icon={copiedMessenger ? <Check size={16} color="#16a34a"/> : <MessageCircleMore size={16} color="#0084FF"/>}
+          label={copiedMessenger ? 'Copied!' : 'Copy for Messenger'}
+          sublabel="Formatted text + link"
+          onClick={handleCopyMessenger}
+          success={copiedMessenger}
         />
       </div>
-    </>
-  )
- 
-  if (isMobile) {
-    return (
-      <>
-        <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.4)',animation:'fadeIn 0.15s ease' }}/>
-        <div ref={sheetRef} style={{
-          position:'fixed', bottom:0, left:0, right:0, zIndex:81,
-          background:colors.cardBg,
-          borderRadius:'16px 16px 0 0',
-          boxShadow:'0 -4px 24px rgba(0,0,0,0.18)',
-          paddingBottom:'env(safe-area-inset-bottom)',
-          animation:'sheetSlideUp 0.22s cubic-bezier(0.16,1,0.3,1)',
-        }}>
-          <div style={{ display:'flex',justifyContent:'center',padding:'10px 0 4px' }}>
-            <div style={{ width:36,height:4,borderRadius:2,background:colors.border }}/>
-          </div>
-          {content}
-        </div>
-      </>
-    )
-  }
- 
-  // Desktop: floating popover above the Share button
-  return (
-    <div ref={sheetRef} style={{
-      position:'absolute', bottom:'calc(100% + 8px)', left:'50%', transform:'translateX(-50%)',
-      width:230, background:colors.cardBg, borderRadius:14, border:`1px solid ${colors.border}`,
-      boxShadow:'0 8px 28px rgba(0,0,0,0.14)', overflow:'hidden', zIndex:30, animation:'slideUp 0.18s ease',
-    }}>
-      {content}
     </div>
   )
 }
@@ -645,13 +639,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               )}
             </div>
 
-            {/* ── Timestamp row — visibility tag replaces redundant type label ── */}
             <div style={{ display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',marginTop:1 }}>
               <span style={{ fontSize:11.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
                 {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
               </span>
-
-              {/* Visibility tag — Class (teal) or Group (purple) */}
               <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
               {isGroupPost ? (
                 <span style={{ fontSize:11.5,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',display:'inline-flex',alignItems:'center',gap:3 }}>
@@ -669,15 +660,12 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                   Class
                 </span>
               )}
-
               {postData.is_edited && (
                 <>
                   <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
                   <span style={{ fontSize:11,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>Edited</span>
                 </>
               )}
-
-              {/* Superadmin note for group posts they can see via powers */}
               {isGroupPost && isSuperadmin && !isOwn && (
                 <>
                   <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
@@ -808,6 +796,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             label={postData.is_locked ? 'Locked' : 'Comment'}
             disabled={postData.is_locked} colors={colors}
           />
+          {/* Share — dropup, same container pattern as the ... menu */}
           <div ref={shareRef} style={{ flex:1,position:'relative' }}>
             <ActionBtn onClick={() => setShowShare(v => !v)} icon={<Share2 size={17} color={showShare?RED:colors.textSec}/>} label="Share" active={showShare} activeColor={RED} noflex colors={colors}/>
             {showShare && <ShareSheet post={postData} onClose={() => setShowShare(false)} anchorRef={shareRef}/>}
@@ -826,12 +815,15 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         <GroupMembersModal memberIds={groupMemberIds} onClose={() => setShowMembersModal(false)} colors={colors}/>
       )}
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes slideUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes expandIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-        @keyframes fadeIn { from{opacity:0}to{opacity:1} }
-        @keyframes sheetSlideUp { from{opacity:0;transform:translateY(100%)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideDown   { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideUp     { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
+        @keyframes expandIn    { from{opacity:0;transform:scale(0.96)}      to{opacity:1;transform:scale(1)} }
+        @keyframes spin        { from{transform:rotate(0deg)}               to{transform:rotate(360deg)} }
+        @keyframes fadeIn      { from{opacity:0}                            to{opacity:1} }
+        /* shareDropUp: rises up from below like the ... menu drops down */
+        @keyframes shareDropUp { from{opacity:0;transform:translateX(-50%) translateY(6px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        /* sheetSlideUp for CommentsSheet — must include translateX(-50%) so it doesn't override the centering transform */
+        @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
       `}}/>
     </>
   )
