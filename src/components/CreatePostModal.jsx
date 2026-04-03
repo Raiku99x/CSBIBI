@@ -614,7 +614,7 @@ export default function CreatePostModal({
       </div>
 
       {/* Scrollable body — paddingBottom clears the fixed footer */}
-      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 140px' }}>
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 70px' }}>
 
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
