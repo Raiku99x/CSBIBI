@@ -83,6 +83,7 @@ export default function CreatePostModal({
 
   const initialType = POST_TYPES.find(t => t.sub_type === defaultSubType) || null
   const [selectedType, setSelectedType] = useState(defaultSubType !== 'status' ? initialType : null)
+  const [typeError, setTypeError] = useState(false)
 
   const [form, setForm] = useState({
     caption: '', subject_id: '', announcement_type: '',
@@ -104,6 +105,7 @@ export default function CreatePostModal({
   const fileRef       = useRef()
   const uploadCounter = useRef(0)
   const pasteAreaRef  = useRef()
+  const typePickerRef = useRef()
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
   useEffect(() => {
@@ -128,6 +130,7 @@ export default function CreatePostModal({
 
   function handleSelectType(type) {
     setSelectedType(type)
+    setTypeError(false)
     if (type.sub_type !== 'deadline' && type.sub_type !== 'announcement') { set('due_date', ''); set('due_time', '') }
     if (type.sub_type !== 'material' && type.post_type !== 'announcement') setAttachFiles([])
     set('announcement_type', '')
@@ -180,7 +183,11 @@ export default function CreatePostModal({
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!selectedType) { toast.error('Please select a post type'); return }
+    if (!selectedType) {
+      setTypeError(true)
+      typePickerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
     if (!form.caption.trim() && photoFiles.length === 0 && attachFiles.length === 0 && !hasQuote) {
       toast.error('Add a caption, photo, file, or quoted message'); return
     }
@@ -310,8 +317,10 @@ export default function CreatePostModal({
         </div>
 
         {/* ── PILL CHIPS ── */}
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>What are you posting?</p>
+        <div ref={typePickerRef} style={{ marginBottom: 16, padding: typeError ? '10px' : '0', borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s' }}>
+          <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            What are you posting?{typeError && <span style={{ marginLeft: 6, fontWeight: 700 }}>← Pick a type first</span>}
+          </p>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {POST_TYPES.map(type => {
               const isActive = selectedType?.sub_type === type.sub_type
@@ -328,7 +337,6 @@ export default function CreatePostModal({
           </div>
         </div>
 
-        {/* ── CONTENT — shown after type selected ── */}
         {/* Textarea — always visible */}
         <div style={{ background: '#F7F8FA', borderRadius: 12, padding: '12px 14px', marginBottom: 12, border: '1.5px solid #E4E6EB' }}>
           <textarea autoFocus
@@ -345,179 +353,175 @@ export default function CreatePostModal({
           />
         </div>
 
-        {selectedType && (
-          <>
-            {/* Announcement category */}
-            {isAnnouncement && (
-              <div style={{ position: 'relative', marginBottom: 12 }}>
-                <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
-                  style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: form.announcement_type ? '#E6F4F4' : '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.announcement_type ? '#0D7377' : '#8A8D91', fontWeight: form.announcement_type ? 700 : 400, cursor: 'pointer', outline: 'none' }}>
-                  <option value="">Category (optional)</option>
-                  {announcementTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
-                <ChevronDown size={15} color={form.announcement_type ? '#0D7377' : '#65676B'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              </div>
-            )}
+        {/* Announcement category — only when type selected */}
+        {isAnnouncement && (
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
+              style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: form.announcement_type ? '#E6F4F4' : '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.announcement_type ? '#0D7377' : '#8A8D91', fontWeight: form.announcement_type ? 700 : 400, cursor: 'pointer', outline: 'none' }}>
+              <option value="">Category (optional)</option>
+              {announcementTypes.map(type => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <ChevronDown size={15} color={form.announcement_type ? '#0D7377' : '#65676B'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+        )}
 
-            {/* Subject */}
-            <div style={{ position: 'relative', marginBottom: 12 }}>
-              <select value={form.subject_id} onChange={e => set('subject_id', e.target.value)}
-                style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
-                <option value="">No subject (General)</option>
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        {/* Subject — always visible */}
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <select value={form.subject_id} onChange={e => set('subject_id', e.target.value)}
+            style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
+            <option value="">No subject (General)</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        </div>
+
+        {/* Due date — only when type selected */}
+        {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
+          <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
+            <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              📅 Due Date &amp; Time
+              {isDeadline ? <span style={{ color: '#E41E3F' }}>*</span> : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none' }}>(optional)</span>}
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} min={new Date().toISOString().split('T')[0]}
+                style={{ flex: 3, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_date ? '#0D7377' : isDeadline ? '#E41E3F' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
+              <input type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} disabled={!form.due_date}
+                style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.due_date ? '#050505' : '#BCC0C4', background: form.due_date ? 'white' : '#F0F2F5', outline: 'none', boxSizing: 'border-box', opacity: form.due_date ? 1 : 0.5, cursor: form.due_date ? 'text' : 'not-allowed' }} />
             </div>
+          </div>
+        )}
 
-            {/* Due date */}
-            {(isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
-              <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
-                <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                  📅 Due Date &amp; Time
-                  {isDeadline ? <span style={{ color: '#E41E3F' }}>*</span> : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none' }}>(optional)</span>}
-                </label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} min={new Date().toISOString().split('T')[0]}
-                    style={{ flex: 3, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_date ? '#0D7377' : isDeadline ? '#E41E3F' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
-                  <input type="time" value={form.due_time} onChange={e => set('due_time', e.target.value)} disabled={!form.due_date}
-                    style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1px solid ${form.due_time ? '#0D7377' : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.due_date ? '#050505' : '#BCC0C4', background: form.due_date ? 'white' : '#F0F2F5', outline: 'none', boxSizing: 'border-box', opacity: form.due_date ? 1 : 0.5, cursor: form.due_date ? 'text' : 'not-allowed' }} />
+        {/* Quoted message — always visible */}
+        <div style={{ marginBottom: 12 }}>
+          <button type="button" onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showQuoteSection ? accent.border : '#E4E6EB'}`, background: showQuoteSection ? accent.bg : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showQuoteSection ? accent.color : '#65676B' }}>
+            <MessageSquareQuote size={16} color={showQuoteSection ? accent.color : '#8A8D91'} />
+            <span style={{ flex: 1, textAlign: 'left' }}>{showQuoteSection ? 'Remove quoted message' : 'Attach a quoted message'}</span>
+            {showQuoteSection ? <X size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showQuoteSection && (
+            <div style={{ marginTop: 8, padding: '10px 8px', background: '#FAFAFA', borderRadius: 10, border: `1px solid ${accent.border}`, animation: 'expandIn 0.18s ease' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                <div style={{ width: 86, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                  <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', marginBottom: 4, display: 'block' }}>From</label>
+                  <input type="text" value={form.quoted_from} onChange={e => set('quoted_from', e.target.value)} placeholder="e.g. Sir Cruz" maxLength={40}
+                    style={{ flex: 1, padding: '8px 9px', borderRadius: 8, border: `1.5px solid ${form.quoted_from ? accent.color : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none' }}
+                    onFocus={e => e.currentTarget.style.borderColor = accent.color}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? accent.color : '#E4E6EB'} />
                 </div>
-              </div>
-            )}
-
-            {/* Quoted message */}
-            <div style={{ marginBottom: 12 }}>
-              <button type="button" onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showQuoteSection ? accent.border : '#E4E6EB'}`, background: showQuoteSection ? accent.bg : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showQuoteSection ? accent.color : '#65676B' }}>
-                <MessageSquareQuote size={16} color={showQuoteSection ? accent.color : '#8A8D91'} />
-                <span style={{ flex: 1, textAlign: 'left' }}>{showQuoteSection ? 'Remove quoted message' : 'Attach a quoted message'}</span>
-                {showQuoteSection ? <X size={14} /> : <ChevronDown size={14} />}
-              </button>
-              {showQuoteSection && (
-                <div style={{ marginTop: 8, padding: '10px 8px', background: '#FAFAFA', borderRadius: 10, border: `1px solid ${accent.border}`, animation: 'expandIn 0.18s ease' }}>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-                    <div style={{ width: 86, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-                      <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', marginBottom: 4, display: 'block' }}>From</label>
-                      <input type="text" value={form.quoted_from} onChange={e => set('quoted_from', e.target.value)} placeholder="e.g. Sir Cruz" maxLength={40}
-                        style={{ flex: 1, padding: '8px 9px', borderRadius: 8, border: `1.5px solid ${form.quoted_from ? accent.color : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none' }}
-                        onFocus={e => e.currentTarget.style.borderColor = accent.color}
-                        onBlur={e => e.currentTarget.style.borderColor = form.quoted_from ? accent.color : '#E4E6EB'} />
-                    </div>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B' }}>Paste message</label>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button type="button" onClick={handlePasteButton} disabled={pastingMsg}
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', background: accent.light, color: accent.color, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11, opacity: pastingMsg ? 0.6 : 1 }}>
-                            <ClipboardPaste size={11} /> Paste
-                          </button>
-                          {form.quoted_message && (
-                            <button type="button" onClick={() => set('quoted_message', '')}
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#F0F2F5', color: '#65676B', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11 }}
-                              onMouseEnter={e => { e.currentTarget.style.background = '#FADBD8'; e.currentTarget.style.color = '#C0392B' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = '#F0F2F5'; e.currentTarget.style.color = '#65676B' }}>
-                              <Trash2 size={11} /> Clear
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <textarea ref={pasteAreaRef} value={form.quoted_message} onChange={e => set('quoted_message', e.target.value)}
-                        placeholder="Paste the exact message here…" rows={3}
-                        style={{ flex: 1, padding: '8px 9px', borderRadius: 8, border: `1.5px solid ${form.quoted_message ? accent.color : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', resize: 'vertical', lineHeight: 1.45, minHeight: 70 }}
-                        onFocus={e => e.currentTarget.style.borderColor = accent.color}
-                        onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'} />
-                      <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: '#BCC0C4' }}>Ctrl+V / ⌘V or long-press to paste</p>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B' }}>Paste message</label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button type="button" onClick={handlePasteButton} disabled={pastingMsg}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', background: accent.light, color: accent.color, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11, opacity: pastingMsg ? 0.6 : 1 }}>
+                        <ClipboardPaste size={11} /> Paste
+                      </button>
+                      {form.quoted_message && (
+                        <button type="button" onClick={() => set('quoted_message', '')}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#F0F2F5', color: '#65676B', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11 }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#FADBD8'; e.currentTarget.style.color = '#C0392B' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#F0F2F5'; e.currentTarget.style.color = '#65676B' }}>
+                          <Trash2 size={11} /> Clear
+                        </button>
+                      )}
                     </div>
                   </div>
-                  {(form.quoted_from || form.quoted_message) && (
-                    <button type="button" onClick={() => setShowQuotePreview(v => !v)}
-                      style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: accent.color }}>
-                      {showQuotePreview ? <EyeOff size={13} /> : <Eye size={13} />}
-                      {showQuotePreview ? 'Hide preview' : 'Preview how it looks on feed'}
-                    </button>
-                  )}
-                  {showQuotePreview && <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} accent={accent} />}
+                  <textarea ref={pasteAreaRef} value={form.quoted_message} onChange={e => set('quoted_message', e.target.value)}
+                    placeholder="Paste the exact message here…" rows={3}
+                    style={{ flex: 1, padding: '8px 9px', borderRadius: 8, border: `1.5px solid ${form.quoted_message ? accent.color : '#E4E6EB'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', resize: 'vertical', lineHeight: 1.45, minHeight: 70 }}
+                    onFocus={e => e.currentTarget.style.borderColor = accent.color}
+                    onBlur={e => e.currentTarget.style.borderColor = form.quoted_message ? accent.color : '#E4E6EB'} />
+                  <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, color: '#BCC0C4' }}>Ctrl+V / ⌘V or long-press to paste</p>
                 </div>
+              </div>
+              {(form.quoted_from || form.quoted_message) && (
+                <button type="button" onClick={() => setShowQuotePreview(v => !v)}
+                  style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 12, color: accent.color }}>
+                  {showQuotePreview ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showQuotePreview ? 'Hide preview' : 'Preview how it looks on feed'}
+                </button>
+              )}
+              {showQuotePreview && <QuotedMessagePreview from={form.quoted_from} message={form.quoted_message} accent={accent} />}
+            </div>
+          )}
+        </div>
+
+        {/* Schedule — superadmin only */}
+        {isSuperadmin && (
+          <div style={{ marginBottom: 12 }}>
+            <button type="button" onClick={() => { setShowSchedule(v => !v); if (showSchedule) { set('scheduled_date', ''); set('scheduled_time', '') } }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showSchedule ? '#7C3AED' : '#E4E6EB'}`, background: showSchedule ? '#F5F3FF' : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showSchedule ? '#7C3AED' : '#65676B' }}>
+              <Clock size={16} color={showSchedule ? '#7C3AED' : '#8A8D91'} />
+              <span style={{ flex: 1, textAlign: 'left' }}>{showSchedule && isScheduledFuture ? `Scheduled for ${formatScheduledPreview()}` : 'Schedule this post'}</span>
+              {showSchedule ? <X size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {showSchedule && (
+              <div style={{ marginTop: 8, padding: '12px 14px', background: '#F5F3FF', borderRadius: 10, border: '1.5px solid #DDD6FE', animation: 'expandIn 0.18s ease' }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="date" value={form.scheduled_date} onChange={e => set('scheduled_date', e.target.value)} min={new Date().toISOString().split('T')[0]}
+                    style={{ flex: 3, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${form.scheduled_date ? '#7C3AED' : '#DDD6FE'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
+                  <input type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)} disabled={!form.scheduled_date}
+                    style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${form.scheduled_time ? '#7C3AED' : '#DDD6FE'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.scheduled_date ? '#050505' : '#BCC0C4', background: form.scheduled_date ? 'white' : '#EDE9FE', outline: 'none', boxSizing: 'border-box', opacity: form.scheduled_date ? 1 : 0.5, cursor: form.scheduled_date ? 'text' : 'not-allowed' }} />
+                </div>
+                {form.scheduled_date && !isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#C0392B' }}>⚠️ Pick a future date and time</p>}
+                {isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED' }}>✓ Will publish {formatScheduledPreview()}</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Photo previews */}
+        {photoPreviews.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#65676B' }}>{photoPreviews.length}/{MAX_PHOTOS} photos</span>
+              <button type="button" onClick={() => { photoPreviews.forEach(u => URL.revokeObjectURL(u)); setPhotoFiles([]); setPhotoPreviews([]) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>Remove all</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              {photoPreviews.map((url, i) => (
+                <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 10, overflow: 'hidden', background: '#E4E6EB' }}>
+                  <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                  <button type="button" onClick={() => removePhoto(i)}
+                    style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={11} color="white" />
+                  </button>
+                </div>
+              ))}
+              {photoPreviews.length < MAX_PHOTOS && (
+                <button type="button" onClick={() => photoRef.current.click()}
+                  style={{ aspectRatio: '1/1', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, color: '#65676B' }}>
+                  <Plus size={18} /><span style={{ fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add</span>
+                </button>
               )}
             </div>
+          </div>
+        )}
 
-            {/* Schedule — superadmin only */}
-            {isSuperadmin && (
-              <div style={{ marginBottom: 12 }}>
-                <button type="button" onClick={() => { setShowSchedule(v => !v); if (showSchedule) { set('scheduled_date', ''); set('scheduled_time', '') } }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showSchedule ? '#7C3AED' : '#E4E6EB'}`, background: showSchedule ? '#F5F3FF' : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showSchedule ? '#7C3AED' : '#65676B' }}>
-                  <Clock size={16} color={showSchedule ? '#7C3AED' : '#8A8D91'} />
-                  <span style={{ flex: 1, textAlign: 'left' }}>{showSchedule && isScheduledFuture ? `Scheduled for ${formatScheduledPreview()}` : 'Schedule this post'}</span>
-                  {showSchedule ? <X size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {showSchedule && (
-                  <div style={{ marginTop: 8, padding: '12px 14px', background: '#F5F3FF', borderRadius: 10, border: '1.5px solid #DDD6FE', animation: 'expandIn 0.18s ease' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input type="date" value={form.scheduled_date} onChange={e => set('scheduled_date', e.target.value)} min={new Date().toISOString().split('T')[0]}
-                        style={{ flex: 3, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${form.scheduled_date ? '#7C3AED' : '#DDD6FE'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'white', outline: 'none', boxSizing: 'border-box' }} />
-                      <input type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)} disabled={!form.scheduled_date}
-                        style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${form.scheduled_time ? '#7C3AED' : '#DDD6FE'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.scheduled_date ? '#050505' : '#BCC0C4', background: form.scheduled_date ? 'white' : '#EDE9FE', outline: 'none', boxSizing: 'border-box', opacity: form.scheduled_date ? 1 : 0.5, cursor: form.scheduled_date ? 'text' : 'not-allowed' }} />
-                    </div>
-                    {form.scheduled_date && !isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#C0392B' }}>⚠️ Pick a future date and time</p>}
-                    {isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED' }}>✓ Will publish {formatScheduledPreview()}</p>}
-                  </div>
-                )}
+        {/* File list */}
+        {attachFiles.length > 0 && (
+          <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#65676B' }}>{attachFiles.length}/{MAX_FILES} files</span>
+              <button type="button" onClick={() => setAttachFiles([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>Remove all</button>
+            </div>
+            {attachFiles.map((file, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#F7F8FA', borderRadius: 10, border: '1px solid #E4E6EB' }}>
+                <FileText size={15} color="#0D7377" />
+                <span style={{ flex: 1, fontSize: 13, color: '#050505', fontFamily: '"Instrument Sans", system-ui', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                <button type="button" onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={14} color="#65676B" /></button>
               </div>
+            ))}
+            {attachFiles.length < MAX_FILES && (
+              <button type="button" onClick={() => fileRef.current.click()}
+                style={{ padding: '9px 0', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#65676B' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#0D7377'; e.currentTarget.style.color = '#0D7377' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#CED0D4'; e.currentTarget.style.color = '#65676B' }}>
+                <Plus size={15} /><span style={{ fontSize: 12, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add more files</span>
+              </button>
             )}
-
-            {/* Photo previews */}
-            {photoPreviews.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#65676B' }}>{photoPreviews.length}/{MAX_PHOTOS} photos</span>
-                  <button type="button" onClick={() => { photoPreviews.forEach(u => URL.revokeObjectURL(u)); setPhotoFiles([]); setPhotoPreviews([]) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>Remove all</button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                  {photoPreviews.map((url, i) => (
-                    <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 10, overflow: 'hidden', background: '#E4E6EB' }}>
-                      <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
-                      <button type="button" onClick={() => removePhoto(i)}
-                        style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <X size={11} color="white" />
-                      </button>
-                    </div>
-                  ))}
-                  {photoPreviews.length < MAX_PHOTOS && (
-                    <button type="button" onClick={() => photoRef.current.click()}
-                      style={{ aspectRatio: '1/1', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, color: '#65676B' }}>
-                      <Plus size={18} /><span style={{ fontSize: 11, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* File list */}
-            {attachFiles.length > 0 && (
-              <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#65676B' }}>{attachFiles.length}/{MAX_FILES} files</span>
-                  <button type="button" onClick={() => setAttachFiles([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>Remove all</button>
-                </div>
-                {attachFiles.map((file, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#F7F8FA', borderRadius: 10, border: '1px solid #E4E6EB' }}>
-                    <FileText size={15} color="#0D7377" />
-                    <span style={{ flex: 1, fontSize: 13, color: '#050505', fontFamily: '"Instrument Sans", system-ui', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                    <button type="button" onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X size={14} color="#65676B" /></button>
-                  </div>
-                ))}
-                {attachFiles.length < MAX_FILES && (
-                  <button type="button" onClick={() => fileRef.current.click()}
-                    style={{ padding: '9px 0', borderRadius: 10, border: '2px dashed #CED0D4', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#65676B' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#0D7377'; e.currentTarget.style.color = '#0D7377' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#CED0D4'; e.currentTarget.style.color = '#65676B' }}>
-                    <Plus size={15} /><span style={{ fontSize: 12, fontFamily: '"Instrument Sans", system-ui', fontWeight: 600 }}>Add more files</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         <div style={{ height: 16 }} />
@@ -526,34 +530,32 @@ export default function CreatePostModal({
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
       <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
 
-      {/* Footer — only shown after type selected */}
-      {selectedType && (
-        <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
-          <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
-            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <MediaBtn icon={<Image size={22} color="#45BD62" />} title="Photos" onClick={() => photoRef.current.click()} badge={photoFiles.length > 0 ? photoFiles.length : null} />
-              {(isMaterial || isAnnouncement) && (
-                <MediaBtn icon={<Paperclip size={22} color="#1877F2" />} title="Attach files (PDF, DOCX, PPT…)" onClick={() => fileRef.current.click()} badge={attachFiles.length > 0 ? attachFiles.length : null} />
-              )}
-            </div>
-          </div>
-          {!isMaterial && !isAnnouncement && (
-            <p style={{ margin: 0, padding: '6px 16px 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
-              💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
-            </p>
-          )}
-          <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
-            <button onClick={handleSubmit} disabled={loading}
-              style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType.btnColor, color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
-              onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.985)' }}
-              onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}>
-              {loading && <Loader2 size={17} style={{ animation: 'spin 0.8s linear infinite' }} />}
-              {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule Post' : `Post ${selectedType.emoji}`}
-            </button>
+      {/* Footer — always shown */}
+      <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
+        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
+          <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <MediaBtn icon={<Image size={22} color="#45BD62" />} title="Photos" onClick={() => photoRef.current.click()} badge={photoFiles.length > 0 ? photoFiles.length : null} />
+            {(isMaterial || isAnnouncement) && (
+              <MediaBtn icon={<Paperclip size={22} color="#1877F2" />} title="Attach files (PDF, DOCX, PPT…)" onClick={() => fileRef.current.click()} badge={attachFiles.length > 0 ? attachFiles.length : null} />
+            )}
           </div>
         </div>
-      )}
+        {!isMaterial && !isAnnouncement && (
+          <p style={{ margin: 0, padding: '6px 16px 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
+            💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
+          </p>
+        )}
+        <div style={{ padding: '10px 16px', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+          <button onClick={handleSubmit} disabled={loading}
+            style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType ? selectedType.btnColor : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s, transform 0.1s' }}
+            onMouseDown={e => { if (!loading) e.currentTarget.style.transform = 'scale(0.985)' }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+            {loading && <Loader2 size={17} style={{ animation: 'spin 0.8s linear infinite' }} />}
+            {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule Post' : selectedType ? `Post ${selectedType.emoji}` : 'Post'}
+          </button>
+        </div>
+      </div>
 
       <style>{`
         @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
