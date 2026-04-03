@@ -475,7 +475,7 @@ export default function CreatePostModal({
   const displayList = memberSearch.trim() ? filteredUsers : allUsers
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', height: vpHeight, overflow: 'hidden', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
 
       {/* ── MEMBER PANEL (full-screen overlay) ── */}
       {showMemberPanel && (
@@ -572,14 +572,13 @@ export default function CreatePostModal({
                 <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No users found</p>
               </div>
             )}
-          </div>
-
-          {/* Done button — natural flex bottom */}
-          <div style={{ padding: '10px 16px', borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
-            <button type="button" onClick={doneMemberPanel}
-              style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
-              {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
-            </button>
+            {/* ── Done button inside scroll — never blocked by keyboard ── */}
+            <div style={{ position: 'sticky', bottom: 0, paddingTop: 10, paddingBottom: 12, background: 'white', borderTop: '1px solid #E4E6EB', marginTop: 8 }}>
+              <button type="button" onClick={doneMemberPanel}
+                style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
+                {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -923,14 +922,8 @@ export default function CreatePostModal({
           </div>
         )}
 
-        <div style={{ height: 16 }} />
-      </div>
-
-      <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
-      <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
-
-      {/* Footer — normal flex child, NOT sticky above keyboard */}
-      <div style={{ borderTop: '1px solid #E4E6EB', background: 'white', flexShrink: 0 }}>
+        {/* ── Post actions + Post button — lives inside scroll, never blocked by keyboard ── */}
+        <div style={{ borderTop: '1px solid #E4E6EB', marginTop: 4, background: 'white' }}>
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -954,7 +947,14 @@ export default function CreatePostModal({
             {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule Post' : selectedType ? `Post ${selectedType.emoji}` : 'Post'}
           </button>
         </div>
+        </div>
+
+        <div style={{ height: 8 }} />
       </div>
+
+      <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
+      <input ref={fileRef} type="file" accept={FILE_ACCEPT} multiple style={{ display: 'none' }} onChange={handleFile} />
+
 
       <style>{`
         @keyframes fullscreenIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
