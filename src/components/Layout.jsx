@@ -12,7 +12,7 @@ import {
   Home, MessageSquare, BookMarked, Grid3X3,
   LogOut, Settings, Check, X, Menu, Search, CalendarClock, Bell,
   Bookmark, Heart, Moon, Sun, Info, MoreHorizontal,
-  EyeOff, Eye, Send, Shield, Crown, User, ChevronRight
+  EyeOff, Eye, Send, Shield, Crown, ChevronRight
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import SavedPostsPage from '../pages/SavedPostsPage'
@@ -20,6 +20,7 @@ import LikedPostsPage from '../pages/LikedPostsPage'
 import AboutModal from './AboutModal'
 import AdminDashboard from '../pages/AdminDashboard'
 import UserProfilePage from '../pages/UserProfilePage'
+import MessagesPage from '../pages/MessagesPage'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -73,13 +74,24 @@ function useForceLogout(profile, signOut, navigate) {
   }, [profile?.id, signOut, navigate])
 }
 
-function getNavItems(dmUnread) {
+// Desktop sidebar nav — Messages removed from route links
+function getDesktopNavItems() {
   return [
     { to: '/',              icon: Home,          label: 'Feed',      exact: true },
-    { to: '/messages',      icon: MessageSquare, label: 'Messages',  badge: dmUnread },
     { to: '/announcements', icon: CalendarClock, label: 'Deadlines' },
     { to: '/subjects',      icon: BookMarked,    label: 'Subjects'  },
     { to: '/apps',          icon: Grid3X3,       label: 'Apps'      },
+  ]
+}
+
+// Bottom nav — Messages uses modal trigger instead of route
+function getBottomNavItems(dmUnread) {
+  return [
+    { to: '/',              icon: Home,          label: 'Feed',      exact: true,  isModal: false },
+    { key: 'messages',      icon: MessageSquare, label: 'Messages',  badge: dmUnread, isModal: true },
+    { to: '/announcements', icon: CalendarClock, label: 'Deadlines', isModal: false },
+    { to: '/subjects',      icon: BookMarked,    label: 'Subjects',  isModal: false },
+    { to: '/apps',          icon: Grid3X3,       label: 'Apps',      isModal: false },
   ]
 }
 
@@ -116,20 +128,24 @@ export default function Layout({ children, onOpenSearch }) {
 
   const { onlineUsers } = usePresence(profile?.id, profile, appearOffline)
 
-  const [showDrawer,    setShowDrawer]    = useState(false)
-  const [showNotifs,    setShowNotifs]    = useState(false)
-  const [dmUnread,      setDmUnread]      = useState(0)
-  const [showSaved,     setShowSaved]     = useState(false)
-  const [showLiked,     setShowLiked]     = useState(false)
-  const [showAbout,     setShowAbout]     = useState(false)
-  const [showDashboard, setShowDashboard] = useState(false)
-  const [selfMenuOpen,  setSelfMenuOpen]  = useState(false)
+  const [showDrawer,     setShowDrawer]     = useState(false)
+  const [showNotifs,     setShowNotifs]     = useState(false)
+  const [dmUnread,       setDmUnread]       = useState(0)
+  const [showSaved,      setShowSaved]      = useState(false)
+  const [showLiked,      setShowLiked]      = useState(false)
+  const [showAbout,      setShowAbout]      = useState(false)
+  const [showDashboard,  setShowDashboard]  = useState(false)
+  const [selfMenuOpen,   setSelfMenuOpen]   = useState(false)
   const [showOwnProfile, setShowOwnProfile] = useState(false)
+  // ── Messages modal ──────────────────────────────────────────
+  const [showMessages,       setShowMessages]       = useState(false)
+  const [messagesDMTarget,   setMessagesDMTarget]   = useState(null)
 
   const notifRef    = useRef(null)
   const selfMenuRef = useRef(null)
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
-  const navItems = getNavItems(dmUnread)
+  const desktopNavItems = getDesktopNavItems()
+  const bottomNavItems  = getBottomNavItems(dmUnread)
 
   useForceLogout(profile, signOut, navigate)
 
@@ -170,6 +186,11 @@ export default function Layout({ children, onOpenSearch }) {
     return () => supabase.removeChannel(ch)
   }, [profile])
 
+  function openMessages(dmTargetId) {
+    setMessagesDMTarget(dmTargetId || null)
+    setShowMessages(true)
+  }
+
   async function handleSignOut() {
     setShowDrawer(false)
     await signOut()
@@ -181,7 +202,6 @@ export default function Layout({ children, onOpenSearch }) {
     setShowOwnProfile(true)
   }
 
-  // All colors from the dark-mode-aware `colors` object
   const pageBg     = colors.pageBg
   const cardBg     = colors.cardBg
   const borderCol  = colors.border
@@ -191,6 +211,7 @@ export default function Layout({ children, onOpenSearch }) {
   const surfaceBg  = colors.surface
   const dividerCol = colors.divider
 
+  // ── Left Sidebar ──────────────────────────────────────────
   function LeftSidebar({ onClose }) {
     return (
       <div style={{ display:'flex',flexDirection:'column',height:'100%' }}>
@@ -203,37 +224,15 @@ export default function Layout({ children, onOpenSearch }) {
         )}
         <div className="csb-sidebar-scroll" style={{ flex:1,overflowY:'auto',padding:isDesktop?'12px 10px':'8px 10px' }}>
 
-          {/* Clickable profile card */}
+          {/* Profile card */}
           <button
             onClick={handleOpenOwnProfile}
-            style={{
-              width: '100%',
-              padding: '12px 10px',
-              marginBottom: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              border: `1.5px solid ${borderCol}`,
-              borderRadius: 12,
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'background 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.08)' : '#F0F2F5'
-              e.currentTarget.style.borderColor = dark ? '#4A4B4C' : '#CED0D4'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
-              e.currentTarget.style.borderColor = borderCol
-            }}
+            style={{ width:'100%',padding:'12px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:12,background:dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',border:`1.5px solid ${borderCol}`,borderRadius:12,cursor:'pointer',textAlign:'left',transition:'background 0.15s, border-color 0.15s' }}
+            onMouseEnter={e=>{ e.currentTarget.style.background=dark?'rgba(255,255,255,0.08)':'#F0F2F5'; e.currentTarget.style.borderColor=dark?'#4A4B4C':'#CED0D4' }}
+            onMouseLeave={e=>{ e.currentTarget.style.background=dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor=borderCol }}
           >
-            <img
-              src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-              alt="avatar"
-              style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }}
-            />
+            <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar"
+              style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }}/>
             <div style={{ minWidth:0,flex:1 }}>
               <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
                 <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
@@ -249,10 +248,11 @@ export default function Layout({ children, onOpenSearch }) {
 
           <div style={{ height:1,background:dividerCol,margin:'0 4px 8px' }}/>
 
+          {/* Desktop navigation links (no Messages route — it's a modal now) */}
           {isDesktop && (
             <>
               <div style={{ marginBottom:4 }}>
-                {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
+                {desktopNavItems.map(({ to, icon: Icon, label, exact }) => (
                   <NavLink key={to} to={to} end={exact} style={{ textDecoration:'none' }}>
                     {({ isActive }) => (
                       <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2,cursor:'pointer',background:isActive?(dark?'rgba(192,57,43,0.15)':'#FFF0EF'):'transparent',transition:'background 0.12s' }}
@@ -262,11 +262,33 @@ export default function Layout({ children, onOpenSearch }) {
                           <Icon size={16} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
                         </div>
                         <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:isActive?700:600,fontSize:14,color:isActive?RED:textPri }}>{label}</span>
-                        {badge>0&&<span style={{ minWidth:18,height:18,borderRadius:9,background:RED,color:'white',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px' }}>{badge>9?'9+':badge}</span>}
                       </div>
                     )}
                   </NavLink>
                 ))}
+
+                {/* Messages — opens modal, not a route */}
+                <button
+                  onClick={() => { onClose?.(); openMessages() }}
+                  style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2,cursor:'pointer',background:'transparent',border:'none',width:'100%',textAlign:'left',transition:'background 0.12s' }}
+                  onMouseEnter={e=>e.currentTarget.style.background=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                >
+                  <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:surfaceBg,display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'background 0.12s' }}>
+                    <MessageSquare size={16} color={textSec} strokeWidth={2}/>
+                    {dmUnread > 0 && (
+                      <span style={{ position:'absolute',top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
+                        {dmUnread > 9 ? '9+' : dmUnread}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>Messages</span>
+                  {dmUnread > 0 && (
+                    <span style={{ minWidth:18,height:18,borderRadius:9,background:RED,color:'white',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px' }}>
+                      {dmUnread > 9 ? '9+' : dmUnread}
+                    </span>
+                  )}
+                </button>
               </div>
               <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
             </>
@@ -309,7 +331,6 @@ export default function Layout({ children, onOpenSearch }) {
               <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:surfaceBg,display:'flex',alignItems:'center',justifyContent:'center' }}>
                 {dark?<Sun size={16} color="#F4C430"/>:<Moon size={16} color={textSec}/>}
               </div>
-              {/* FIXED: label shows current mode, not target */}
               <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>
                 {dark ? 'Dark Mode' : 'Light Mode'}
               </span>
@@ -356,6 +377,8 @@ export default function Layout({ children, onOpenSearch }) {
         {/* Header */}
         <header style={{ position:'sticky',top:0,zIndex:40,background:colors.headerBg,borderBottom:`1px solid ${borderCol}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)' }}>
           <div style={{ height:52,padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8 }}>
+
+            {/* Left: hamburger + logo */}
             <div style={{ display:'flex',alignItems:'center',gap:8,flexShrink:0 }}>
               {!isDesktop&&(
                 <button onClick={()=>setShowDrawer(true)} style={{ width:36,height:36,borderRadius:9,background:surfaceBg,border:`1.5px solid ${borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
@@ -371,6 +394,7 @@ export default function Layout({ children, onOpenSearch }) {
               {modMode&&<ModChip isSuperadmin={isSuperadmin}/>}
             </div>
 
+            {/* Right: search + bell + messages (mobile) */}
             <div style={{ display:'flex',alignItems:'center',gap:6,flexShrink:0 }}>
               <button onClick={onOpenSearch} style={{ width:36,height:36,borderRadius:9,background:surfaceBg,border:`1.5px solid ${borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
                 <Search size={17} color={textSec}/>
@@ -402,15 +426,18 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </div>
 
-              {/* Person icon (mobile) */}
-              {!isDesktop&&(
+              {/* Messages button — mobile header only (replaces old person/avatar icon) */}
+              {!isDesktop && (
                 <button
-                  onClick={() => setShowOwnProfile(true)}
-                  style={{ width:36,height:36,borderRadius:9,border:`1.5px solid ${borderCol}`,background:surfaceBg,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = dark ? '#4A4B4C' : '#D8DADF'}
-                  onMouseLeave={e => e.currentTarget.style.background = surfaceBg}
+                  onClick={() => openMessages()}
+                  style={{ width:36,height:36,borderRadius:9,background:showMessages?'#FADBD8':surfaceBg,border:`1.5px solid ${showMessages?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative',transition:'all 0.15s' }}
                 >
-                  <User size={17} color={textSec}/>
+                  <MessageSquare size={17} color={showMessages?RED:textSec} strokeWidth={showMessages?2.5:2}/>
+                  {dmUnread > 0 && (
+                    <span style={{ position:'absolute',top:-4,right:-4,minWidth:17,height:17,borderRadius:9,background:RED,color:'white',fontSize:9.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'2px solid white' }}>
+                      {dmUnread>9?'9+':dmUnread}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
@@ -431,7 +458,7 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         )}
 
-        {/* Desktop 3-col */}
+        {/* Desktop 3-col layout */}
         {isDesktop ? (
           <div style={{ display:'flex',flex:1,width:'100%',maxWidth:1400,margin:'0 auto' }}>
             <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,position:'sticky',top:52,height:'calc(100vh - 52px)',background:colors.sidebarBg,overflowY:'auto' }}>
@@ -478,7 +505,7 @@ export default function Layout({ children, onOpenSearch }) {
                     <OnlineRow key={u.id} avatar={u.avatar_url||dicebearUrl(u.display_name)} name={u.display_name}
                       sublabel="Online" sublabelColor={colors.online} dotColor={colors.online}
                       dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
-                      rightSlot={<DMBtn onClick={()=>navigate('/messages',{state:{openDM:u.id}})} surfaceBg={surfaceBg}/>}
+                      rightSlot={<DMBtn onClick={()=>openMessages(u.id)} surfaceBg={surfaceBg}/>}
                     />
                   ))
                 }
@@ -496,26 +523,55 @@ export default function Layout({ children, onOpenSearch }) {
         {!isDesktop&&!hideNav&&(
           <nav style={{ position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
-              {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
-                <NavLink key={to} to={to} end={exact} style={{ flex:1,textDecoration:'none' }}>
-                  {({ isActive }) => (
-                    <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}>
-                      {isActive&&<div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
+              {bottomNavItems.map((item) => {
+                // Messages — modal button
+                if (item.isModal) {
+                  const isActive = showMessages
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => openMessages()}
+                      style={{ flex:1,background:'none',border:'none',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}
+                    >
+                      {isActive && <div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
                       <div style={{ position:'relative' }}>
                         <div style={{ width:34,height:26,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:7,background:isActive?'#FADBD8':'transparent',transition:'background 0.15s' }}>
-                          <Icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
+                          <item.icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
                         </div>
-                        {badge>0&&(
+                        {item.badge>0&&(
                           <div style={{ position:'absolute',top:-4,right:-5,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
-                            {badge>9?'9+':badge}
+                            {item.badge>9?'9+':item.badge}
                           </div>
                         )}
                       </div>
-                      <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{label}</span>
-                    </div>
-                  )}
-                </NavLink>
-              ))}
+                      <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{item.label}</span>
+                    </button>
+                  )
+                }
+
+                // Regular NavLink items
+                const { to, icon: Icon, label, exact, badge } = item
+                return (
+                  <NavLink key={to} to={to} end={exact} style={{ flex:1,textDecoration:'none' }}>
+                    {({ isActive }) => (
+                      <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}>
+                        {isActive&&<div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
+                        <div style={{ position:'relative' }}>
+                          <div style={{ width:34,height:26,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:7,background:isActive?'#FADBD8':'transparent',transition:'background 0.15s' }}>
+                            <Icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
+                          </div>
+                          {badge>0&&(
+                            <div style={{ position:'absolute',top:-4,right:-5,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
+                              {badge>9?'9+':badge}
+                            </div>
+                          )}
+                        </div>
+                        <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{label}</span>
+                      </div>
+                    )}
+                  </NavLink>
+                )
+              })}
             </div>
           </nav>
         )}
@@ -532,10 +588,20 @@ export default function Layout({ children, onOpenSearch }) {
           />
         )}
 
+        {/* Messages full-screen modal */}
+        {showMessages && (
+          <MessagesOverlay
+            onClose={() => { setShowMessages(false); setMessagesDMTarget(null) }}
+            initialDMTarget={messagesDMTarget}
+            profile={profile}
+          />
+        )}
+
         <style>{`
           @keyframes fadeIn         { from{opacity:0}to{opacity:1} }
           @keyframes slideDown      { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)} }
           @keyframes slideDownSheet { from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)} }
+          @keyframes messagesIn     { from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)} }
           .csb-sidebar-scroll::-webkit-scrollbar { width:4px; }
           .csb-sidebar-scroll::-webkit-scrollbar-track { background:transparent; }
           .csb-sidebar-scroll::-webkit-scrollbar-thumb { background:#C8CAD0; border-radius:4px; }
@@ -547,6 +613,34 @@ export default function Layout({ children, onOpenSearch }) {
   )
 }
 
+// ── Messages overlay — wraps MessagesPage as a full-screen modal ──────────
+function MessagesOverlay({ onClose, initialDMTarget, profile }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:70,background:'rgba(0,0,0,0.4)',animation:'fadeIn 0.18s ease' }}/>
+      <div style={{
+        position:'fixed',inset:0,zIndex:71,
+        maxWidth:680,margin:'0 auto',
+        display:'flex',flexDirection:'column',
+        animation:'messagesIn 0.25s cubic-bezier(0.16,1,0.3,1)',
+      }}>
+        <MessagesPage
+          asModal
+          onClose={onClose}
+          initialDMTarget={initialDMTarget}
+        />
+      </div>
+    </>
+  )
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────
 function OnlineRow({ avatar, name, sublabel, sublabelColor, dotColor, isSelf, dark, colors, textPri, textMut, surfaceBg, pageBg, rightSlot }) {
   const [hovered, setHovered] = useState(false)
   return (
