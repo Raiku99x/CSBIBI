@@ -92,12 +92,13 @@ export default function CreatePostModal({
   const [visibility, setVisibility]         = useState('class')
   const [groupMembers, setGroupMembers]     = useState([])
   const [memberSearch, setMemberSearch]     = useState('')
-  const [searchResults, setSearchResults]   = useState([])
-  const [searchLoading, setSearchLoading]   = useState(false)
+  const [allUsers, setAllUsers]             = useState([])        // full list loaded on panel open
+  const [filteredUsers, setFilteredUsers]   = useState([])        // filtered by search
+  const [allUsersLoading, setAllUsersLoading] = useState(false)
   const [groupError, setGroupError]         = useState(false)
   const [showVisibilityDropdown, setShowVisibilityDropdown] = useState(false)
   const [showMemberPanel, setShowMemberPanel] = useState(false)
-  const [pendingMembers, setPendingMembers] = useState([]) // temp selection in panel
+  const [pendingMembers, setPendingMembers] = useState([])
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
   const searchTimeout                       = useRef(null)
   const visibilityDropdownRef               = useRef(null)
@@ -158,7 +159,6 @@ export default function CreatePostModal({
     set('announcement_type', '')
   }
 
-  // Handle close with discard check
   function handleClose() {
     if (visibility === 'group' && groupMembers.length > 0) {
       setDiscardDialogOpen(true)
@@ -181,16 +181,53 @@ export default function CreatePostModal({
     setShowVisibilityDropdown(false)
   }
 
+  // ── Load all users when panel opens ──
+  async function loadAllUsers() {
+    setAllUsersLoading(true)
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .neq('id', user.id)
+        .order('display_name', { ascending: true })
+        .limit(100)
+
+      if (form.subject_id) {
+        const { data: enrolled } = await supabase
+          .from('user_subjects')
+          .select('user_id')
+          .eq('subject_id', form.subject_id)
+        const enrolledIds = (enrolled || []).map(e => e.user_id).filter(id => id !== user.id)
+        if (enrolledIds.length === 0) {
+          setAllUsers([])
+          setFilteredUsers([])
+          setAllUsersLoading(false)
+          return
+        }
+        query = query.in('id', enrolledIds)
+      }
+
+      const { data } = await query
+      setAllUsers(data || [])
+      setFilteredUsers(data || [])
+    } catch {
+      setAllUsers([])
+      setFilteredUsers([])
+    }
+    setAllUsersLoading(false)
+  }
+
   // ── Member panel ──
   function openMemberPanel() {
     setPendingMembers([...groupMembers])
     setMemberSearch('')
-    setSearchResults([])
+    setAllUsers([])
+    setFilteredUsers([])
     setShowMemberPanel(true)
+    loadAllUsers()
   }
 
   function closeMemberPanelSafe() {
-    // If pending differs from committed, warn
     const changed = pendingMembers.length !== groupMembers.length ||
       pendingMembers.some(m => !groupMembers.find(g => g.id === m.id))
     if (changed && pendingMembers.length > 0) {
@@ -198,7 +235,6 @@ export default function CreatePostModal({
     }
     setShowMemberPanel(false)
     setMemberSearch('')
-    setSearchResults([])
   }
 
   function doneMemberPanel() {
@@ -206,47 +242,31 @@ export default function CreatePostModal({
     setGroupError(false)
     setShowMemberPanel(false)
     setMemberSearch('')
-    setSearchResults([])
   }
 
-  // ── Member search (searches pendingMembers while panel is open) ──
+  // ── Search filters the already-loaded list ──
   useEffect(() => {
     if (!showMemberPanel) return
-    if (!memberSearch.trim()) { setSearchResults([]); return }
+    if (!memberSearch.trim()) {
+      setFilteredUsers(allUsers)
+      return
+    }
     clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(async () => {
-      setSearchLoading(true)
-      try {
-        let query = supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url')
-          .neq('id', user.id)
-          .ilike('display_name', `%${memberSearch.trim()}%`)
-          .limit(20)
-
-        if (form.subject_id) {
-          const { data: enrolled } = await supabase
-            .from('user_subjects')
-            .select('user_id')
-            .eq('subject_id', form.subject_id)
-          const enrolledIds = (enrolled || []).map(e => e.user_id).filter(id => id !== user.id)
-          if (enrolledIds.length === 0) {
-            setSearchResults([])
-            setSearchLoading(false)
-            return
-          }
-          query = query.in('id', enrolledIds)
-        }
-
-        const { data } = await query
-        setSearchResults(data || [])
-      } catch {
-        setSearchResults([])
-      }
-      setSearchLoading(false)
-    }, 300)
+    searchTimeout.current = setTimeout(() => {
+      const q = memberSearch.trim().toLowerCase()
+      setFilteredUsers(allUsers.filter(u => u.display_name?.toLowerCase().includes(q)))
+    }, 150)
     return () => clearTimeout(searchTimeout.current)
-  }, [memberSearch, showMemberPanel, form.subject_id, user.id])
+  }, [memberSearch, allUsers, showMemberPanel])
+
+  // Reload users when subject changes while panel would re-open
+  useEffect(() => {
+    if (showMemberPanel) {
+      setAllUsers([])
+      setFilteredUsers([])
+      loadAllUsers()
+    }
+  }, [form.subject_id])
 
   function togglePendingMember(member) {
     setPendingMembers(prev => {
@@ -254,10 +274,6 @@ export default function CreatePostModal({
       if (exists) return prev.filter(m => m.id !== member.id)
       return [...prev, member]
     })
-  }
-
-  function removeMember(id) {
-    setGroupMembers(prev => prev.filter(m => m.id !== id))
   }
 
   async function handlePasteButton() {
@@ -383,7 +399,6 @@ export default function CreatePostModal({
 
       if (error) throw error
 
-      // Notifications — only for group members or all enrolled
       if (!isScheduledFuture && isAnnouncement) {
         let notifyUserIds = []
         if (visibility === 'group') {
@@ -429,11 +444,13 @@ export default function CreatePostModal({
     return new Date(`${form.scheduled_date}T${time}:00`).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   }
 
-  // ── Visibility label for subtitle ──
   function visibilityLabel() {
     if (visibility === 'group') return `👥 Group${groupMembers.length > 0 ? ` (${groupMembers.length})` : ''}`
     return '🌐 Class'
   }
+
+  // List to show in panel: filtered or full
+  const displayList = memberSearch.trim() ? filteredUsers : allUsers
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
@@ -478,55 +495,59 @@ export default function CreatePostModal({
                 placeholder="Search by name…"
                 style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', background: 'transparent' }}
               />
-              {searchLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
-              {memberSearch && !searchLoading && <button type="button" onClick={() => { setMemberSearch(''); setSearchResults([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}><X size={13} color="#8A8D91" /></button>}
+              {allUsersLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+              {memberSearch && !allUsersLoading && (
+                <button type="button" onClick={() => setMemberSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
+                  <X size={13} color="#8A8D91" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Member list */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
-            {searchResults.length > 0 ? (
-              searchResults.map(u => {
-                const checked = !!pendingMembers.find(m => m.id === u.id)
-                return (
-                  <button key={u.id} type="button" onClick={() => togglePendingMember(u)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', border: 'none', background: checked ? '#F5F3FF' : 'white', cursor: 'pointer', borderRadius: 10, marginBottom: 2, textAlign: 'left', transition: 'background 0.1s' }}
-                    onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#FAFAFA' }}
-                    onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'white' }}>
-                    <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #E4E6EB' }} alt="" />
-                    <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
-                    <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checked ? '#7C3AED' : '#CED0D4'}`, background: checked ? '#7C3AED' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                      {checked && <Check size={12} color="white" strokeWidth={3} />}
-                    </div>
-                  </button>
-                )
-              })
-            ) : memberSearch.trim() && !searchLoading ? (
+            {allUsersLoading ? (
+              <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2.5px solid #DDD6FE', borderTopColor: '#7C3AED', animation: 'spin 0.7s linear infinite', margin: '0 auto 8px' }} />
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>Loading members…</p>
+              </div>
+            ) : displayList.length > 0 ? (
+              <>
+                {memberSearch.trim() && (
+                  <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+                {displayList.map(u => {
+                  const checked = !!pendingMembers.find(m => m.id === u.id)
+                  return (
+                    <button key={u.id} type="button" onClick={() => togglePendingMember(u)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', border: 'none', background: checked ? '#F5F3FF' : 'white', cursor: 'pointer', borderRadius: 10, marginBottom: 2, textAlign: 'left', transition: 'background 0.1s' }}
+                      onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#FAFAFA' }}
+                      onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'white' }}>
+                      <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #E4E6EB' }} alt="" />
+                      <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checked ? '#7C3AED' : '#CED0D4'}`, background: checked ? '#7C3AED' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                        {checked && <Check size={12} color="white" strokeWidth={3} />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </>
+            ) : memberSearch.trim() ? (
               <div style={{ padding: '24px 0', textAlign: 'center' }}>
                 <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>
                   No results for "{memberSearch}"
-                  {form.subject_id && <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>They may not be enrolled in this subject</span>}
+                  {form.subject_id && (
+                    <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>
+                      They may not be enrolled in this subject
+                    </span>
+                  )}
                 </p>
               </div>
-            ) : !memberSearch.trim() && pendingMembers.length === 0 ? (
+            ) : (
               <div style={{ padding: '24px 0', textAlign: 'center' }}>
-                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>Search for classmates to add</p>
-              </div>
-            ) : null}
-
-            {/* Selected members shown at bottom when not searching */}
-            {!memberSearch.trim() && pendingMembers.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.5 }}>Selected ({pendingMembers.length})</p>
-                {pendingMembers.map(m => (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px', borderRadius: 10, background: '#F5F3FF', marginBottom: 2 }}>
-                    <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #DDD6FE' }} alt="" />
-                    <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{m.display_name}</span>
-                    <button type="button" onClick={() => togglePendingMember(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}>
-                      <X size={14} color="#7C3AED" />
-                    </button>
-                  </div>
-                ))}
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No users found</p>
               </div>
             )}
           </div>
@@ -652,7 +673,7 @@ export default function CreatePostModal({
                   </div>
                 ) : (
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, fontWeight: 600, color: groupError ? '#E41E3F' : '#7C3AED' }}>
-                    {groupError ? '⚠️ Add at least one member' : 'Select group members →'}
+                    {groupError ? '⚠️ Add at least one member' : 'Click to select group members'}
                   </span>
                 )}
               </div>
@@ -716,7 +737,7 @@ export default function CreatePostModal({
 
         {/* Subject */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
-          <select value={form.subject_id} onChange={e => { set('subject_id', e.target.value); setGroupMembers([]); setMemberSearch(''); setSearchResults([]) }}
+          <select value={form.subject_id} onChange={e => { set('subject_id', e.target.value); setGroupMembers([]); setMemberSearch('') }}
             style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
             <option value="">No subject (General)</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
