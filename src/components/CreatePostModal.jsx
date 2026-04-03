@@ -14,7 +14,8 @@ function dicebearUrl(name = '') {
 import {
   X, Image, Paperclip, ChevronDown, Loader2,
   Plus, MessageSquareQuote, Eye, EyeOff,
-  ClipboardPaste, Trash2, Clock, FileText
+  ClipboardPaste, Trash2, Clock, FileText,
+  Users, Globe, Search
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -87,6 +88,15 @@ export default function CreatePostModal({
     scheduled_date: '', scheduled_time: '',
   })
 
+  // ── Visibility / Group state ──
+  const [visibility, setVisibility]         = useState('class') // 'class' | 'group'
+  const [groupMembers, setGroupMembers]     = useState([])      // array of {id, display_name, avatar_url}
+  const [memberSearch, setMemberSearch]     = useState('')
+  const [searchResults, setSearchResults]   = useState([])
+  const [searchLoading, setSearchLoading]   = useState(false)
+  const [groupError, setGroupError]         = useState(false)
+  const searchTimeout                       = useRef(null)
+
   const [photoFiles, setPhotoFiles]         = useState([])
   const [photoPreviews, setPhotoPreviews]   = useState([])
   const [attachFiles, setAttachFiles]       = useState([])
@@ -130,6 +140,58 @@ export default function CreatePostModal({
     if (type.sub_type !== 'deadline' && type.sub_type !== 'announcement') { set('due_date', ''); set('due_time', '') }
     if (type.sub_type !== 'material' && type.post_type !== 'announcement') setAttachFiles([])
     set('announcement_type', '')
+  }
+
+  // ── Member search ──
+  useEffect(() => {
+    if (visibility !== 'group') return
+    if (!memberSearch.trim()) { setSearchResults([]); return }
+    clearTimeout(searchTimeout.current)
+    searchTimeout.current = setTimeout(async () => {
+      setSearchLoading(true)
+      try {
+        let query = supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .neq('id', user.id)
+          .ilike('display_name', `%${memberSearch.trim()}%`)
+          .limit(10)
+
+        // If subject selected, filter to enrolled users only
+        if (form.subject_id) {
+          const { data: enrolled } = await supabase
+            .from('user_subjects')
+            .select('user_id')
+            .eq('subject_id', form.subject_id)
+          const enrolledIds = (enrolled || []).map(e => e.user_id).filter(id => id !== user.id)
+          if (enrolledIds.length === 0) {
+            setSearchResults([])
+            setSearchLoading(false)
+            return
+          }
+          query = query.in('id', enrolledIds)
+        }
+
+        const { data } = await query
+        const alreadyAdded = new Set(groupMembers.map(m => m.id))
+        setSearchResults((data || []).filter(u => !alreadyAdded.has(u.id)))
+      } catch {
+        setSearchResults([])
+      }
+      setSearchLoading(false)
+    }, 300)
+    return () => clearTimeout(searchTimeout.current)
+  }, [memberSearch, visibility, form.subject_id, user.id, groupMembers])
+
+  function addMember(member) {
+    setGroupMembers(prev => [...prev, member])
+    setMemberSearch('')
+    setSearchResults([])
+    setGroupError(false)
+  }
+
+  function removeMember(id) {
+    setGroupMembers(prev => prev.filter(m => m.id !== id))
   }
 
   async function handlePasteButton() {
@@ -195,6 +257,11 @@ export default function CreatePostModal({
       if (!form.scheduled_date) { toast.error('Please set a scheduled date'); return }
       if (!isScheduledFuture) { toast.error('Scheduled time must be in the future'); return }
     }
+    if (visibility === 'group' && groupMembers.length === 0) {
+      setGroupError(true)
+      toast.error('Add at least one group member')
+      return
+    }
 
     setLoading(true)
     try {
@@ -225,6 +292,8 @@ export default function CreatePostModal({
         ? JSON.stringify({ from: form.quoted_from.trim(), message: form.quoted_message.trim() })
         : null
 
+      const group_members_ids = visibility === 'group' ? groupMembers.map(m => m.id) : null
+
       const { data: post, error } = await supabase
         .from('posts')
         .insert({
@@ -240,20 +309,29 @@ export default function CreatePostModal({
           due_time: form.due_time || null,
           quoted_message: quoted_data,
           scheduled_at: scheduledAt,
+          visibility,
+          group_members: group_members_ids,
         })
         .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .single()
 
       if (error) throw error
 
-      if (!isScheduledFuture && isAnnouncement && form.subject_id) {
-        const { data: enrolled } = await supabase
-          .from('user_subjects').select('user_id')
-          .eq('subject_id', form.subject_id).neq('user_id', user.id)
-        if (enrolled?.length) {
+      // Notifications — only for group members or all enrolled
+      if (!isScheduledFuture && isAnnouncement) {
+        let notifyUserIds = []
+        if (visibility === 'group') {
+          notifyUserIds = groupMembers.map(m => m.id)
+        } else if (form.subject_id) {
+          const { data: enrolled } = await supabase
+            .from('user_subjects').select('user_id')
+            .eq('subject_id', form.subject_id).neq('user_id', user.id)
+          notifyUserIds = (enrolled || []).map(e => e.user_id)
+        }
+        if (notifyUserIds.length) {
           await supabase.from('notifications').insert(
-            enrolled.map(e => ({
-              user_id: e.user_id, post_id: post.id, type: 'announcement',
+            notifyUserIds.map(uid => ({
+              user_id: uid, post_id: post.id, type: 'announcement',
               message: `📢 New announcement in ${post.subjects?.name || 'a subject'}: "${form.caption.slice(0, 60)}${form.caption.length > 60 ? '…' : ''}"`,
               is_read: false,
             }))
@@ -307,7 +385,7 @@ export default function CreatePostModal({
           <div>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>{profile?.display_name}</p>
             <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType ? selectedType.activeColor : '#8A8D91' }}>
-              {selectedType ? `${selectedType.emoji} ${selectedType.label} · Class` : 'Select a type below to continue'}
+              {selectedType ? `${selectedType.emoji} ${selectedType.label} · ${visibility === 'group' ? `Group (${groupMembers.length})` : 'Class'}` : 'Select a type below to continue'}
             </p>
           </div>
         </div>
@@ -363,13 +441,108 @@ export default function CreatePostModal({
 
         {/* Subject — always visible */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
-          <select value={form.subject_id} onChange={e => set('subject_id', e.target.value)}
+          <select value={form.subject_id} onChange={e => { set('subject_id', e.target.value); setGroupMembers([]); setMemberSearch(''); setSearchResults([]) }}
             style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
             <option value="">No subject (General)</option>
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
         </div>
+
+        {/* ── VISIBILITY TOGGLE ── */}
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ margin: '0 0 8px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>Who can see this?</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {/* Class */}
+            <button type="button" onClick={() => { setVisibility('class'); setGroupMembers([]); setGroupError(false) }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${visibility === 'class' ? '#0D7377' : '#E4E6EB'}`, background: visibility === 'class' ? '#E6F4F4' : '#F7F8FA', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'class' ? 700 : 500, fontSize: 14, color: visibility === 'class' ? '#0D7377' : '#65676B', transition: 'all 0.15s' }}>
+              <Globe size={16} color={visibility === 'class' ? '#0D7377' : '#8A8D91'} />
+              Class
+            </button>
+            {/* Group */}
+            <button type="button" onClick={() => { setVisibility('group'); setGroupError(false) }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#E4E6EB'}`, background: visibility === 'group' ? (groupError ? '#FFF0F0' : '#F5F3FF') : '#F7F8FA', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: visibility === 'group' ? 700 : 500, fontSize: 14, color: visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#65676B', transition: 'all 0.15s' }}>
+              <Users size={16} color={visibility === 'group' ? (groupError ? '#E41E3F' : '#7C3AED') : '#8A8D91'} />
+              Group
+            </button>
+          </div>
+        </div>
+
+        {/* ── GROUP MEMBER PICKER ── */}
+        {visibility === 'group' && (
+          <div style={{ marginBottom: 12, padding: '12px', background: '#FAFAFA', borderRadius: 12, border: `1.5px solid ${groupError ? '#E41E3F' : '#DDD6FE'}`, animation: 'expandIn 0.18s ease' }}>
+
+            {/* Info tip */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 10, padding: '8px 10px', background: '#EDE9FE', borderRadius: 8 }}>
+              <span style={{ fontSize: 13 }}>💡</span>
+              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
+                {form.subject_id
+                  ? "Showing only users enrolled in the selected subject. Can't find someone? They may not be enrolled in this subject."
+                  : 'No subject selected — you can add anyone. Select a subject above to filter by enrolled users.'}
+              </p>
+            </div>
+
+            {/* Selected chips */}
+            {groupMembers.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                {groupMembers.map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px 4px 5px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE' }}>
+                    <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                    <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#5B21B6' }}>{m.display_name}</span>
+                    <button type="button" onClick={() => removeMember(m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, marginLeft: 2 }}>
+                      <X size={11} color="#7C3AED" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Search input */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${groupError ? '#E41E3F' : '#DDD6FE'}`, background: 'white' }}>
+                <Search size={14} color="#8A8D91" />
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={e => { setMemberSearch(e.target.value); setGroupError(false) }}
+                  placeholder="Search by name…"
+                  style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#050505', background: 'transparent' }}
+                />
+                {searchLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
+              </div>
+
+              {/* Dropdown results */}
+              {searchResults.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4, background: 'white', borderRadius: 10, border: '1.5px solid #DDD6FE', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                  {searchResults.map(u => (
+                    <button key={u.id} type="button" onClick={() => addMember(u)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: 'none', background: 'white', cursor: 'pointer', textAlign: 'left', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#F5F3FF'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                      <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
+                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
+                      <Plus size={14} color="#7C3AED" style={{ marginLeft: 'auto' }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* No results */}
+              {memberSearch.trim() && !searchLoading && searchResults.length === 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, marginTop: 4, background: 'white', borderRadius: 10, border: '1.5px solid #DDD6FE', padding: '12px', textAlign: 'center' }}>
+                  <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
+                    No results for "{memberSearch}"
+                    {form.subject_id && <span style={{ display: 'block', marginTop: 3, color: '#C0392B', fontWeight: 600 }}>They may not be enrolled in this subject</span>}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {groupError && (
+              <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#E41E3F' }}>⚠️ Add at least one member to post as Group</p>
+            )}
+          </div>
+        )}
 
         {/* Due date — only when type selected */}
         {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
