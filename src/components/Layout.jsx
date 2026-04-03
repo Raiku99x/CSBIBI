@@ -1,4 +1,3 @@
-
 import { APP_VERSION, APP_COHORT } from '../version'
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
@@ -488,7 +487,7 @@ export default function Layout({ children, onOpenSearch }) {
             </aside>
           </div>
         ) : (
-          <main style={{ height: hideNav ? 'calc(100dvh - 52px)' : 'calc(100dvh - 104px)', maxWidth:680, margin:'0 auto', width:'100%', overflow:'hidden' }}>
+          <main style={{ flex:1,maxWidth:680,margin:'0 auto',width:'100%',paddingBottom:hideNav?0:64 }}>
             {children}
           </main>
         )}
