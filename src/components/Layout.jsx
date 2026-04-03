@@ -156,16 +156,16 @@ export default function Layout({ children, onOpenSearch }) {
 
   useEffect(() => {
     if (!profile) return
-    supabase.from('direct_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('receiver_id', profile.id).eq('is_read', false)
-      .then(({ count }) => setDmUnread(count || 0))
+    const refetch = async () => {
+      const { count } = await supabase.from('direct_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', profile.id).eq('is_read', false)
+      setDmUnread(count || 0)
+    }
+    refetch()
     const ch = supabase.channel('dm-badge-' + profile.id)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${profile.id}` }, () => setDmUnread(c => c + 1))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${profile.id}` }, async () => {
-        const { count } = await supabase.from('direct_messages').select('id', { count: 'exact', head: true }).eq('receiver_id', profile.id).eq('is_read', false)
-        setDmUnread(count || 0)
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, refetch)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages' }, refetch)
       .subscribe()
     return () => supabase.removeChannel(ch)
   }, [profile])
@@ -435,47 +435,47 @@ export default function Layout({ children, onOpenSearch }) {
            * - Children (MessagesPage) get height:100% which resolves correctly
            *   because the parent has a concrete computed height
            */
-          <main style={{
-            height: hideNav
-              ? 'calc(100dvh - 52px)'
-              : 'calc(100dvh - 52px - 52px - env(safe-area-inset-bottom))',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            maxWidth: 680,
-            margin: '0 auto',
-            width: '100%',
-          }}>
-            {children}
-          </main>
-        )}
-
-        {/* Mobile bottom nav — position:fixed, does NOT affect layout flow */}
-        {!isDesktop&&!hideNav&&(
-          <nav style={{ position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
-            <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
-              {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
-                <NavLink key={to} to={to} end={exact} style={{ flex:1,textDecoration:'none' }}>
-                  {({ isActive }) => (
-                    <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}>
-                      {isActive&&<div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
-                      <div style={{ position:'relative' }}>
-                        <div style={{ width:34,height:26,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:7,background:isActive?'#FADBD8':'transparent',transition:'background 0.15s' }}>
-                          <Icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
-                        </div>
-                        {badge>0&&(
-                          <div style={{ position:'absolute',top:-4,right:-5,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
-                            {badge>9?'9+':badge}
+          <>
+            <main style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              maxWidth: 680,
+              margin: '0 auto',
+              width: '100%',
+            }}>
+              {children}
+            </main>
+            {/* Nav is IN the flex flow — not fixed — so flex chain works like desktop */}
+            {!hideNav && (
+              <nav style={{ flexShrink:0,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
+                <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
+                  {navItems.map(({ to, icon: Icon, label, exact, badge }) => (
+                    <NavLink key={to} to={to} end={exact} style={{ flex:1,textDecoration:'none' }}>
+                      {({ isActive }) => (
+                        <div style={{ display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,padding:'6px 4px',position:'relative' }}>
+                          {isActive&&<div style={{ position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2.5,borderRadius:2,background:RED }}/>}
+                          <div style={{ position:'relative' }}>
+                            <div style={{ width:34,height:26,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:7,background:isActive?'#FADBD8':'transparent',transition:'background 0.15s' }}>
+                              <Icon size={19} color={isActive?RED:textSec} strokeWidth={isActive?2.5:2}/>
+                            </div>
+                            {badge>0&&(
+                              <div style={{ position:'absolute',top:-4,right:-5,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
+                                {badge>9?'9+':badge}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{label}</span>
-                    </div>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </nav>
+                          <span style={{ fontSize:9.5,fontWeight:isActive?700:500,color:isActive?RED:textSec,fontFamily:'"Instrument Sans",system-ui' }}>{label}</span>
+                        </div>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </nav>
+            )}
+          </>
         )}
 
         {showSaved     && <SavedPostsPage onClose={()=>setShowSaved(false)}/>}
