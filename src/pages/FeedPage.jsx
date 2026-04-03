@@ -28,6 +28,24 @@ function isScheduledFuture(post) {
   return new Date(post.scheduled_at) > new Date()
 }
 
+// Returns true if the current user can see this post
+function canSeePost(post, userId, isSuperadmin) {
+  // Scheduled future posts: only author or superadmin
+  if (isScheduledFuture(post)) {
+    if (post.author_id === userId || isSuperadmin) return true
+    return false
+  }
+  // Group posts: only author, group members, or superadmin
+  if (post.visibility === 'group') {
+    if (post.author_id === userId) return true
+    if (isSuperadmin) return true
+    if (Array.isArray(post.group_members) && post.group_members.includes(userId)) return true
+    return false
+  }
+  // Class posts: everyone
+  return true
+}
+
 export default function FeedPage() {
   const { user, profile } = useAuth()
   const { isSuperadmin } = useRole()
@@ -124,14 +142,10 @@ export default function FeedPage() {
           .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
           .eq('id', payload.new.id)
           .single()
-        if (data) {
-          const isFuture = isScheduledFuture(data)
-          const canSee = !isFuture || data.author_id === user?.id || isSuperadmin
-          if (canSee) {
-            setPosts(prev =>
-              prev.some(p => p.id === data.id) ? prev : [data, ...prev]
-            )
-          }
+        if (data && canSeePost(data, user?.id, isSuperadmin)) {
+          setPosts(prev =>
+            prev.some(p => p.id === data.id) ? prev : [data, ...prev]
+          )
         }
       }).subscribe()
     return () => supabase.removeChannel(channel)
@@ -161,12 +175,8 @@ export default function FeedPage() {
     return () => clearInterval(timer)
   }, [targetPostId, setSearchParams])
 
-  const visiblePosts = posts.filter(post => {
-    if (!isScheduledFuture(post)) return true
-    if (post.author_id === user?.id) return true
-    if (isSuperadmin) return true
-    return false
-  })
+  // ── Filter visible posts ──────────────────────────────────
+  const visiblePosts = posts.filter(post => canSeePost(post, user?.id, isSuperadmin))
 
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
@@ -251,6 +261,9 @@ export default function FeedPage() {
               {isScheduledFuture(post) && (post.author_id === user?.id || isSuperadmin) && (
                 <ScheduledBadge scheduledAt={post.scheduled_at} />
               )}
+              {post.visibility === 'group' && (
+                <GroupBadge count={post.group_members?.length || 0} isAuthor={post.author_id === user?.id} isSuperadmin={isSuperadmin} />
+              )}
               <PostCard
                 post={post}
                 currentUserId={user?.id}
@@ -319,6 +332,18 @@ function ScheduledBadge({ scheduledAt }) {
       <Clock size={12} color="#7C3AED" />
       <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#7C3AED' }}>
         🕐 Scheduled · Publishes {label}
+      </span>
+    </div>
+  )
+}
+
+function GroupBadge({ count, isAuthor, isSuperadmin }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:'#F5F3FF', borderTop:'1px solid #DDD6FE', borderLeft:'3px solid #7C3AED' }}>
+      <span style={{ fontSize:11 }}>👥</span>
+      <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#5B21B6' }}>
+        Group post · {count} {count === 1 ? 'member' : 'members'}
+        {isSuperadmin && !isAuthor && <span style={{ fontWeight:400, color:'#7C3AED', marginLeft:5 }}>(visible via superadmin)</span>}
       </span>
     </div>
   )
