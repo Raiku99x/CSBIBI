@@ -147,7 +147,8 @@ function ShareOption({ icon, label, sublabel, onClick, success }) {
   const { colors } = useDarkMode()
   return (
     <button onClick={onClick}
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => { if (!isTouchDevice) setHovered(true) }}
+      onMouseLeave={() => { if (!isTouchDevice) setHovered(false) }}
       style={{ width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 12px',border:'none',cursor:'pointer',background:hovered?(success?'rgba(22,163,74,0.08)':colors.surface):'transparent',borderRadius:8,textAlign:'left',transition:'background 0.1s' }}>
       <div style={{ width:34,height:34,borderRadius:9,background:success?'rgba(22,163,74,0.12)':colors.surface,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
         {icon}
@@ -683,8 +684,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             <button
               onClick={() => setShowMenu(v => !v)}
               style={{ width:32,height:32,borderRadius:7,background:showMenu?colors.surface:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:showMenu?colors.textSec:colors.textMut,transition:'background 0.12s,color 0.12s' }}
-              onMouseEnter={e=>{e.currentTarget.style.background=colors.surface;e.currentTarget.style.color=colors.textSec}}
-              onMouseLeave={e=>{if(!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color=colors.textMut}}}>
+              onMouseEnter={e=>{if(!isTouchDevice){e.currentTarget.style.background=colors.surface;e.currentTarget.style.color=colors.textSec}}}
+              onMouseLeave={e=>{if(!isTouchDevice&&!showMenu){e.currentTarget.style.background='transparent';e.currentTarget.style.color=colors.textMut}}}>
               <MoreHorizontal size={17}/>
             </button>
             {showMenu && (
@@ -836,7 +837,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 function MenuItem({ icon, label, onClick, danger, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    <button onClick={onClick} onMouseEnter={() => { if (!isTouchDevice) setHovered(true) }} onMouseLeave={() => { if (!isTouchDevice) setHovered(false) }}
       style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 14px',border:'none',cursor:'pointer',background:hovered?(danger?'rgba(192,57,43,0.1)':colors.surface):'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:danger?RED:colors.textPri,textAlign:'left',transition:'background 0.1s' }}>
       {icon} {label}
     </button>
@@ -847,18 +848,24 @@ function MenuDivider({ colors }) {
   return <div style={{ height:1,background:colors.border }}/>
 }
 
+const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
 function ActionBtn({ onClick, icon, label, active, activeColor, noflex, disabled, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={disabled ? undefined : onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
-      flex:noflex?'none':1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,
-      padding:'8px 4px',border:'none',cursor:disabled?'default':'pointer',
-      background:hovered&&!disabled?colors.surface:'transparent',borderRadius:7,transition:'background 0.12s',
-      fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,
-      color:disabled?colors.textMut:active?(activeColor||RED):colors.textSec,
-      width:noflex?'100%':undefined,
-      opacity: disabled ? 0.6 : 1,
-    }}>
+    <button
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => { if (!isTouchDevice) setHovered(true) }}
+      onMouseLeave={() => { if (!isTouchDevice) setHovered(false) }}
+      style={{
+        flex:noflex?'none':1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,
+        padding:'8px 4px',border:'none',cursor:disabled?'default':'pointer',
+        background:hovered&&!disabled?colors.surface:'transparent',borderRadius:7,transition:'background 0.12s',
+        fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,
+        color:disabled?colors.textMut:active?(activeColor||RED):colors.textSec,
+        width:noflex?'100%':undefined,
+        opacity: disabled ? 0.6 : 1,
+      }}>
       {icon}{label&&<span>{label}</span>}
     </button>
   )
