@@ -487,7 +487,7 @@ export default function Layout({ children, onOpenSearch }) {
             </aside>
           </div>
         ) : (
-          <main style={{ flex:1,maxWidth:680,margin:'0 auto',width:'100%',paddingBottom:hideNav?0:64 }}>
+          <main style={{ height: hideNav ? 'calc(100dvh - 52px)' : 'calc(100dvh - 104px)', maxWidth:680, margin:'0 auto', width:'100%', overflow:'hidden' }}>
             {children}
           </main>
         )}
