@@ -82,22 +82,26 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   return (
     <>
+      {/* Backdrop */}
       <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
 
+      {/* Sheet — animates up from bottom, translateX centering is on the element itself not in keyframe */}
       <div style={{
-        position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',
-        width:'100%',maxWidth:680,zIndex:61,
+        position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
+        width:'100%', maxWidth:680, zIndex:61,
         background:colors.cardBg,
         borderRadius:'16px 16px 0 0',
         boxShadow:'0 -4px 32px rgba(0,0,0,0.25)',
-        display:'flex',flexDirection:'column',
+        display:'flex', flexDirection:'column',
         maxHeight:'80vh',
-        animation:'slideUp 0.25s cubic-bezier(0.16,1,0.3,1)',
+        animation:'sheetSlideUp 0.28s cubic-bezier(0.16,1,0.3,1)',
       }}>
+        {/* Drag handle */}
         <div style={{ display:'flex',justifyContent:'center',padding:'10px 0 4px' }}>
           <div style={{ width:36,height:4,borderRadius:2,background:colors.border }}/>
         </div>
 
+        {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 16px 12px',borderBottom:`1px solid ${colors.border}` }}>
           <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:16,color:colors.textPri }}>
             Comments {comments.length > 0 && <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:colors.textSec }}>· {comments.length}</span>}
@@ -107,6 +111,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           </button>
         </div>
 
+        {/* Comments list */}
         <div style={{ flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:14 }}>
           {loading ? (
             <div style={{ display:'flex',justifyContent:'center',padding:32 }}>
@@ -131,6 +136,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           <div ref={bottomRef}/>
         </div>
 
+        {/* Input area */}
         <div style={{ borderTop:`1px solid ${colors.border}`,paddingBottom:'calc(10px + env(safe-area-inset-bottom))',background:colors.cardBg }}>
           {effectivelyMuted ? (
             <div style={{ margin:'10px 12px',padding:'12px 14px',background:'rgba(230,81,0,0.1)',border:'1px solid rgba(230,81,0,0.3)',borderRadius:12,display:'flex',alignItems:'center',gap:10 }}>
@@ -193,9 +199,9 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       </div>
 
       <style>{`
-        @keyframes fadeIn  { from{opacity:0}to{opacity:1} }
-        @keyframes slideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)}to{opacity:1;transform:translateX(-50%) translateY(0)} }
-        @keyframes spin    { from{transform:rotate(0deg)}to{transform:rotate(360deg)} }
+        @keyframes fadeIn    { from{opacity:0} to{opacity:1} }
+        @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
       `}</style>
     </>
   )
