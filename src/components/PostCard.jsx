@@ -206,13 +206,16 @@ function ShareSheet({ post, onClose, anchorRef }) {
   }
 
   // Dropup — same look as the ... menu but opens UPWARD (bottom: calc(100% + 4px))
-  // Works identically on mobile and desktop
+  // On mobile: anchor to right edge so it doesn't clip off screen
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   return (
     <div ref={sheetRef} style={{
       position: 'absolute',
       bottom: 'calc(100% + 4px)',
-      left: '50%',
-      transform: 'translateX(-50%)',
+      ...(isMobile
+        ? { right: 0, left: 'auto', transform: 'none' }
+        : { left: '50%', transform: 'translateX(-50%)' }
+      ),
       width: 230,
       background: colors.cardBg,
       borderRadius: 10,
@@ -220,7 +223,7 @@ function ShareSheet({ post, onClose, anchorRef }) {
       boxShadow: '0 -6px 20px rgba(0,0,0,0.15)',
       overflow: 'hidden',
       zIndex: 30,
-      animation: 'shareDropUp 0.15s ease',
+      animation: isMobile ? 'shareDropUp 0.15s ease' : 'shareDropUpDesktop 0.15s ease',
     }}>
       {/* Header */}
       <div style={{ padding:'11px 14px 8px',borderBottom:`1px solid ${colors.border}`,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
@@ -821,7 +824,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         @keyframes spin        { from{transform:rotate(0deg)}               to{transform:rotate(360deg)} }
         @keyframes fadeIn      { from{opacity:0}                            to{opacity:1} }
         /* shareDropUp: rises up from below like the ... menu drops down */
-        @keyframes shareDropUp { from{opacity:0;transform:translateX(-50%) translateY(6px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        @keyframes shareDropUp        { from{opacity:0;transform:translateY(6px)}                       to{opacity:1;transform:translateY(0)} }
+        @keyframes shareDropUpDesktop { from{opacity:0;transform:translateX(-50%) translateY(6px)}      to{opacity:1;transform:translateX(-50%) translateY(0)} }
         /* sheetSlideUp for CommentsSheet — must include translateX(-50%) so it doesn't override the centering transform */
         @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
       `}}/>
