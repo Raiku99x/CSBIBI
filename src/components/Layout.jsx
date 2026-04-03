@@ -436,15 +436,15 @@ export default function Layout({ children, onOpenSearch }) {
            *   because the parent has a concrete computed height
            */
           <main style={{
-            flex: 1,
-            minHeight: 0,
+            height: hideNav
+              ? 'calc(100dvh - 52px)'
+              : 'calc(100dvh - 52px - 52px - env(safe-area-inset-bottom))',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             maxWidth: 680,
             margin: '0 auto',
             width: '100%',
-            paddingBottom: hideNav ? 0 : 'calc(52px + env(safe-area-inset-bottom))',
           }}>
             {children}
           </main>
