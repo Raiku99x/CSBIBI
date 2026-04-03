@@ -9,7 +9,7 @@ import {
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
   MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2,
   Link, MessageSquare, Check, Shield, Crown, Pin, Lock, BadgeCheck,
-  MessageCircleMore, Users
+  MessageCircleMore, Users, Globe
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
@@ -395,6 +395,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const canModerate = (isModerator || isSuperadmin) && modMode
 
   const isGroupPost = postData.visibility === 'group'
+  const isClassPost = !postData.visibility || postData.visibility === 'class'
   const groupMemberIds = postData.group_members || []
   const groupCount = groupMemberIds.length
 
@@ -522,7 +523,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const displayCaption = isLong && !expanded ? caption.slice(0,220)+'…' : caption
 
   const banner    = getBanner(postData.sub_type, postData.post_type)
-  const typeLabel = getTypeLabel(postData.sub_type, postData.post_type)
   const isPastDue = postData.due_date && isPast(
     (() => {
       const [y, m, d] = (postData.due_date).split('-').map(Number)
@@ -615,38 +615,43 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               )}
             </div>
 
-            {/* Timestamp row — now includes group info inline */}
+            {/* ── Timestamp row — visibility tag replaces redundant type label ── */}
             <div style={{ display:'flex',alignItems:'center',gap:0,flexWrap:'wrap',marginTop:1 }}>
               <span style={{ fontSize:11.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
                 {formatDistanceToNow(new Date(postData.created_at),{addSuffix:true})}
               </span>
+
+              {/* Visibility tag — Class (teal) or Group (purple) */}
               <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
-              <span style={{ fontSize:11.5,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui' }}>{typeLabel}</span>
+              {isGroupPost ? (
+                <span style={{ fontSize:11.5,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',display:'inline-flex',alignItems:'center',gap:3 }}>
+                  <Users size={10} color="#7C3AED"/>
+                  Group ·{' '}
+                  <button
+                    onClick={() => setShowMembersModal(true)}
+                    style={{ background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'"Instrument Sans",system-ui',fontSize:11.5,fontWeight:700,color:'#7C3AED',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:2 }}>
+                    {groupCount} {groupCount === 1 ? 'member' : 'members'}
+                  </button>
+                </span>
+              ) : (
+                <span style={{ fontSize:11.5,color:'#0D7377',fontFamily:'"Instrument Sans",system-ui',display:'inline-flex',alignItems:'center',gap:3,fontWeight:600 }}>
+                  <Globe size={10} color="#0D7377"/>
+                  Class
+                </span>
+              )}
+
               {postData.is_edited && (
                 <>
                   <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
                   <span style={{ fontSize:11,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>Edited</span>
                 </>
               )}
-              {/* ── Inline group info ── */}
-              {isGroupPost && (
+
+              {/* Superadmin note for group posts they can see via powers */}
+              {isGroupPost && isSuperadmin && !isOwn && (
                 <>
                   <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
-                  <span style={{ fontSize:11.5,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',display:'inline-flex',alignItems:'center',gap:3 }}>
-                    <Users size={10} color="#7C3AED"/>
-                    Group ·{' '}
-                    <button
-                      onClick={() => setShowMembersModal(true)}
-                      style={{ background:'none',border:'none',cursor:'pointer',padding:0,fontFamily:'"Instrument Sans",system-ui',fontSize:11.5,fontWeight:700,color:'#7C3AED',textDecoration:'underline',textDecorationStyle:'dotted',textUnderlineOffset:2 }}>
-                      {groupCount} {groupCount === 1 ? 'member' : 'members'}
-                    </button>
-                  </span>
-                  {isSuperadmin && !isOwn && (
-                    <>
-                      <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
-                      <span style={{ fontSize:11,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>via superadmin</span>
-                    </>
-                  )}
+                  <span style={{ fontSize:11,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>via superadmin</span>
                 </>
               )}
             </div>
