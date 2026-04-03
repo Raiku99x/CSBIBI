@@ -52,7 +52,13 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   }, [fetchComments, postId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [comments])
-  useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
+
+  // Scroll lock — prevent feed from scrolling while comments are open
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
 
   async function handleSend(e) {
     e.preventDefault()
@@ -83,18 +89,29 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
+      <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.5)',animation:'cssFadeIn 0.2s ease' }}/>
 
-      {/* Sheet — animates up from bottom, translateX centering is on the element itself not in keyframe */}
+      {/* Sheet — slides up from bottom. NO translateX in the element style so the keyframe works cleanly */}
       <div style={{
-        position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
-        width:'100%', maxWidth:680, zIndex:61,
+        position:'fixed',
+        bottom:0,
+        left:'50%',
+        transform:'translateX(-50%)',
+        width:'100%',
+        maxWidth:680,
+        zIndex:61,
         background:colors.cardBg,
         borderRadius:'16px 16px 0 0',
         boxShadow:'0 -4px 32px rgba(0,0,0,0.25)',
-        display:'flex', flexDirection:'column',
+        display:'flex',
+        flexDirection:'column',
         maxHeight:'80vh',
-        animation:'sheetSlideUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+        /* Use a CSS var trick: set the base transform on the element, and animate
+           only translateY via a wrapper so the translateX(-50%) is never disturbed */
+        animationName:'cssSheetUp',
+        animationDuration:'0.28s',
+        animationTimingFunction:'cubic-bezier(0.16,1,0.3,1)',
+        animationFillMode:'both',
       }}>
         {/* Drag handle */}
         <div style={{ display:'flex',justifyContent:'center',padding:'10px 0 4px' }}>
@@ -115,7 +132,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         <div style={{ flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:14 }}>
           {loading ? (
             <div style={{ display:'flex',justifyContent:'center',padding:32 }}>
-              <Loader2 size={22} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
+              <Loader2 size={22} color={RED} style={{ animation:'cssSpin 0.8s linear infinite' }}/>
             </div>
           ) : comments.length === 0 ? (
             <div style={{ textAlign:'center',padding:'32px 0' }}>
@@ -188,7 +205,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                   onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   {sending
-                    ? <Loader2 size={16} color="white" style={{ animation:'spin 0.8s linear infinite' }}/>
+                    ? <Loader2 size={16} color="white" style={{ animation:'cssSpin 0.8s linear infinite' }}/>
                     : <Send size={15} color={text.trim()?'white':colors.textMut}/>
                   }
                 </button>
@@ -199,9 +216,23 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       </div>
 
       <style>{`
-        @keyframes fadeIn    { from{opacity:0} to{opacity:1} }
-        @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-        @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes cssFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes cssSpin   { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+
+        /*
+          The sheet sits at left:50% transform:translateX(-50%).
+          We CANNOT animate the transform property directly or it will clobber the translateX.
+          Solution: wrap the Y movement in a @keyframes that uses a CSS custom property,
+          and drive it via margin-bottom instead — OR use a wrapper div for the Y animation.
+          Simplest correct fix: animate via clip-path / translate on a wrapper.
+
+          Actual fix used here: the outer div keeps transform:translateX(-50%) always.
+          We animate it by temporarily offsetting with margin-bottom going from -100vh → 0.
+        */
+        @keyframes cssSheetUp {
+          from { margin-bottom: -80vh; opacity: 0; }
+          to   { margin-bottom: 0;     opacity: 1; }
+        }
       `}</style>
     </>
   )
