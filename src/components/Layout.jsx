@@ -181,7 +181,6 @@ export default function Layout({ children, onOpenSearch }) {
     setShowOwnProfile(true)
   }
 
-  // All colors from the dark-mode-aware `colors` object
   const pageBg     = colors.pageBg
   const cardBg     = colors.cardBg
   const borderCol  = colors.border
@@ -202,43 +201,16 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         )}
         <div className="csb-sidebar-scroll" style={{ flex:1,overflowY:'auto',padding:isDesktop?'12px 10px':'8px 10px' }}>
-
-          {/* Clickable profile card */}
           <button
             onClick={handleOpenOwnProfile}
-            style={{
-              width: '100%',
-              padding: '12px 10px',
-              marginBottom: 8,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-              border: `1.5px solid ${borderCol}`,
-              borderRadius: 12,
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'background 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.08)' : '#F0F2F5'
-              e.currentTarget.style.borderColor = dark ? '#4A4B4C' : '#CED0D4'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
-              e.currentTarget.style.borderColor = borderCol
-            }}
+            style={{ width:'100%',padding:'12px 10px',marginBottom:8,display:'flex',alignItems:'center',gap:12,background:dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',border:`1.5px solid ${borderCol}`,borderRadius:12,cursor:'pointer',textAlign:'left',transition:'background 0.15s, border-color 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = dark?'rgba(255,255,255,0.08)':'#F0F2F5'; e.currentTarget.style.borderColor = dark?'#4A4B4C':'#CED0D4' }}
+            onMouseLeave={e => { e.currentTarget.style.background = dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = borderCol }}
           >
-            <img
-              src={profile?.avatar_url || dicebearUrl(profile?.display_name)}
-              alt="avatar"
-              style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }}
-            />
+            <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} alt="avatar" style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0,border:`1.5px solid ${dividerCol}` }} />
             <div style={{ minWidth:0,flex:1 }}>
               <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
-                <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                  {profile?.display_name}
-                </p>
+                <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:textPri,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{profile?.display_name}</p>
                 {profile?.role==='superadmin'&&<span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#FEF9C3',color:'#92400E',border:'1px solid #FDE68A',borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',flexShrink:0 }}><Crown size={9}/> Admin</span>}
                 {profile?.role==='moderator'&&<span style={{ display:'inline-flex',alignItems:'center',gap:3,background:'#EBF5FB',color:BLUE,border:'1px solid #AED6F1',borderRadius:10,padding:'1px 6px',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',flexShrink:0 }}><Shield size={9}/> Mod</span>}
               </div>
@@ -272,7 +244,6 @@ export default function Layout({ children, onOpenSearch }) {
             </>
           )}
 
-          {/* Personal */}
           <div style={{ marginBottom:4 }}>
             <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>Personal</p>
             <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Settings size={16} color={textSec}/>} label="Profile Settings" onClick={()=>{ onClose?.(); navigate('/profile') }}/>
@@ -302,17 +273,13 @@ export default function Layout({ children, onOpenSearch }) {
             </>
           )}
 
-          {/* Preferences */}
           <div style={{ marginBottom:4 }}>
             <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>Preferences</p>
             <div style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2 }}>
               <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:surfaceBg,display:'flex',alignItems:'center',justifyContent:'center' }}>
                 {dark?<Sun size={16} color="#F4C430"/>:<Moon size={16} color={textSec}/>}
               </div>
-              {/* FIXED: label shows current mode, not target */}
-              <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>
-                {dark ? 'Dark Mode' : 'Light Mode'}
-              </span>
+              <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>{dark ? 'Dark Mode' : 'Light Mode'}</span>
               <button onClick={toggleDark} style={{ width:40,height:22,borderRadius:11,border:'none',background:dark?RED:'#CED0D4',cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0 }}>
                 <div style={{ position:'absolute',top:3,left:dark?21:3,width:16,height:16,borderRadius:'50%',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.2)',transition:'left 0.2s' }}/>
               </button>
@@ -334,27 +301,23 @@ export default function Layout({ children, onOpenSearch }) {
 
   return (
     <NavVisibilityContext.Provider value={{ hideNav, setHideNav }}>
-      <div style={{ minHeight:'100vh',background:pageBg,display:'flex',flexDirection:'column' }}>
+      {/* KEY: full viewport height, flex column, no overflow at root */}
+      <div style={{ height:'100dvh',background:pageBg,display:'flex',flexDirection:'column',overflow:'hidden' }}>
 
-        {/* Drawer backdrop */}
         {!isDesktop && showDrawer && (
           <div onClick={()=>setShowDrawer(false)} style={{ position:'fixed',inset:0,zIndex:80,background:'rgba(0,0,0,0.5)',animation:'fadeIn 0.2s ease' }}/>
         )}
-
-        {/* Notification backdrop (mobile) */}
         {!isDesktop && showNotifs && (
           <div onClick={()=>setShowNotifs(false)} style={{ position:'fixed',inset:0,zIndex:98,background:'rgba(0,0,0,0.2)',animation:'fadeIn 0.2s ease' }}/>
         )}
-
-        {/* Drawer (mobile) */}
         {!isDesktop && (
           <div style={{ position:'fixed',top:0,left:0,bottom:0,width:300,zIndex:90,background:colors.sidebarBg,boxShadow:'4px 0 24px rgba(0,0,0,0.15)',transform:showDrawer?'translateX(0)':'translateX(-100%)',transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)' }}>
             <LeftSidebar onClose={()=>setShowDrawer(false)}/>
           </div>
         )}
 
-        {/* Header */}
-        <header style={{ position:'sticky',top:0,zIndex:40,background:colors.headerBg,borderBottom:`1px solid ${borderCol}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)' }}>
+        {/* Header — flex-shrink:0 so it never squishes */}
+        <header style={{ flexShrink:0,position:'sticky',top:0,zIndex:40,background:colors.headerBg,borderBottom:`1px solid ${borderCol}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)' }}>
           <div style={{ height:52,padding:'0 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8 }}>
             <div style={{ display:'flex',alignItems:'center',gap:8,flexShrink:0 }}>
               {!isDesktop&&(
@@ -370,17 +333,12 @@ export default function Layout({ children, onOpenSearch }) {
               </div>
               {modMode&&<ModChip isSuperadmin={isSuperadmin}/>}
             </div>
-
             <div style={{ display:'flex',alignItems:'center',gap:6,flexShrink:0 }}>
               <button onClick={onOpenSearch} style={{ width:36,height:36,borderRadius:9,background:surfaceBg,border:`1.5px solid ${borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
                 <Search size={17} color={textSec}/>
               </button>
-
-              {/* Bell */}
               <div ref={notifRef} style={{ position:'relative' }}>
-                <button
-                  onClick={()=>setShowNotifs(v=>!v)}
-                  style={{ width:36,height:36,borderRadius:9,background:showNotifs?'#FADBD8':surfaceBg,border:`1.5px solid ${showNotifs?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'all 0.15s' }}>
+                <button onClick={()=>setShowNotifs(v=>!v)} style={{ width:36,height:36,borderRadius:9,background:showNotifs?'#FADBD8':surfaceBg,border:`1.5px solid ${showNotifs?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'all 0.15s' }}>
                   <Bell size={17} color={showNotifs?RED:textSec} strokeWidth={showNotifs?2.5:2}/>
                   {unreadCount>0&&(
                     <span style={{ position:'absolute',top:-4,right:-4,minWidth:17,height:17,borderRadius:9,background:RED,color:'white',fontSize:9.5,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'2px solid white' }}>
@@ -388,28 +346,16 @@ export default function Layout({ children, onOpenSearch }) {
                     </span>
                   )}
                 </button>
-
                 {showNotifs&&isDesktop&&(
                   <div style={{ position:'absolute',right:0,top:'calc(100% + 8px)',zIndex:100,animation:'slideDown 0.18s ease' }}>
-                    <NotifPanel
-                      notifications={notifications} unreadCount={unreadCount}
-                      markAllRead={markAllRead} markRead={markRead}
-                      onClose={()=>setShowNotifs(false)} navigate={navigate}
-                      dark={dark} cardBg={cardBg} borderCol={borderCol}
-                      textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg}
-                    />
+                    <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={()=>setShowNotifs(false)} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg}/>
                   </div>
                 )}
               </div>
-
-              {/* Person icon (mobile) */}
               {!isDesktop&&(
-                <button
-                  onClick={() => setShowOwnProfile(true)}
-                  style={{ width:36,height:36,borderRadius:9,border:`1.5px solid ${borderCol}`,background:surfaceBg,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.15s' }}
+                <button onClick={() => setShowOwnProfile(true)} style={{ width:36,height:36,borderRadius:9,border:`1.5px solid ${borderCol}`,background:surfaceBg,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = dark ? '#4A4B4C' : '#D8DADF'}
-                  onMouseLeave={e => e.currentTarget.style.background = surfaceBg}
-                >
+                  onMouseLeave={e => e.currentTarget.style.background = surfaceBg}>
                   <User size={17} color={textSec}/>
                 </button>
               )}
@@ -417,30 +363,25 @@ export default function Layout({ children, onOpenSearch }) {
           </div>
         </header>
 
-        {/* Mobile notification panel */}
         {showNotifs&&!isDesktop&&(
           <div style={{ position:'fixed',left:0,right:0,top:52,bottom:0,zIndex:99,display:'flex',flexDirection:'column',animation:'slideDownSheet 0.28s cubic-bezier(0.16,1,0.3,1)' }}>
-            <NotifPanel
-              notifications={notifications} unreadCount={unreadCount}
-              markAllRead={markAllRead} markRead={markRead}
-              onClose={()=>setShowNotifs(false)} navigate={navigate}
-              dark={dark} cardBg={cardBg} borderCol={borderCol}
-              textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg}
-              mobile
-            />
+            <NotifPanel notifications={notifications} unreadCount={unreadCount} markAllRead={markAllRead} markRead={markRead} onClose={()=>setShowNotifs(false)} navigate={navigate} dark={dark} cardBg={cardBg} borderCol={borderCol} textPri={textPri} textSec={textSec} textMut={textMut} surfaceBg={surfaceBg} mobile/>
           </div>
         )}
 
-        {/* Desktop 3-col */}
+        {/* Body — takes remaining height after header */}
         {isDesktop ? (
-          <div style={{ display:'flex',flex:1,width:'100%',maxWidth:1400,margin:'0 auto' }}>
-            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,position:'sticky',top:52,height:'calc(100vh - 52px)',background:colors.sidebarBg,overflowY:'auto' }}>
+          <div style={{ display:'flex',flex:1,minHeight:0,width:'100%',maxWidth:1400,margin:'0 auto',overflow:'hidden' }}>
+            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,height:'100%',background:colors.sidebarBg,overflowY:'auto' }}>
               <LeftSidebar/>
             </aside>
-            <main style={{ flex:1,minWidth:0,background:pageBg,display:'flex',flexDirection:'column' }}>
-              <div style={{ flex:1,maxWidth:680,margin:'0 auto',width:'100%',paddingBottom:32,display:'flex',flexDirection:'column' }}>{children}</div>
+            {/* CENTER COLUMN: flex column, fills height, children scroll inside */}
+            <main style={{ flex:1,minWidth:0,minHeight:0,display:'flex',flexDirection:'column',overflow:'hidden',background:pageBg }}>
+              <div style={{ flex:1,minHeight:0,display:'flex',flexDirection:'column',maxWidth:680,margin:'0 auto',width:'100%' }}>
+                {children}
+              </div>
             </main>
-            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,position:'sticky',top:52,height:'calc(100vh - 52px)',background:pageBg,overflowY:'auto',paddingTop:12 }}>
+            <aside className="csb-sidebar-scroll" style={{ width:280,flexShrink:0,height:'100%',background:pageBg,overflowY:'auto',paddingTop:12 }}>
               <div style={{ padding:'0 10px' }}>
                 <div style={{ display:'flex',alignItems:'center',gap:7,padding:'4px 4px 10px' }}>
                   <div style={{ width:8,height:8,borderRadius:'50%',background:colors.online,boxShadow:`0 0 0 2px ${colors.online}40`,flexShrink:0 }}/>
@@ -452,16 +393,14 @@ export default function Layout({ children, onOpenSearch }) {
                   isSelf dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
                   rightSlot={
                     <div ref={selfMenuRef} style={{ position:'relative' }}>
-                      <button onClick={()=>setSelfMenuOpen(v=>!v)}
-                        style={{ width:28,height:28,borderRadius:7,background:selfMenuOpen?surfaceBg:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.12s' }}
+                      <button onClick={()=>setSelfMenuOpen(v=>!v)} style={{ width:28,height:28,borderRadius:7,background:selfMenuOpen?surfaceBg:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.12s' }}
                         onMouseEnter={e=>e.currentTarget.style.background=surfaceBg}
                         onMouseLeave={e=>{ if(!selfMenuOpen) e.currentTarget.style.background='transparent' }}>
                         <MoreHorizontal size={15} color={textSec}/>
                       </button>
                       {selfMenuOpen&&(
                         <div style={{ position:'absolute',right:0,top:'calc(100% + 4px)',width:190,background:cardBg,borderRadius:10,border:`1px solid ${borderCol}`,boxShadow:'0 6px 20px rgba(0,0,0,0.13)',overflow:'hidden',zIndex:50,animation:'slideDown 0.15s ease' }}>
-                          <button onClick={()=>{ toggleAppearOffline(); setSelfMenuOpen(false) }}
-                            style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 13px',border:'none',cursor:'pointer',background:'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:textPri,textAlign:'left' }}
+                          <button onClick={()=>{ toggleAppearOffline(); setSelfMenuOpen(false) }} style={{ width:'100%',display:'flex',alignItems:'center',gap:9,padding:'10px 13px',border:'none',cursor:'pointer',background:'transparent',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,color:textPri,textAlign:'left' }}
                             onMouseEnter={e=>e.currentTarget.style.background=surfaceBg}
                             onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                             {appearOffline?<><Eye size={14} color={colors.online}/> Show as online</>:<><EyeOff size={14} color={textSec}/> Appear offline</>}
@@ -487,12 +426,13 @@ export default function Layout({ children, onOpenSearch }) {
             </aside>
           </div>
         ) : (
-            <main style={{ height: hideNav ? 'calc(100dvh - 52px)' : 'calc(100dvh - 104px)', maxWidth:680, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column' }}>
-              {children}
-            </main>
+          /* MOBILE: flex:1 + minHeight:0 so it fills remaining space after header */
+          <main style={{ flex:1,minHeight:0,display:'flex',flexDirection:'column',overflow:'hidden',maxWidth:680,margin:'0 auto',width:'100%' }}>
+            {children}
+          </main>
         )}
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav — fixed, does NOT affect layout flow */}
         {!isDesktop&&!hideNav&&(
           <nav style={{ position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:colors.navBg,backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderTop:`1px solid ${borderCol}`,boxShadow:'0 -1px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ maxWidth:680,margin:'0 auto',height:52,display:'flex',alignItems:'center',paddingBottom:'env(safe-area-inset-bottom)' }}>
@@ -524,12 +464,8 @@ export default function Layout({ children, onOpenSearch }) {
         {showLiked     && <LikedPostsPage onClose={()=>setShowLiked(false)}/>}
         {showAbout     && <AboutModal     onClose={()=>setShowAbout(false)}/>}
         {showDashboard && <AdminDashboard onClose={()=>setShowDashboard(false)}/>}
-
         {showOwnProfile && profile?.id && (
-          <UserProfilePage
-            userId={profile.id}
-            onClose={() => setShowOwnProfile(false)}
-          />
+          <UserProfilePage userId={profile.id} onClose={() => setShowOwnProfile(false)}/>
         )}
 
         <style>{`
@@ -570,8 +506,7 @@ function OnlineRow({ avatar, name, sublabel, sublabelColor, dotColor, isSelf, da
 function DMBtn({ onClick, surfaceBg }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button onClick={onClick}
-      style={{ width:30,height:30,borderRadius:8,background:hovered?'#FADBD8':surfaceBg,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.12s' }}
+    <button onClick={onClick} style={{ width:30,height:30,borderRadius:8,background:hovered?'#FADBD8':surfaceBg,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'background 0.12s' }}
       onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}>
       <Send size={13} color={hovered?RED:'#8A8D91'}/>
     </button>
@@ -618,11 +553,7 @@ function NotifPanel({ notifications, unreadCount, markAllRead, markRead, onClose
 
 function NotifItem({ notif, onRead, onClose, navigate, cardBg, textPri, textSec, surfaceBg }) {
   const [hovered, setHovered] = useState(false)
-  const icons = {
-    announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨',
-    like:'❤️', comment:'💬', deadline:'📅', reminder:'🔔',
-    material:'📁', mute:'🔇', ban:'🚫', role:'🛡️',
-  }
+  const icons = { announcement:'📢', tag:'🏷️', whisper:'💬', system_dm:'📨', like:'❤️', comment:'💬', deadline:'📅', reminder:'🔔', material:'📁', mute:'🔇', ban:'🚫', role:'🛡️' }
   function handleClick() {
     onRead(notif.id)
     onClose()
