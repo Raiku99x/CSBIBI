@@ -7,7 +7,7 @@ import PostCard from '../components/PostCard'
 import CreatePostModal from '../components/CreatePostModal'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
-import { Image, Megaphone, Paperclip, VolumeX, Clock } from 'lucide-react'
+import { Image, Megaphone, Paperclip, VolumeX, Clock, Users, Eye, EyeOff } from 'lucide-react'
 import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
 import { useRole } from '../hooks/useRole'
@@ -29,20 +29,20 @@ function isScheduledFuture(post) {
 }
 
 // Returns true if the current user can see this post
-function canSeePost(post, userId, isSuperadmin) {
+function canSeePost(post, userId, isSuperadmin, superadminGroupView) {
   // Scheduled future posts: only author or superadmin
   if (isScheduledFuture(post)) {
     if (post.author_id === userId || isSuperadmin) return true
     return false
   }
-  // Group posts: only author, group members, or superadmin
+  // Group posts
   if (post.visibility === 'group') {
     if (post.author_id === userId) return true
-    if (isSuperadmin) return true
     if (Array.isArray(post.group_members) && post.group_members.includes(userId)) return true
+    // Superadmin sees group posts only if they've toggled it on
+    if (isSuperadmin && superadminGroupView) return true
     return false
   }
-  // Class posts: everyone
   return true
 }
 
@@ -66,6 +66,9 @@ export default function FeedPage() {
   const [autoOpenPhoto, setAutoOpenPhoto] = useState(false)
   const [autoOpenFile, setAutoOpenFile]   = useState(false)
   const [viewingUserId, setViewingUserId] = useState(null)
+
+  // Superadmin group view toggle
+  const [superadminGroupView, setSuperadminGroupView] = useState(false)
 
   const sentinelRef = useRef(null)
   const oldestCreatedAt = useRef(null)
@@ -142,14 +145,14 @@ export default function FeedPage() {
           .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
           .eq('id', payload.new.id)
           .single()
-        if (data && canSeePost(data, user?.id, isSuperadmin)) {
+        if (data && canSeePost(data, user?.id, isSuperadmin, superadminGroupView)) {
           setPosts(prev =>
             prev.some(p => p.id === data.id) ? prev : [data, ...prev]
           )
         }
       }).subscribe()
     return () => supabase.removeChannel(channel)
-  }, [fetchInitial, user?.id, isSuperadmin])
+  }, [fetchInitial, user?.id, isSuperadmin, superadminGroupView])
 
   // ── Scroll to highlighted post ────────────────────────────
   useEffect(() => {
@@ -176,7 +179,7 @@ export default function FeedPage() {
   }, [targetPostId, setSearchParams])
 
   // ── Filter visible posts ──────────────────────────────────
-  const visiblePosts = posts.filter(post => canSeePost(post, user?.id, isSuperadmin))
+  const visiblePosts = posts.filter(post => canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
 
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
@@ -221,6 +224,21 @@ export default function FeedPage() {
         </div>
       )}
 
+      {/* Superadmin group view toggle */}
+      {isSuperadmin && (
+        <div style={{ margin:'0 0 6px', padding:'8px 12px', background: superadminGroupView ? '#F5F3FF' : 'white', border:`1px solid ${superadminGroupView ? '#DDD6FE' : '#E4E6EB'}`, borderLeft:`3px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, borderRadius:'0 8px 8px 0', display:'flex', alignItems:'center', gap:10 }}>
+          <Users size={14} color={superadminGroupView ? '#7C3AED' : '#8A8D91'}/>
+          <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:600, color: superadminGroupView ? '#5B21B6' : '#65676B' }}>
+            {superadminGroupView ? '👁️ Viewing all group posts (superadmin)' : 'Group posts hidden (your normal view)'}
+          </span>
+          <button
+            onClick={() => setSuperadminGroupView(v => !v)}
+            style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:8, border:`1.5px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, background: superadminGroupView ? '#7C3AED' : 'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color: superadminGroupView ? 'white' : '#65676B', transition:'all 0.15s' }}>
+            {superadminGroupView ? <><EyeOff size={12}/> Disable</> : <><Eye size={12}/> Enable</>}
+          </button>
+        </div>
+      )}
+
       {/* Compose Card */}
       <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', marginBottom:6 }}>
         <div style={{ padding:'10px 12px 8px', display:'flex', alignItems:'center', gap:8 }}>
@@ -261,9 +279,6 @@ export default function FeedPage() {
               {isScheduledFuture(post) && (post.author_id === user?.id || isSuperadmin) && (
                 <ScheduledBadge scheduledAt={post.scheduled_at} />
               )}
-              {post.visibility === 'group' && (
-                <GroupBadge count={post.group_members?.length || 0} isAuthor={post.author_id === user?.id} isSuperadmin={isSuperadmin} />
-              )}
               <PostCard
                 post={post}
                 currentUserId={user?.id}
@@ -274,17 +289,15 @@ export default function FeedPage() {
             </div>
           ))}
 
-          {/* Sentinel div — IntersectionObserver watches this */}
           {hasMore && (
             <div ref={sentinelRef} style={{ padding:'20px 0', display:'flex', justifyContent:'center', alignItems:'center', gap:8 }}>
               {loadingMore && <>
-                <div style={{ width:18, height:18, borderRadius:'50%', border:`2.5px solid #E4E6EB`, borderTopColor:RED, animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
+                <div style={{ width:18, height:18, borderRadius:'50%', border:'2.5px solid #E4E6EB', borderTopColor:RED, animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
                 <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>Loading more…</span>
               </>}
             </div>
           )}
 
-          {/* End of feed */}
           {!hasMore && (
             <div style={{ padding:'16px 0 8px', textAlign:'center' }}>
               <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>
@@ -332,18 +345,6 @@ function ScheduledBadge({ scheduledAt }) {
       <Clock size={12} color="#7C3AED" />
       <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#7C3AED' }}>
         🕐 Scheduled · Publishes {label}
-      </span>
-    </div>
-  )
-}
-
-function GroupBadge({ count, isAuthor, isSuperadmin }) {
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:'#F5F3FF', borderTop:'1px solid #DDD6FE', borderLeft:'3px solid #7C3AED' }}>
-      <span style={{ fontSize:11 }}>👥</span>
-      <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#5B21B6' }}>
-        Group post · {count} {count === 1 ? 'member' : 'members'}
-        {isSuperadmin && !isAuthor && <span style={{ fontWeight:400, color:'#7C3AED', marginLeft:5 }}>(visible via superadmin)</span>}
       </span>
     </div>
   )
