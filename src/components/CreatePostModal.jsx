@@ -69,8 +69,6 @@ function QuotedMessagePreview({ from, message, accent }) {
   )
 }
 
-// ── FOOTER HEIGHT constant — used for scroll padding ──
-const FOOTER_HEIGHT = 130
 
 export default function CreatePostModal({
   onClose, onCreated, subjects,
@@ -121,6 +119,16 @@ export default function CreatePostModal({
   const uploadCounter = useRef(0)
   const pasteAreaRef  = useRef()
   const typePickerRef = useRef()
+
+  // Hide footer when keyboard is open
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75)
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }, [])
   useEffect(() => {
@@ -517,7 +525,7 @@ export default function CreatePostModal({
           </div>
 
           {/* Member list — scrollable, padded bottom so content clears the fixed Done button */}
-          <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px', paddingBottom: FOOTER_HEIGHT }}>
+          <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
             {allUsersLoading ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
                 <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2.5px solid #DDD6FE', borderTopColor: '#7C3AED', animation: 'spin 0.7s linear infinite', margin: '0 auto 8px' }} />
@@ -565,7 +573,7 @@ export default function CreatePostModal({
           </div>
 
           {/* ── Done button — fixed at bottom, keyboard can overlap it ── */}
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 61, padding: '10px 16px 16px', background: 'white', borderTop: '1px solid #E4E6EB' }}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 61, padding: '10px 16px 16px', background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
             <button type="button" onClick={doneMemberPanel}
               style={{ width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', background: pendingMembers.length > 0 ? '#7C3AED' : '#CED0D4', color: 'white', cursor: pendingMembers.length > 0 ? 'pointer' : 'not-allowed', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 16, transition: 'background 0.15s' }}>
               {pendingMembers.length > 0 ? `Done · ${pendingMembers.length} member${pendingMembers.length !== 1 ? 's' : ''} selected` : 'Select at least one member'}
@@ -607,7 +615,7 @@ export default function CreatePostModal({
       </div>
 
       {/* Scrollable body — paddingBottom clears the fixed footer */}
-      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 0', paddingBottom: FOOTER_HEIGHT }}>
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px' }}>
 
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -910,8 +918,8 @@ export default function CreatePostModal({
 
       </div>{/* end scrollable body */}
 
-      {/* ── FIXED FOOTER — stays at bottom always, keyboard overlaps it ── */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB' }}>
+      {/* ── FIXED FOOTER — hidden when keyboard is open ── */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
         <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #F0F2F5' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
           <div style={{ display: 'flex', gap: 4 }}>
