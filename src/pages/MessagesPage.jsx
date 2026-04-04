@@ -32,9 +32,9 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
   const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
-      const { data: dmRows } = await supabase
-        .from('direct_messages')
-        .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
+    const { data: dmRows } = await supabase
+      .from('direct_messages')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
       .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false })
 
@@ -612,10 +612,25 @@ function IconBtn({ onClick, active, children, title }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────
-export default function MessagesPage() {
+// FIX #1 + #2:
+//   - Accepts `asModal` prop: when true, uses height:'100%' instead of calculating
+//     dvh-based height, so it fills the MessagesOverlay container correctly.
+//   - Accepts `initialDMTarget` prop: a full partner profile object. When provided,
+//     opens directly into that DM conversation on mount.
+//   - Accepts `onClose` prop: used by the modal close button (header X).
+export default function MessagesPage({ asModal = false, onClose, initialDMTarget }) {
   const { user, profile } = useAuth()
-  const { setHideNav } = useNavVisibility()
-  const [view, setView] = useState('inbox')
+  const navCtx = useNavVisibility()
+  const setHideNav = navCtx?.setHideNav ?? (() => {})
+
+  // FIX #1: initialDMTarget is now a full partner object (id, display_name, avatar_url, etc.)
+  // so DMConversation can render immediately without a separate profile fetch.
+  const [view, setView] = useState(() => {
+    if (initialDMTarget && initialDMTarget.id) {
+      return { type: 'dm', partner: initialDMTarget }
+    }
+    return 'inbox'
+  })
 
   // FIX #9: detect desktop so we don't subtract non-existent bottom nav height
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BP)
@@ -628,20 +643,35 @@ export default function MessagesPage() {
   const isChat = view !== 'inbox'
 
   useEffect(() => {
-    setHideNav(isChat)
-    return () => setHideNav(false)
-  }, [isChat, setHideNav])
+    if (!asModal) setHideNav(isChat)
+    return () => { if (!asModal) setHideNav(false) }
+  }, [isChat, setHideNav, asModal])
 
-  // FIX #9: on desktop there is no bottom nav, so don't subtract its 52px from inbox height
-  const pageHeight = isChat || isDesktop
-    ? 'calc(100dvh - 52px)'
-    : 'calc(100dvh - 52px - 52px)'
+  // FIX #2: when used as a modal (asModal=true), fill 100% of the overlay container.
+  // When used as a standalone route page, use the dvh-based calculation as before.
+  const pageHeight = asModal
+    ? '100%'
+    : isChat || isDesktop
+      ? 'calc(100dvh - 52px)'
+      : 'calc(100dvh - 52px - 52px)'
 
   function goToChat(dest) { setView(dest) }
   function goBack()       { setView('inbox') }
 
   return (
-    <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column', background: 'white' }}>
+      {/* Modal close button shown in inbox header when asModal=true */}
+      {asModal && view === 'inbox' && onClose && (
+        <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
+          <button onClick={onClose}
+            style={{ width: 32, height: 32, borderRadius: '50%', background: '#F0F2F5', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1l12 12M13 1L1 13" stroke="#65676B" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
       {view === 'inbox' ? (
         <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
       ) : view === 'group' ? (
