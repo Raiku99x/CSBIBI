@@ -661,7 +661,9 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
       : 'calc(100dvh - 52px - 52px)'
 
   function goToChat(dest) { setView(dest) }
-  function goBack()       { setView('inbox') }
+  function goBack() {
+  setView('inbox')
+}
 
   return (
     <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column', background: 'white' }}>
