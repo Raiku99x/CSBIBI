@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDarkMode } from '../contexts/DarkModeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, ArrowRight, Loader2, BookOpen, Bell, MessageSquare, FileText, ChevronLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -43,6 +44,7 @@ export default function AuthPage() {
   const [otpAttempts, setOtpAttempts] = useState(0)
   const [resendCooldown, setResendCooldown] = useState(0)
   const { signInWithGoogle, signInWithOTP, verifyOTP } = useAuth()
+  const { dark, colors } = useDarkMode()
 
   async function handleGoogle() {
     setLoading(true)
@@ -184,6 +186,19 @@ export default function AuthPage() {
         .auth-mobile-logo { display:flex; }
         .otp-input:focus { border-color:${RED} !important; box-shadow:0 0 0 3px rgba(192,57,43,0.15); }
 
+        /* Dark mode overrides */
+        ${dark ? `
+          .auth-right {
+            background:
+              radial-gradient(ellipse 60% 40% at 90% 10%,rgba(192,57,43,0.28) 0%,transparent 65%),
+              radial-gradient(ellipse 55% 45% at 10% 85%,rgba(26,82,118,0.24) 0%,transparent 65%),
+              ${colors.pageBg} !important;
+          }
+          .auth-right::before {
+            background-image:radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px) !important;
+          }
+        ` : ''}
+
         @media (min-width:900px) {
           .auth-left { display:flex; }
           .auth-mobile-logo { display:none; }
@@ -236,31 +251,31 @@ export default function AuthPage() {
             </div>
           </div>
 
-          <div className="auth-card" style={{ width:'100%',maxWidth:420,background:'rgba(255,255,255,0.88)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderRadius:20,padding:'32px 30px',boxShadow:'0 16px 56px rgba(0,0,0,0.14),0 2px 12px rgba(0,0,0,0.08)',border:'1px solid rgba(255,255,255,0.95)' }}>
+          <div className="auth-card" style={{ width:'100%',maxWidth:420,background:dark?colors.cardBg:'rgba(255,255,255,0.88)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderRadius:20,padding:'32px 30px',boxShadow:'0 16px 56px rgba(0,0,0,0.14),0 2px 12px rgba(0,0,0,0.08)',border:dark?`1px solid ${colors.border}`:'1px solid rgba(255,255,255,0.95)' }}>
 
             {step === 'choose' && (
               <>
                 <div style={{ textAlign:'center',marginBottom:28 }}>
-                  <h1 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:24,color:'#050505' }}>
+                  <h1 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:24,color:colors.textPri }}>
                     Welcome to CSB 👋
                   </h1>
-                  <p style={{ margin:0,fontSize:13.5,color:'#65676B',fontFamily:'"Instrument Sans",system-ui' }}>
+                  <p style={{ margin:0,fontSize:13.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
                     Sign in to access your class
                   </p>
                 </div>
 
                 <button onClick={handleGoogle} disabled={loading}
-                  style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px 0',borderRadius:11,border:'1.5px solid #E4E6EB',background:'white',cursor:loading?'not-allowed':'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,color:'#050505',marginBottom:12,transition:'all 0.15s',boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}
-                  onMouseEnter={e => { if(!loading){e.currentTarget.style.background='#F7F8FA';e.currentTarget.style.borderColor='#CED0D4'}}}
-                  onMouseLeave={e => { e.currentTarget.style.background='white';e.currentTarget.style.borderColor='#E4E6EB' }}>
+                  style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'13px 0',borderRadius:11,border:`1.5px solid ${colors.border}`,background:colors.cardBg,cursor:loading?'not-allowed':'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,color:colors.textPri,marginBottom:12,transition:'all 0.15s',boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}
+                  onMouseEnter={e => { if(!loading){e.currentTarget.style.background=colors.surface;e.currentTarget.style.borderColor=colors.borderStrong}}}
+                  onMouseLeave={e => { e.currentTarget.style.background=colors.cardBg;e.currentTarget.style.borderColor=colors.border }}>
                   {loading ? <Loader2 size={17} style={{ animation:'spin 0.8s linear infinite' }}/> : <GoogleIcon/>}
                   Continue with Google
                 </button>
 
                 <div style={{ display:'flex',alignItems:'center',gap:12,margin:'8px 0' }}>
-                  <div style={{ flex:1,height:1,background:'#EAECEF' }}/>
-                  <span style={{ color:'#BCC0C4',fontSize:12,fontFamily:'"Instrument Sans",system-ui' }}>or</span>
-                  <div style={{ flex:1,height:1,background:'#EAECEF' }}/>
+                  <div style={{ flex:1,height:1,background:colors.border }}/>
+                  <span style={{ color:colors.textMut,fontSize:12,fontFamily:'"Instrument Sans",system-ui' }}>or</span>
+                  <div style={{ flex:1,height:1,background:colors.border }}/>
                 </div>
 
                 <button onClick={() => setStep('otp-email')}
@@ -280,28 +295,28 @@ export default function AuthPage() {
 
             {step === 'otp-email' && (
               <>
-                <button onClick={() => setStep('choose')} style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
+                <button onClick={() => setStep('choose')} style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:colors.textSec,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
                   <ChevronLeft size={15}/> Back
                 </button>
                 <div style={{ marginBottom:24 }}>
                   <div style={{ width:44,height:44,borderRadius:12,background:'#FADBD8',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14 }}>
                     <Mail size={20} color={RED}/>
                   </div>
-                  <h2 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:22,color:'#050505' }}>
+                  <h2 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:22,color:colors.textPri }}>
                     Enter your email
                   </h2>
-                  <p style={{ margin:0,fontSize:13.5,color:'#65676B',fontFamily:'"Instrument Sans",system-ui' }}>
+                  <p style={{ margin:0,fontSize:13.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui' }}>
                     We'll send a 6-digit code to sign you in.
                   </p>
                 </div>
                 <form onSubmit={handleSendOTP}>
-                  <div style={{ display:'flex',alignItems:'center',gap:10,padding:'0 14px',height:52,borderRadius:11,border:`1.5px solid #E4E6EB`,background:'#F7F8FA',marginBottom:14,transition:'all 0.15s' }}
+                  <div style={{ display:'flex',alignItems:'center',gap:10,padding:'0 14px',height:52,borderRadius:11,border:`1.5px solid ${colors.border}`,background:colors.inputBg,marginBottom:14,transition:'all 0.15s' }}
                     onFocusCapture={e => e.currentTarget.style.borderColor=RED}
-                    onBlurCapture={e => e.currentTarget.style.borderColor='#E4E6EB'}>
-                    <Mail size={16} color="#BCC0C4"/>
+                    onBlurCapture={e => e.currentTarget.style.borderColor=colors.border}>
+                    <Mail size={16} color={colors.textMut}/>
                     <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                       placeholder="your@email.com" required autoFocus maxLength={100}
-                      style={{ flex:1,border:'none',background:'transparent',outline:'none',fontSize:15,color:'#1c1e21',fontFamily:'"Instrument Sans",system-ui' }}/>
+                      style={{ flex:1,border:'none',background:'transparent',outline:'none',fontSize:15,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui' }}/>
                   </div>
                   <button type="submit" disabled={loading || !email.trim()}
                     style={{ width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'13px 0',borderRadius:11,border:'none',background:email.trim()?RED:'#E4E6EB',color:email.trim()?'white':'#BCC0C4',cursor:email.trim()?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:15,transition:'all 0.15s',boxShadow:email.trim()?'0 4px 16px rgba(192,57,43,0.32)':'none' }}
@@ -316,19 +331,19 @@ export default function AuthPage() {
             {step === 'otp-verify' && (
               <>
                 <button onClick={() => { setStep('otp-email'); setOtp(['','','','','','']); setOtpAttempts(0) }}
-                  style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:'#65676B',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
+                  style={{ display:'flex',alignItems:'center',gap:4,background:'none',border:'none',cursor:'pointer',color:colors.textSec,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13,marginBottom:20,padding:0 }}>
                   <ChevronLeft size={15}/> Back
                 </button>
                 <div style={{ marginBottom:24 }}>
                   <div style={{ width:44,height:44,borderRadius:12,background:'#FADBD8',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14 }}>
                     <span style={{ fontSize:22 }}>📬</span>
                   </div>
-                  <h2 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:22,color:'#050505' }}>
+                  <h2 style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:22,color:colors.textPri }}>
                     Check your email
                   </h2>
-                  <p style={{ margin:0,fontSize:13.5,color:'#65676B',fontFamily:'"Instrument Sans",system-ui',lineHeight:1.5 }}>
+                  <p style={{ margin:0,fontSize:13.5,color:colors.textSec,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.5 }}>
                     We sent a 6-digit code to<br/>
-                    <strong style={{ color:'#050505' }}>{email}</strong>
+                    <strong style={{ color:colors.textPri }}>{email}</strong>
                   </p>
                 </div>
 
@@ -350,7 +365,7 @@ export default function AuthPage() {
                         onChange={e => handleOtpChange(idx, e.target.value)}
                         onKeyDown={e => handleOtpKeyDown(idx, e)}
                         autoFocus={idx === 0}
-                        style={{ width:46,height:54,borderRadius:12,border:'1.5px solid #E4E6EB',background:'#F7F8FA',textAlign:'center',fontSize:22,fontWeight:800,fontFamily:'"Bricolage Grotesque",system-ui',color:'#050505',outline:'none',transition:'all 0.15s',caretColor:RED }}/>
+                        style={{ width:46,height:54,borderRadius:12,border:`1.5px solid ${colors.border}`,background:colors.inputBg,textAlign:'center',fontSize:22,fontWeight:800,fontFamily:'"Bricolage Grotesque",system-ui',color:colors.textPri,outline:'none',transition:'all 0.15s',caretColor:RED }}/>
                     ))}
                   </div>
                   <button type="submit" disabled={loading || otp.join('').length !== 6}
@@ -373,7 +388,7 @@ export default function AuthPage() {
             )}
           </div>
 
-          <p style={{ textAlign:'center',fontSize:11.5,color:'rgba(100,100,120,0.6)',marginTop:24,fontFamily:'"Instrument Sans",system-ui',position:'relative',zIndex:1 }}>
+          <p style={{ textAlign:'center',fontSize:11.5,color:dark?colors.textMut:'rgba(100,100,120,0.6)',marginTop:24,fontFamily:'"Instrument Sans",system-ui',position:'relative',zIndex:1 }}>
             CSB · Computer Science Board · Announcement Platform
           </p>
         </div>
