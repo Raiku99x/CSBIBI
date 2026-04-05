@@ -152,7 +152,12 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
                 preview={c.lastMsg ? (c.lastMsg.sender_id === currentUserId ? `You: ${c.lastMsg.content}` : c.lastMsg.content) : ''}
                 timestamp={c.lastMsg?.created_at}
                 unread={c.unread}
-                onClick={() => onOpenDM(c.partner)}
+                onClick={async () => {
+                  await supabase.from('direct_messages').update({ is_read: true })
+                    .eq('sender_id', c.partnerId).eq('receiver_id', currentUserId).eq('is_read', false)
+                  setDmConvos(prev => prev.map(x => x.partnerId === c.partnerId ? { ...x, unread: 0 } : x))
+                  onOpenDM(c.partner)
+                }}
               />
             ))}
             {!showNew && filteredDMs.length === 0 && !groupVisible && (
