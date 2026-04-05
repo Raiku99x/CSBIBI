@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useMuteGate } from '../hooks/useMuteGate'
 import { useDarkMode } from '../contexts/DarkModeContext'
 import { formatDistanceToNow } from 'date-fns'
-import { X, Send, Loader2, Trash2, MicOff } from 'lucide-react'
+import { X, Send, Loader2, Trash2, MicOff, MessageCircle } from 'lucide-react'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -53,7 +53,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [comments])
 
-  // Scroll lock — prevent feed from scrolling while comments are open
+  // Scroll lock
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -74,7 +74,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         const commenterName = profile?.display_name || 'Someone'
         await supabase.from('notifications').insert({
           user_id: postRow.author_id, post_id: postId, type: 'comment',
-          message: `💬 ${commenterName} commented on your post "${postRow.caption?.slice(0,40)||'No caption'}…" — "${content.slice(0,50)}${content.length>50?'…':''}"`,
+          message: `${commenterName} commented on your post "${postRow.caption?.slice(0,40)||'No caption'}…" — "${content.slice(0,50)}${content.length>50?'…':''}"`,
           is_read: false,
         })
       }
@@ -91,7 +91,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       {/* Backdrop */}
       <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.5)',animation:'cssFadeIn 0.2s ease' }}/>
 
-      {/* Sheet — slides up from bottom. NO translateX in the element style so the keyframe works cleanly */}
+      {/* Sheet */}
       <div style={{
         position:'fixed',
         bottom:0,
@@ -106,8 +106,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         display:'flex',
         flexDirection:'column',
         maxHeight:'80vh',
-        /* Use a CSS var trick: set the base transform on the element, and animate
-           only translateY via a wrapper so the translateX(-50%) is never disturbed */
         animationName:'cssSheetUp',
         animationDuration:'0.28s',
         animationTimingFunction:'cubic-bezier(0.16,1,0.3,1)',
@@ -136,7 +134,9 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
             </div>
           ) : comments.length === 0 ? (
             <div style={{ textAlign:'center',padding:'32px 0' }}>
-              <div style={{ fontSize:36,marginBottom:8 }}>💬</div>
+              <div style={{ display:'flex',justifyContent:'center',marginBottom:8 }}>
+                <MessageCircle size={36} color={colors.textMut}/>
+              </div>
               <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textSec,margin:0 }}>No comments yet — be the first!</p>
             </div>
           ) : (
@@ -218,17 +218,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       <style>{`
         @keyframes cssFadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes cssSpin   { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-
-        /*
-          The sheet sits at left:50% transform:translateX(-50%).
-          We CANNOT animate the transform property directly or it will clobber the translateX.
-          Solution: wrap the Y movement in a @keyframes that uses a CSS custom property,
-          and drive it via margin-bottom instead — OR use a wrapper div for the Y animation.
-          Simplest correct fix: animate via clip-path / translate on a wrapper.
-
-          Actual fix used here: the outer div keeps transform:translateX(-50%) always.
-          We animate it by temporarily offsetting with margin-bottom going from -100vh → 0.
-        */
         @keyframes cssSheetUp {
           from { margin-bottom: -80vh; opacity: 0; }
           to   { margin-bottom: 0;     opacity: 1; }
