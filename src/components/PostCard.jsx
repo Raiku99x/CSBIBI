@@ -104,14 +104,14 @@ function buildMessengerText(post) {
     })()
   )
 
-  const lines = []
-  if (subType === 'deadline')             lines.push(`[DEADLINE]${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'reminder')        lines.push(`[REMINDER]${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'material')        lines.push(`[NEW MATERIAL]${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'announcement' || postType === 'announcement') lines.push(`[ANNOUNCEMENT]${subject ? ` — ${subject}` : ' — General'}`)
-  else                                    lines.push(`[STATUS] — ${author}`)
+const lines = []
+if (subType === 'deadline')             lines.push(`[🚨 DEADLINE]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'reminder')        lines.push(`[🔔 REMINDER]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'material')        lines.push(`[📁 MATERIAL]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'announcement' || postType === 'announcement') lines.push(`[📢 ANNOUNCEMENT]${subject ? ` — ${subject}` : ''}`)
+else                                    lines.push(`[💬 STATUS] — ${author}`)
 
-  if (annType) lines.push(`Tag: ${annType}`)
+if (annType) lines.push(`Task: ${annType}`)
   if (dueDate) {
     const [y, mo, d] = dueDate.split('-').map(Number)
     const formatted = format(new Date(y, mo - 1, d), 'MMM d, yyyy')
