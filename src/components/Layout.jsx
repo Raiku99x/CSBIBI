@@ -174,29 +174,6 @@ function LeftSidebar({
                   )}
                 </NavLink>
               ))}
-
-              {/* Messages — opens modal */}
-              <button
-                onClick={() => { onClose?.(); openMessages() }}
-                style={{ display:'flex',alignItems:'center',gap:11,padding:'8px 10px',borderRadius:10,marginBottom:2,cursor:'pointer',background:'transparent',border:'none',width:'100%',textAlign:'left',transition:'background 0.12s' }}
-                onMouseEnter={e=>e.currentTarget.style.background=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'}
-                onMouseLeave={e=>e.currentTarget.style.background='transparent'}
-              >
-                <div style={{ width:32,height:32,borderRadius:9,flexShrink:0,background:surfaceBg,display:'flex',alignItems:'center',justifyContent:'center',position:'relative',transition:'background 0.12s' }}>
-                  <MessageSquare size={16} color={textSec} strokeWidth={2}/>
-                  {dmUnread > 0 && (
-                    <span style={{ position:'absolute',top:-4,right:-4,minWidth:16,height:16,borderRadius:8,background:RED,color:'white',fontSize:9,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',border:'1.5px solid white' }}>
-                      {dmUnread > 9 ? '9+' : dmUnread}
-                    </span>
-                  )}
-                </div>
-                <span style={{ flex:1,fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:textPri }}>Messages</span>
-                {dmUnread > 0 && (
-                  <span style={{ minWidth:18,height:18,borderRadius:9,background:RED,color:'white',fontSize:10,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px' }}>
-                    {dmUnread > 9 ? '9+' : dmUnread}
-                  </span>
-                )}
-              </button>
             </div>
             <div style={{ height:1,background:dividerCol,margin:'4px 4px 8px' }}/>
           </>
