@@ -6,7 +6,9 @@ import {
   User, ChevronLeft, Camera, Upload, ChevronDown, BookOpen,
   Calendar, ChevronRight, Check, X, Cake
 } from 'lucide-react'
+import { differenceInYears } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useDarkMode } from '../contexts/DarkModeContext'
 
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
@@ -78,6 +80,7 @@ function Field({ label, children, error, required }) {
 
 export default function CodeGatePage() {
   const { user, profile, updateProfile, signOut } = useAuth()
+  const { dark, colors } = useDarkMode()
 
   const [step, setStep]         = useState(1)
   const [loading, setLoading]   = useState(false)
@@ -125,14 +128,12 @@ export default function CodeGatePage() {
     setLoading(true)
     setCodeError('')
     try {
-      const { data: anyRow } = await supabase
-        .from('allowed_codes').select('id, is_used').eq('code', trimmed).single()
-
-      if (!anyRow) { setCodeError('invalid'); setLoading(false); return }
-      if (anyRow.is_used) { setCodeError('used'); setLoading(false); return }
-
+      // Single query — avoids race condition between two sequential fetches
       const { data: row } = await supabase
         .from('allowed_codes').select('*').eq('code', trimmed).single()
+
+      if (!row) { setCodeError('invalid'); setLoading(false); return }
+      if (row.is_used) { setCodeError('used'); setLoading(false); return }
 
       setCodeRow(row)
       setFullName('')
@@ -161,7 +162,7 @@ export default function CodeGatePage() {
     if (!birthday) {
       setBdayError('Birthday is required'); ok = false
     } else {
-      const age = Math.floor((Date.now() - new Date(birthday)) / (1000 * 60 * 60 * 24 * 365))
+      const age = differenceInYears(new Date(), new Date(birthday))
       if (age < 15) { setBdayError('Must be at least 15 years old'); ok = false }
       else if (age > 40) { setBdayError('Please enter a valid birthday'); ok = false }
     }
@@ -283,7 +284,7 @@ export default function CodeGatePage() {
       `}</style>
 
       <div className="csb-outer" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(ellipse 70% 50% at 95% 5%,rgba(192,57,43,0.13) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 5% 90%,rgba(26,82,118,0.12) 0%,transparent 60%),#ECEEF2`
+        background: dark ? `radial-gradient(ellipse 70% 50% at 95% 5%,rgba(192,57,43,0.18) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 5% 90%,rgba(26,82,118,0.16) 0%,transparent 60%),${colors.pageBg}` : `radial-gradient(ellipse 70% 50% at 95% 5%,rgba(192,57,43,0.13) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 5% 90%,rgba(26,82,118,0.12) 0%,transparent 60%),#ECEEF2`
       }}>
         <div style={{ position:'absolute',top:-150,right:-100,width:480,height:480,borderRadius:'50%',background:'radial-gradient(circle,rgba(192,57,43,0.18) 0%,transparent 68%)',animation:'floatA 10s ease-in-out infinite',pointerEvents:'none'}}/>
         <div style={{ position:'absolute',bottom:-130,left:-50,width:440,height:440,borderRadius:'50%',background:'radial-gradient(circle,rgba(26,82,118,0.16) 0%,transparent 68%)',animation:'floatB 13s ease-in-out infinite',pointerEvents:'none'}}/>
@@ -299,7 +300,7 @@ export default function CodeGatePage() {
             <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 10, color: BLUE, letterSpacing: '2px', textTransform: 'uppercase', marginTop: 3 }}>Computer Science Board</div>
           </div>
 
-          <div className="csb-card" style={{ background: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: 22, padding: '26px 24px 30px', boxShadow: '0 20px 60px rgba(0,0,0,0.10),0 4px 16px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.98)' }}>
+          <div className="csb-card" style={{ background: dark ? colors.cardBg : 'rgba(255,255,255,0.93)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: 22, padding: '26px 24px 30px', boxShadow: '0 20px 60px rgba(0,0,0,0.10),0 4px 16px rgba(0,0,0,0.06)', border: dark ? `1px solid ${colors.border}` : '1px solid rgba(255,255,255,0.98)' }}>
 
             <StepBar step={step}/>
 
