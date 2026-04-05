@@ -26,6 +26,7 @@ function dicebearUrl(name = '') {
 }
 
 const RED  = '#C0392B'
+const BLUE = '#1A5276'
 
 function formatTime12(timeStr) {
   if (!timeStr) return null
