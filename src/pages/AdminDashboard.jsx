@@ -11,8 +11,8 @@ import {
   BarChart2, Clock, VolumeX, Ban, ChevronRight,
   Loader2, Send, Tag, BookOpen, Eye, EyeOff,
   ChevronUp, ChevronDown, Pencil, Check, Archive,
-  Star, AlertTriangle, GripVertical, Settings,
-  Download, ToggleLeft, ToggleRight, WrenchIcon,
+  Star, AlertTriangle,
+  Download, ToggleLeft, ToggleRight,
   Wrench, Mail, Radio, Search, CheckSquare, Square
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
@@ -37,6 +37,7 @@ export default function AdminDashboard({ onClose }) {
   const [tab, setTab]             = useState('overview')
   const [stats, setStats]         = useState(null)
   const [users, setUsers]         = useState([])
+  const [subjects, setSubjects]   = useState([])
   const [auditLogs, setAuditLogs] = useState([])
   const [banners, setBanners]     = useState([])
   const [loading, setLoading]     = useState(true)
@@ -66,6 +67,7 @@ export default function AdminDashboard({ onClose }) {
         { data: usersData },
         { data: logsData },
         { data: bannersData },
+        { data: subjectsData },
       ] = await Promise.all([
         supabase.from('posts').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
@@ -74,11 +76,13 @@ export default function AdminDashboard({ onClose }) {
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('audit_logs').select('*, actor:profiles!audit_logs_actor_id_fkey(display_name, avatar_url)').order('created_at', { ascending: false }).limit(50),
         supabase.from('system_notifications').select('*').order('created_at', { ascending: false }),
+        supabase.from('subjects').select('*').order('name'),
       ])
       setStats({ postCount, userCount, likeCount, commentCount })
       setUsers(usersData || [])
       setAuditLogs(logsData || [])
       setBanners(bannersData || [])
+      setSubjects(subjectsData || [])
     } catch (err) {
       toast.error('Failed to load dashboard data')
     }
@@ -194,7 +198,7 @@ export default function AdminDashboard({ onClose }) {
         <EditPostModal
           post={editingPost}
           profile={users.find(u => u.id === editingPost.author_id) || {}}
-          subjects={[]}
+          subjects={subjects}
           onClose={() => setEditingPost(null)}
           onUpdated={() => { setEditingPost(null); toast.success('Post updated!') }}
         />
