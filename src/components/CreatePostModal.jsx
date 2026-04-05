@@ -15,7 +15,8 @@ import {
   X, Image, Paperclip, ChevronDown, Loader2,
   Plus, MessageSquareQuote, Eye, EyeOff,
   ClipboardPaste, Trash2, Clock, FileText,
-  Users, Globe, Search, Check
+  Users, Globe, Search, Check,
+  MessageCircle, Megaphone, Bell, CalendarCheck, Folder
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -42,12 +43,13 @@ const FILE_ACCEPT = [
   'application/x-zip-compressed',
 ].join(',')
 
+// POST_TYPES — Icon replaces emoji
 const POST_TYPES = [
-  { sub_type: 'status',       post_type: 'status',       emoji: '💬', label: 'Status',       btnColor: '#0D7377', activeColor: '#050505', activeBg: '#F0F2F5', activeBorder: '#CED0D4' },
-  { sub_type: 'material',     post_type: 'status',       emoji: '📁', label: 'Material',     btnColor: '#1A5276', activeColor: '#1A5276', activeBg: '#EBF5FB', activeBorder: '#AED6F1' },
-  { sub_type: 'announcement', post_type: 'announcement', emoji: '📢', label: 'Announcement', btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
-  { sub_type: 'reminder',     post_type: 'announcement', emoji: '🔔', label: 'Reminder',     btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
-  { sub_type: 'deadline',     post_type: 'announcement', emoji: '📅', label: 'Deadline',     btnColor: '#922B21', activeColor: '#922B21', activeBg: '#FFF5F5', activeBorder: '#F5B7B1' },
+  { sub_type: 'status',       post_type: 'status',       Icon: MessageCircle,  label: 'Status',       btnColor: '#0D7377', activeColor: '#050505', activeBg: '#F0F2F5', activeBorder: '#CED0D4' },
+  { sub_type: 'material',     post_type: 'status',       Icon: Folder,         label: 'Material',     btnColor: '#1A5276', activeColor: '#1A5276', activeBg: '#EBF5FB', activeBorder: '#AED6F1' },
+  { sub_type: 'announcement', post_type: 'announcement', Icon: Megaphone,      label: 'Announcement', btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
+  { sub_type: 'reminder',     post_type: 'announcement', Icon: Bell,           label: 'Reminder',     btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
+  { sub_type: 'deadline',     post_type: 'announcement', Icon: CalendarCheck,  label: 'Deadline',     btnColor: '#922B21', activeColor: '#922B21', activeBg: '#FFF5F5', activeBorder: '#F5B7B1' },
 ]
 
 function getQuoteAccent() {
@@ -198,7 +200,7 @@ export default function CreatePostModal({
     setMemberSearch('')
     if (visibility === 'group' && groupMembers.length > 0) {
       setGroupMembers([])
-      toast('Members cleared — subject changed', { icon: '🔄', duration: 3000 })
+      toast('Members cleared — subject changed', { duration: 3000 })
     }
   }
 
@@ -303,7 +305,7 @@ export default function CreatePostModal({
       const text = await navigator.clipboard.readText()
       if (text) { set('quoted_message', text); toast.success('Message pasted!') }
       else toast.error('Clipboard is empty')
-    } catch { pasteAreaRef.current?.focus(); toast('Press Ctrl+V / Cmd+V to paste', { icon: '📋' }) }
+    } catch { pasteAreaRef.current?.focus(); toast('Press Ctrl+V / Cmd+V to paste') }
     finally { setPastingMsg(false) }
   }
 
@@ -326,7 +328,7 @@ export default function CreatePostModal({
     const remaining = MAX_FILES - attachFiles.length
     if (remaining <= 0) { toast.error(`Max ${MAX_FILES} files`); e.target.value = ''; return }
     const toAdd = chosen.slice(0, remaining)
-    if (chosen.length > remaining) toast(`Only ${remaining} file${remaining !== 1 ? 's' : ''} added`, { icon: 'ℹ️' })
+    if (chosen.length > remaining) toast(`Only ${remaining} file${remaining !== 1 ? 's' : ''} added`)
     setAttachFiles(prev => [...prev, ...toAdd])
     e.target.value = ''
   }
@@ -434,21 +436,24 @@ export default function CreatePostModal({
           await supabase.from('notifications').insert(
             notifyUserIds.map(uid => ({
               user_id: uid, post_id: post.id, type: 'announcement',
-              message: `📢 New announcement in ${post.subjects?.name || 'a subject'}: "${form.caption.slice(0, 60)}${form.caption.length > 60 ? '…' : ''}"`,
+              message: `New announcement in ${post.subjects?.name || 'a subject'}: "${form.caption.slice(0, 60)}${form.caption.length > 60 ? '…' : ''}"`,
               is_read: false,
             }))
           )
         }
       }
 
-      if (isScheduledFuture) toast.success('🕐 Post scheduled!', { duration: 3500 })
-      else toast.success(
-        isDeadline ? '📅 Deadline posted!'
-        : selectedType.sub_type === 'reminder' ? '🔔 Reminder posted!'
-        : isAnnouncement ? '📢 Announcement posted!'
-        : isMaterial ? '📁 Material shared!'
-        : 'Posted!'
-      )
+      if (isScheduledFuture) {
+        toast.success('Post scheduled!', { duration: 3500 })
+      } else {
+        toast.success(
+          isDeadline ? 'Deadline posted!'
+          : selectedType.sub_type === 'reminder' ? 'Reminder posted!'
+          : isAnnouncement ? 'Announcement posted!'
+          : isMaterial ? 'Material shared!'
+          : 'Posted!'
+        )
+      }
       onCreated(post)
       onClose()
     } catch (err) {
@@ -466,8 +471,8 @@ export default function CreatePostModal({
   }
 
   function visibilityLabel() {
-    if (visibility === 'group') return `👥 Group${groupMembers.length > 0 ? ` (${groupMembers.length})` : ''}`
-    return '🌐 Class'
+    if (visibility === 'group') return `Group${groupMembers.length > 0 ? ` (${groupMembers.length})` : ''}`
+    return 'Class'
   }
 
   const displayList = memberSearch.trim() ? filteredUsers : allUsers
@@ -494,7 +499,7 @@ export default function CreatePostModal({
 
           {/* Info tip */}
           <div style={{ margin: '10px 16px 0', padding: '9px 11px', background: '#EDE9FE', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
-            <span style={{ fontSize: 13 }}>💡</span>
+            <Users size={14} color="#5B21B6" style={{ flexShrink: 0, marginTop: 1 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
               {form.subject_id
                 ? "Showing only users enrolled in the selected subject. Can't find someone? They may not be enrolled in this subject."
@@ -523,7 +528,7 @@ export default function CreatePostModal({
             </div>
           </div>
 
-          {/* Member list — scrollable, padded bottom so content clears the fixed Done button */}
+          {/* Member list */}
           <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
             {allUsersLoading ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
@@ -603,7 +608,14 @@ export default function CreatePostModal({
           <button onClick={handleSubmit} disabled={loading}
             style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: loading ? '#7EC8C8' : isScheduledFuture ? '#7C3AED' : selectedType ? selectedType.btnColor : '#0D7377', color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s', whiteSpace: 'nowrap' }}>
             {loading && <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} />}
-            {loading ? (uploadProgress || 'Posting…') : isScheduledFuture ? '🕐 Schedule' : selectedType ? `Post ${selectedType.emoji}` : 'Post'}
+            {loading
+              ? (uploadProgress || 'Posting…')
+              : isScheduledFuture
+                ? <><Clock size={14}/> Schedule</>
+                : selectedType
+                  ? <><selectedType.Icon size={14}/> Post</>
+                  : 'Post'
+            }
           </button>
           <button onClick={handleClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
@@ -613,7 +625,7 @@ export default function CreatePostModal({
         </div>
       </div>
 
-      {/* Scrollable body — paddingBottom clears the fixed footer */}
+      {/* Scrollable body */}
       <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 70px' }}>
 
         {/* Author row */}
@@ -625,13 +637,16 @@ export default function CreatePostModal({
             {/* Inline visibility control */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, position: 'relative' }} ref={visibilityDropdownRef}>
               <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType ? selectedType.activeColor : '#8A8D91' }}>
-                {selectedType ? `${selectedType.emoji} ${selectedType.label}` : 'Select a type below'}
+                {selectedType
+                  ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><selectedType.Icon size={11}/> {selectedType.label}</span>
+                  : 'Select a type below'
+                }
               </p>
               {selectedType && (
                 <>
                   <span style={{ fontSize: 12, color: '#CED0D4', margin: '0 1px' }}>·</span>
-                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: visibility === 'group' ? '#7C3AED' : '#0D7377', fontWeight: 600 }}>
-                    {visibilityLabel()}
+                  <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: visibility === 'group' ? '#7C3AED' : '#0D7377', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    {visibility === 'group' ? <Users size={10}/> : <Globe size={10}/>} {visibilityLabel()}
                   </span>
                   <span style={{ fontSize: 12, color: '#CED0D4', margin: '0 1px' }}>·</span>
                   <button
@@ -649,7 +664,7 @@ export default function CreatePostModal({
                         onMouseEnter={e => { if (visibility !== 'class') e.currentTarget.style.background = '#F7F8FA' }}
                         onMouseLeave={e => { if (visibility !== 'class') e.currentTarget.style.background = 'white' }}>
                         <Globe size={14} color={visibility === 'class' ? '#0D7377' : '#65676B'} />
-                        🌐 Class
+                        Class
                         {visibility === 'class' && <Check size={12} color="#0D7377" style={{ marginLeft: 'auto' }} />}
                       </button>
                       <div style={{ height: 1, background: '#F0F2F5' }} />
@@ -658,7 +673,7 @@ export default function CreatePostModal({
                         onMouseEnter={e => { if (visibility !== 'group') e.currentTarget.style.background = '#F7F8FA' }}
                         onMouseLeave={e => { if (visibility !== 'group') e.currentTarget.style.background = 'white' }}>
                         <Users size={14} color={visibility === 'group' ? '#7C3AED' : '#65676B'} />
-                        👥 Group
+                        Group
                         {visibility === 'group' && <Check size={12} color="#7C3AED" style={{ marginLeft: 'auto' }} />}
                       </button>
                     </div>
@@ -669,7 +684,7 @@ export default function CreatePostModal({
           </div>
         </div>
 
-        {/* ── GROUP MEMBER BUTTON (when group selected) ── */}
+        {/* ── GROUP MEMBER BUTTON ── */}
         {selectedType && visibility === 'group' && (
           <div style={{ marginBottom: 14, animation: 'expandIn 0.18s ease' }}>
             <button type="button" onClick={openMemberPanel}
@@ -680,10 +695,7 @@ export default function CreatePostModal({
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 {groupMembers.length > 0 ? (
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    className="hide-scrollbar"
-                  >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
                     {groupMembers.map(m => (
                       <div key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 4px', borderRadius: 20, background: '#EDE9FE', border: '1px solid #DDD6FE', flexShrink: 0 }}>
                         <img src={m.avatar_url || dicebearUrl(m.display_name)} style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" />
@@ -693,7 +705,7 @@ export default function CreatePostModal({
                   </div>
                 ) : (
                   <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, fontWeight: 600, color: groupError ? '#E41E3F' : '#7C3AED' }}>
-                    {groupError ? '⚠️ Add at least one member' : 'Click to select group members'}
+                    {groupError ? 'Add at least one member' : 'Click to select group members'}
                   </span>
                 )}
               </div>
@@ -709,8 +721,9 @@ export default function CreatePostModal({
 
         {/* ── POST TYPE PILLS ── */}
         <div ref={typePickerRef} style={{ marginBottom: 16, borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s', padding: typeError ? '8px' : '0' }}>
-          <p style={{ margin: '0 0 7px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-            {typeError ? '⚠️ Pick a type first' : 'What are you posting?'}
+          <p style={{ margin: '0 0 7px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6, display: 'flex', alignItems: 'center', gap: 4 }}>
+            {typeError && <X size={11} color="#E41E3F"/>}
+            {typeError ? 'Pick a type first' : 'What are you posting?'}
           </p>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {POST_TYPES.map(type => {
@@ -720,7 +733,7 @@ export default function CreatePostModal({
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 12, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', whiteSpace: 'nowrap' }}
                   onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = type.activeBorder; e.currentTarget.style.background = type.activeBg + '80' } }}
                   onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#E4E6EB'; e.currentTarget.style.background = 'white' } }}>
-                  <span style={{ fontSize: 12 }}>{type.emoji}</span>
+                  <type.Icon size={12} color={isActive ? type.activeColor : '#65676B'} />
                   {type.label}
                 </button>
               )
@@ -770,7 +783,7 @@ export default function CreatePostModal({
         {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
           <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
             <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-              📅 Due Date &amp; Time
+              <CalendarCheck size={12} color={isDeadline ? '#922B21' : '#65676B'} /> Due Date &amp; Time
               {isDeadline ? <span style={{ color: '#E41E3F' }}>*</span> : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none' }}>(optional)</span>}
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -855,8 +868,8 @@ export default function CreatePostModal({
                   <input type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)} disabled={!form.scheduled_date}
                     style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${form.scheduled_time ? '#7C3AED' : '#DDD6FE'}`, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: form.scheduled_date ? '#050505' : '#BCC0C4', background: form.scheduled_date ? 'white' : '#EDE9FE', outline: 'none', boxSizing: 'border-box', opacity: form.scheduled_date ? 1 : 0.5, cursor: form.scheduled_date ? 'text' : 'not-allowed' }} />
                 </div>
-                {form.scheduled_date && !isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#C0392B' }}>⚠️ Pick a future date and time</p>}
-                {isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED' }}>✓ Will publish {formatScheduledPreview()}</p>}
+                {form.scheduled_date && !isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#C0392B', display: 'flex', alignItems: 'center', gap: 4 }}><X size={11} color="#C0392B"/> Pick a future date and time</p>}
+                {isScheduledFuture && <p style={{ margin: '8px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 600, color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 4 }}><Check size={11} color="#7C3AED"/> Will publish {formatScheduledPreview()}</p>}
               </div>
             )}
           </div>
@@ -915,9 +928,9 @@ export default function CreatePostModal({
           </div>
         )}
 
-      </div>{/* end scrollable body */}
+      </div>
 
-      {/* ── FIXED FOOTER — Add to your post only, hidden when keyboard is open ── */}
+      {/* ── FIXED FOOTER ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
         <div style={{ padding: '8px 16px 12px', display: 'flex', alignItems: 'center' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
@@ -929,8 +942,8 @@ export default function CreatePostModal({
           </div>
         </div>
         {!isMaterial && !isAnnouncement && (
-          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
-            💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
+          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Folder size={12} color="#8A8D91"/> Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
           </p>
         )}
       </div>
