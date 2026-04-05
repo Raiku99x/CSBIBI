@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Loader2, ArrowLeft, Camera, Mail, User } from 'lucide-react'
@@ -27,16 +27,26 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const fileInputRef = useRef()
 
+  // Fix #9: if profile arrives after mount (auth still resolving), sync the input field
+  const profileLoaded = useRef(false)
+  useEffect(() => {
+    if (profile && !profileLoaded.current) {
+      profileLoaded.current = true
+      setDisplayName(profile.display_name || '')
+    }
+  }, [profile])
+
   // Detect unsaved changes
   const nameChanged = displayName.trim() !== (profile?.display_name || '')
 
-  const [nameChangedAt, setNameChangedAt] = useState(
-    profile?.display_name_changed_at ? new Date(profile.display_name_changed_at) : null
-  )
+  // Fix #10: derive nameChangedAt directly from profile so refreshProfile() keeps it current
+  const nameChangedAt = profile?.display_name_changed_at
+    ? new Date(profile.display_name_changed_at)
+    : null
   const daysSinceChange = nameChangedAt ? Math.floor((Date.now() - nameChangedAt) / (1000 * 60 * 60 * 24)) : 999
   const canChangeName = daysSinceChange >= 20
   const daysLeft = 20 - daysSinceChange
-  
+
   const hasUnsavedChanges = nameChanged || !!pendingAvatarFile
 
   function handleBack() {
@@ -107,7 +117,6 @@ export default function ProfilePage() {
       // Clear pending state
       setPendingAvatarFile(null)
       setPendingAvatarPreview(null)
-      if (nameChanged) setNameChangedAt(new Date())
       await refreshProfile()
       toast.success('Profile updated!')
     } catch (err) {
