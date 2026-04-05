@@ -457,8 +457,7 @@ export default function Layout({ children, onOpenSearch }) {
                 )}
               </div>
 
-              {/* Messages button — mobile header */}
-              {!isDesktop && (
+              {/* Messages button — header */}
                 <button
                   onClick={() => openMessages()}
                   style={{ width:36,height:36,borderRadius:9,background:showMessages?'#FADBD8':surfaceBg,border:`1.5px solid ${showMessages?'#F5B7B1':borderCol}`,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,position:'relative',transition:'all 0.15s' }}
@@ -470,7 +469,6 @@ export default function Layout({ children, onOpenSearch }) {
                     </span>
                   )}
                 </button>
-              )}
             </div>
           </div>
         </header>
