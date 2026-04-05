@@ -4,6 +4,7 @@ import PostCard from "./PostCard";
 import UserProfilePage from "../pages/UserProfilePage";
 import { useAuth } from "../contexts/AuthContext";
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 const RED = '#C0392B';
 
@@ -55,6 +56,7 @@ const PillBtn = ({ label, active, onClick }) => (
 
 export default function SearchOverlay({ onClose, subjects = [] }) {
   const { user } = useAuth();
+  const { dark, colors } = useDarkMode();
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -112,10 +114,10 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const showResults = debouncedQuery || activeFilterCount > 0;
 
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", flexDirection:"column", background:"#E9EBEE" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", flexDirection:"column", background:colors.pageBg }}>
 
       {/* TOP BAR */}
-      <div style={{ background:'white', borderBottom:"1px solid #E4E6EB", boxShadow:'0 1px 3px rgba(0,0,0,0.08)', flexShrink:0 }}>
+      <div style={{ background:colors.cardBg, borderBottom:`1px solid ${colors.border}`, boxShadow:'0 1px 3px rgba(0,0,0,0.08)', flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:"8px", padding:"10px 12px", paddingTop:"calc(10px + env(safe-area-inset-top))", maxWidth:680, margin:'0 auto', width:'100%' }}>
 
           <button onClick={onClose}
@@ -125,10 +127,10 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#65676B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
 
-          <div style={{ flex:1, display:"flex", alignItems:"center", background:"#F0F2F5", borderRadius:"20px", padding:"0 12px", gap:"8px", height:38, minWidth:0 }}>
+          <div style={{ flex:1, display:"flex", alignItems:"center", background:colors.surface, borderRadius:"20px", padding:"0 12px", gap:"8px", height:38, minWidth:0 }}>
             <Search size={15} color="#8A8D91" style={{ flexShrink:0 }}/>
             <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search posts…"
-              style={{ flex:1, background:"none", border:"none", outline:"none", color:"#050505", fontSize:"14px", fontFamily:'"Instrument Sans", system-ui', minWidth:0 }}/>
+              style={{ flex:1, background:"none", border:"none", outline:"none", color:colors.textPri, fontSize:"14px", fontFamily:'"Instrument Sans", system-ui', minWidth:0 }}/>
             {query.length > 0 && (
               <button onClick={() => setQuery("")}
                 style={{ background:"#CED0D4", border:"none", color:"#65676B", width:18, height:18, borderRadius:'50%', cursor:"pointer", padding:0, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
