@@ -88,7 +88,7 @@ export function useDeadlineReminders() {
             user_id: user.id,
             post_id: deadline.id,
             type: 'deadline',
-            message: `⚠️ Past due — "${shortCaption}" (${subjectName}) was due and is not yet marked done.`,
+            message: `Past due — "${shortCaption}" (${subjectName}) was due and is not yet marked done.`,
             is_read: false,
           })
           logInserts.push({
@@ -104,7 +104,7 @@ export function useDeadlineReminders() {
             user_id: user.id,
             post_id: deadline.id,
             type: 'deadline',
-            message: `📅 Due ${label} — "${shortCaption}" (${subjectName}). Mark it done when finished!`,
+            message: `Due ${label} — "${shortCaption}" (${subjectName}). Mark it done when finished!`,
             is_read: false,
           })
           logInserts.push({
@@ -121,7 +121,6 @@ export function useDeadlineReminders() {
         await supabase.from('notifications').insert(notifications)
       }
       if (logInserts.length > 0) {
-        // upsert so re-runs on the same day are idempotent
         await supabase
           .from('deadline_reminder_log')
           .upsert(logInserts, { onConflict: 'user_id,post_id,reminder_type,sent_date' })
