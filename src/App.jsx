@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { DarkModeProvider } from './contexts/DarkModeContext'
 import { SavedPostsProvider } from './contexts/SavedPostsContext'
@@ -18,6 +18,55 @@ import ProfilePage from './pages/ProfilePage'
 import CodeGatePage from './pages/CodeGatePage'
 import { supabase } from './lib/supabase'
 import { useDeadlineReminders } from './hooks/useDeadlineReminders'
+
+// ── Error Boundary ───────────────────────────────────────────
+// Catches render errors anywhere in the tree and shows a recovery
+// screen instead of a blank white page.
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error('[CSB ErrorBoundary]', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F0F2F5', padding:24 }}>
+          <div style={{ width:'100%', maxWidth:420, background:'white', borderRadius:20, overflow:'hidden', boxShadow:'0 16px 48px rgba(0,0,0,0.14)' }}>
+            <div style={{ background:'linear-gradient(135deg,#C0392B,#1A5276)', padding:'36px 28px 28px', textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
+              <h1 style={{ margin:0, fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:22, color:'white' }}>Something went wrong</h1>
+              <p style={{ margin:'8px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'rgba(255,255,255,0.75)' }}>
+                CSB ran into an unexpected error.
+              </p>
+            </div>
+            <div style={{ padding:'24px 28px 28px' }}>
+              {this.state.error?.message && (
+                <div style={{ background:'#F7F8FA', border:'1px solid #E4E6EB', borderLeft:'4px solid #C0392B', borderRadius:'0 10px 10px 0', padding:'12px 16px', marginBottom:20 }}>
+                  <p style={{ margin:0, fontFamily:'"JetBrains Mono",monospace', fontSize:12, color:'#65676B', wordBreak:'break-word' }}>
+                    {this.state.error.message}
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={() => { this.setState({ hasError:false, error:null }); window.location.href = '/' }}
+                style={{ width:'100%', padding:'13px 0', borderRadius:10, border:'none', background:'#C0392B', color:'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:15 }}
+              >
+                Reload App
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ── Short link resolver ───────────────────────────────────────
 function ShortLinkResolver() {
@@ -224,10 +273,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <DarkModeProvider>
-          <SavedPostsProvider>
-            <AppRoutes />
+      <ErrorBoundary>
+        <AuthProvider>
+          <DarkModeProvider>
+            <SavedPostsProvider>
+              <AppRoutes />
             <Toaster
               position="top-center"
               toastOptions={{
@@ -243,9 +293,10 @@ export default function App() {
                 error: { iconTheme: { primary: '#f43f5e', secondary: '#f8fafc' } },
               }}
             />
-          </SavedPostsProvider>
-        </DarkModeProvider>
-      </AuthProvider>
+            </SavedPostsProvider>
+          </DarkModeProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
