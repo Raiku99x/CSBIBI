@@ -105,12 +105,12 @@ function buildMessengerText(post) {
   )
 
 const lines = []
-if (subType === 'deadline')             lines.push(`[🚨 DEADLINE]${subject ? ` — ${subject}` : ''}`)
-else if (subType === 'reminder')        lines.push(`[🔔 REMINDER]${subject ? ` — ${subject}` : ''}`)
-else if (subType === 'material')        lines.push(`[📁 MATERIAL]${subject ? ` — ${subject}` : ''}`)
-else if (subType === 'announcement' || postType === 'announcement') lines.push(`[📢 ANNOUNCEMENT]${subject ? ` — ${subject}` : ''}`)
-else                                    lines.push(`[💬 STATUS] — ${author}`)
-
+if (subType === 'deadline')             lines.push(`[🚨 𝗗𝗘𝗔𝗗𝗟𝗜𝗡𝗘]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'reminder')        lines.push(`[🔔 𝗥𝗘𝗠𝗜𝗡𝗗𝗘𝗥]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'material')        lines.push(`[📁 𝗠𝗔𝗧𝗘𝗥𝗜𝗔𝗟]${subject ? ` — ${subject}` : ''}`)
+else if (subType === 'announcement' || postType === 'announcement') lines.push(`[📢 𝗔𝗡𝗡𝗢𝗨𝗡𝗖𝗘𝗠𝗘𝗡𝗧]${subject ? ` — ${subject}` : ''}`)
+else                                    lines.push(`[💬 𝗦𝗧𝗔𝗧𝗨𝗦] — ${author}`)
+  
 if (annType) lines.push(`Task: ${annType}`)
   if (dueDate) {
     const [y, mo, d] = dueDate.split('-').map(Number)
@@ -123,7 +123,7 @@ if (annType) lines.push(`Task: ${annType}`)
   if (quoted && quoted.message) {
     const divider = '─'.repeat(14)
     lines.push(divider)
-    lines.push(`From ${quoted.from ? quoted.from : 'quoted message'}:`)
+    lines.push(`𝗙𝗥𝗢𝗠 ${quoted.from ? quoted.from : 'quoted message'}:`)
     lines.push(`"${quoted.message}"`)
     lines.push(divider)
   }
