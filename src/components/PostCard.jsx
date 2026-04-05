@@ -121,7 +121,7 @@ if (annType) lines.push(`Task: ${annType}`)
   if (isPastDue) lines.push('PAST DUE')
   if (caption.trim()) { lines.push(''); lines.push(caption.trim()) }
   if (quoted && quoted.message) {
-    const divider = '─'.repeat(17)
+    const divider = '─'.repeat(14)
     lines.push(divider)
     lines.push(`From ${quoted.from ? quoted.from : 'quoted message'}:`)
     lines.push(`"${quoted.message}"`)
