@@ -6,7 +6,7 @@ import { format, formatDistanceToNow, isPast, isToday, isTomorrow, differenceInD
 import {
   Clock, ChevronDown, ChevronUp,
   BookOpen, FileText, Download, Check, X, RotateCcw,
-  AlertCircle, AlertTriangle, Loader2
+  AlertCircle, AlertTriangle, Loader2, Bell, Calendar, Tag
 } from 'lucide-react'
 
 const RED     = '#C0392B'
@@ -38,7 +38,7 @@ function getDueStatus(due_date, due_time) {
   const date = getDeadlineDate(due_date, due_time)
   if (isPast(date))                   return { label: 'Past due',    color: GREY,  bg: GREY_BG,  urgent: false, past: true  }
   const days = differenceInDays(date, new Date())
-  if (isToday(new Date(due_date)))    return { label: 'Today!',      color: RED,   bg: RED_BG,   urgent: true,  past: false }
+  if (isToday(new Date(due_date)))    return { label: 'Today',       color: RED,   bg: RED_BG,   urgent: true,  past: false }
   if (isTomorrow(new Date(due_date))) return { label: 'Tomorrow',    color: RED,   bg: RED_BG,   urgent: true,  past: false }
   if (days <= 3)  return { label: `${days}d left`, color: RED,  bg: RED_BG,   urgent: true,  past: false }
   if (days <= 7)  return { label: `${days}d left`, color: BLUE, bg: BLUE_BG,  urgent: false, past: false }
@@ -176,7 +176,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                   {format(new Date(post.due_date + 'T00:00:00'), 'MMM')}
                 </div>
                 <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 9, color: animating ? '#16a34a' : done ? '#BCC0C4' : status.color, marginTop: 3, paddingTop: 2, borderTop: `1px solid ${animating ? '#86EFAC' : done ? '#E4E6EB' : status.urgent && !status.past ? '#F5B7B1' : '#AED6F1'}`, letterSpacing: 0.1, whiteSpace: 'nowrap', transition: 'color 0.25s' }}>
-                  {animating ? '✓ Done' : done ? 'Done ✓' : status.label}
+                  {animating ? 'Done' : done ? 'Done' : status.label}
                 </div>
                 {post.due_time && (
                   <div style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 500, fontSize: 8, color: done ? '#BCC0C4' : status.color, opacity: 0.6, marginTop: 2 }}>
@@ -205,7 +205,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                 {toggling
                   ? <Loader2 size={10} style={{ animation: 'spin 0.8s linear infinite' }} />
                   : done
-                    ? <><RotateCcw size={10} strokeWidth={2.5} /> Undone</>
+                    ? <><RotateCcw size={10} strokeWidth={2.5} /> Undo</>
                     : <><Check size={11} strokeWidth={2.5} /> Done</>
                 }
               </button>
@@ -218,8 +218,8 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                   {post.subjects?.name || 'General'}
                 </span>
                 {post.announcement_type && (
-                  <span style={{ background: GREY_BG, color: '#1c1e21', border: '1px solid #DADDE1', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>
-                    {post.announcement_type}
+                  <span style={{ background: GREY_BG, color: '#1c1e21', border: '1px solid #DADDE1', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 11, padding: '2px 8px', borderRadius: 20, display:'inline-flex', alignItems:'center', gap:3 }}>
+                    <Tag size={9}/> {post.announcement_type}
                   </span>
                 )}
               </div>
@@ -293,10 +293,10 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
   )
 }
 
-function EmptyState({ emoji, title, subtitle }) {
+function EmptyState({ icon, title, subtitle }) {
   return (
     <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E4E6EB', padding: '52px 24px', textAlign: 'center' }}>
-      <div style={{ fontSize: 36, marginBottom: 10 }}>{emoji}</div>
+      <div style={{ display:'flex', justifyContent:'center', marginBottom: 12, opacity:0.35 }}>{icon}</div>
       <p style={{ margin: '0 0 6px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505' }}>{title}</p>
       <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: GREY }}>{subtitle}</p>
     </div>
@@ -400,11 +400,11 @@ export default function AnnouncementsPage() {
   })
   const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
 
-  const emptyLabel = {
-    'Due Soon':  { emoji: '🎉', title: 'Nothing due soon!',      subtitle: 'No tasks due today or tomorrow' },
-    'Past Due':  { emoji: '✅', title: 'No past due tasks',      subtitle: "You're all caught up" },
-    'Done':      { emoji: '📋', title: 'No completed tasks yet', subtitle: 'Mark tasks as done to see them here' },
-    'All':       { emoji: '🗓️', title: 'All clear!',             subtitle: 'No deadlines match this filter' },
+  const emptyConfig = {
+    'Due Soon':  { icon: <Bell size={40}/>,     title: 'Nothing due soon',       subtitle: 'No tasks due today or tomorrow' },
+    'Past Due':  { icon: <Check size={40}/>,    title: 'No past due tasks',       subtitle: "You're all caught up" },
+    'Done':      { icon: <Calendar size={40}/>, title: 'No completed tasks yet',  subtitle: 'Mark tasks as done to see them here' },
+    'All':       { icon: <Clock size={40}/>,    title: 'All clear',               subtitle: 'No deadlines match this filter' },
   }
 
   const isPageLoading = loading || completionsLoading
@@ -463,9 +463,13 @@ export default function AnnouncementsPage() {
       {isPageLoading ? (
         <LoadingSkeleton />
       ) : deadlines.length === 0 ? (
-        <EmptyState emoji="📭" title="No deadlines yet" subtitle="Enroll in subjects to see their deadlines" />
+        <EmptyState icon={<Clock size={40}/>} title="No deadlines yet" subtitle="Enroll in subjects to see their deadlines" />
       ) : displayItems.length === 0 ? (
-        <EmptyState emoji={emptyLabel[filter]?.emoji || '🗓️'} title={emptyLabel[filter]?.title || 'Nothing here'} subtitle={emptyLabel[filter]?.subtitle || ''} />
+        <EmptyState
+          icon={emptyConfig[filter]?.icon || <Clock size={40}/>}
+          title={emptyConfig[filter]?.title || 'Nothing here'}
+          subtitle={emptyConfig[filter]?.subtitle || ''}
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           {displayItems.map(post => (
