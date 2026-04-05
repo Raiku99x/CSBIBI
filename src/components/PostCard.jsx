@@ -105,32 +105,32 @@ function buildMessengerText(post) {
   )
 
   const lines = []
-  if (subType === 'deadline')             lines.push(`📅 DEADLINE${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'reminder')        lines.push(`🔔 REMINDER${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'material')        lines.push(`📁 NEW MATERIAL${subject ? ` — ${subject}` : ''}`)
-  else if (subType === 'announcement' || postType === 'announcement') lines.push(`📢 ANNOUNCEMENT${subject ? ` — ${subject}` : ' — General'}`)
-  else                                    lines.push(`💬 STATUS — ${author}`)
+  if (subType === 'deadline')             lines.push(`[DEADLINE]${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'reminder')        lines.push(`[REMINDER]${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'material')        lines.push(`[NEW MATERIAL]${subject ? ` — ${subject}` : ''}`)
+  else if (subType === 'announcement' || postType === 'announcement') lines.push(`[ANNOUNCEMENT]${subject ? ` — ${subject}` : ' — General'}`)
+  else                                    lines.push(`[STATUS] — ${author}`)
 
-  if (annType) lines.push(`🏷️ ${annType}`)
+  if (annType) lines.push(`Tag: ${annType}`)
   if (dueDate) {
     const [y, mo, d] = dueDate.split('-').map(Number)
     const formatted = format(new Date(y, mo - 1, d), 'MMM d, yyyy')
     const timeStr = dueTime ? ` · ${formatTime12(dueTime)}` : ''
-    lines.push(`⏰ Due: ${formatted}${timeStr}`)
+    lines.push(`Due: ${formatted}${timeStr}`)
   }
-  if (isPastDue) lines.push('⚠️ PAST DUE')
+  if (isPastDue) lines.push('PAST DUE')
   if (caption.trim()) { lines.push(''); lines.push(caption.trim()) }
   if (quoted && quoted.message) {
     const divider = '─'.repeat(17)
     lines.push(divider)
-    lines.push(`💬 ${quoted.from ? `From ${quoted.from}` : 'Quoted message'}:`)
+    lines.push(`From ${quoted.from ? quoted.from : 'quoted message'}:`)
     lines.push(`"${quoted.message}"`)
     lines.push(divider)
   }
-  if (photos.length > 0) { lines.push(''); lines.push(`📸 ${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`) }
-  if (files.length > 0) { lines.push(''); lines.push(`📎 ${files.length} file${files.length !== 1 ? 's' : ''}:`); files.forEach(f => lines.push(`   • ${f.name}`)) }
-  if (subType !== 'status' && postType !== 'status') { lines.push(''); lines.push(`👤 ${author}`) }
-  lines.push(`🔗 ${shareUrl.replace('https://', '')}`)
+  if (photos.length > 0) { lines.push(''); lines.push(`${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`) }
+  if (files.length > 0) { lines.push(''); lines.push(`${files.length} file${files.length !== 1 ? 's' : ''}:`); files.forEach(f => lines.push(`   • ${f.name}`)) }
+  if (subType !== 'status' && postType !== 'status') { lines.push(''); lines.push(`By: ${author}`) }
+  lines.push(`Link: ${shareUrl.replace('https://', '')}`)
   return lines.join('\n')
 }
 
@@ -154,7 +154,6 @@ function ShareOption({ icon, label, sublabel, onClick, success }) {
   )
 }
 
-// ── ShareSheet — dropup on both mobile & desktop, same style as the ... menu ──
 function ShareSheet({ post, onClose, anchorRef }) {
   const [copiedLink, setCopiedLink]           = useState(false)
   const [copiedMessenger, setCopiedMessenger] = useState(false)
@@ -162,7 +161,6 @@ function ShareSheet({ post, onClose, anchorRef }) {
   const sheetRef = useRef()
   const shareUrl = `${window.location.origin}/?post=${post.id}`
 
-  // Close on outside click
   useEffect(() => {
     function h(e) {
       if (sheetRef.current && !sheetRef.current.contains(e.target) &&
@@ -194,12 +192,10 @@ function ShareSheet({ post, onClose, anchorRef }) {
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
     }
     setCopiedMessenger(true)
-    toast.success('Copied! Paste it in Messenger 💬', { duration: 2500 })
+    toast.success('Copied! Paste it in Messenger', { duration: 2500 })
     setTimeout(() => { setCopiedMessenger(false); onClose() }, 1600)
   }
 
-  // Dropup — same look as the ... menu but opens UPWARD (bottom: calc(100% + 4px))
-  // On mobile: anchor to right edge so it doesn't clip off screen
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   return (
     <div ref={sheetRef} style={{
@@ -218,7 +214,6 @@ function ShareSheet({ post, onClose, anchorRef }) {
       zIndex: 30,
       animation: isMobile ? 'shareDropUp 0.15s ease' : 'shareDropUpDesktop 0.15s ease',
     }}>
-      {/* Header */}
       <div style={{ padding:'11px 14px 8px',borderBottom:`1px solid ${colors.border}`,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
         <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>Share post</span>
         <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',display:'flex',padding:2 }}>
@@ -226,10 +221,9 @@ function ShareSheet({ post, onClose, anchorRef }) {
         </button>
       </div>
 
-      {/* Options */}
       <div style={{ padding:6,display:'flex',flexDirection:'column',gap:2 }}>
         {!!navigator.share && (
-          <ShareOption icon={<Share2 size={16} color={colors.textSec}/>} label="More options…" onClick={handleNativeShare}/>
+          <ShareOption icon={<Share2 size={16} color={colors.textSec}/>} label="More options..." onClick={handleNativeShare}/>
         )}
         <ShareOption
           icon={copiedLink ? <Check size={16} color="#16a34a"/> : <Link size={16} color={colors.textSec}/>}
@@ -270,10 +264,7 @@ function Lightbox({ photos, initialIndex, onClose }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [photos.length, onClose])
 
-  function handleTouchStart(e) {
-    touchStartX.current = e.touches[0].clientX
-  }
-
+  function handleTouchStart(e) { touchStartX.current = e.touches[0].clientX }
   function handleTouchEnd(e) {
     if (touchStartX.current === null) return
     const diff = touchStartX.current - e.changedTouches[0].clientX
@@ -332,7 +323,7 @@ function PhotoGrid({ photos, onPhotoClick }) {
 function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = message.length > 180
-  const displayText = isLong && !expanded ? message.slice(0, 180) + '…' : message
+  const displayText = isLong && !expanded ? message.slice(0, 180) + '...' : message
   const accentColor = getQuoteBlockAccent(subType, postType)
   return (
     <div style={{ margin:'8px 0 4px',border:`1px solid ${colors.border}`,borderLeft:`3px solid ${accentColor}`,borderRadius:'0 8px 8px 0',overflow:'hidden',background:'transparent' }}>
@@ -361,7 +352,6 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   )
 }
 
-// ── Group Members Mini Modal ──
 function GroupMembersModal({ memberIds, onClose, colors }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -475,7 +465,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       await supabase.from('posts').update({ is_pinned: next }).eq('id', postData.id)
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_pinned: next }))
-      toast.success(next ? '📌 Post pinned' : 'Post unpinned')
+      toast.success(next ? 'Post pinned' : 'Post unpinned')
     } catch (err) { toast.error(err.message) }
   }
 
@@ -485,7 +475,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       await supabase.from('posts').update({ is_locked: next }).eq('id', postData.id)
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'lock_post':'unlock_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_locked: next }))
-      toast.success(next ? '🔒 Comments locked' : '🔓 Comments unlocked')
+      toast.success(next ? 'Comments locked' : 'Comments unlocked')
     } catch (err) { toast.error(err.message) }
   }
 
@@ -494,7 +484,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       const next = !postData.is_official
       await supabase.from('posts').update({ is_official: next }).eq('id', postData.id)
       setPostData(p => ({ ...p, is_official: next }))
-      toast.success(next ? '✅ Marked as official' : 'Official mark removed')
+      toast.success(next ? 'Marked as official' : 'Official mark removed')
     } catch (err) { toast.error(err.message) }
   }
 
@@ -512,11 +502,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           const likerName = profile?.display_name || 'Someone'
           const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
           await supabase.from('notifications').delete().eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
-          await supabase.from('notifications').insert({ user_id:postData.author_id, post_id:postData.id, type:'like', message:`❤️ ${likerName} liked your post "${postData.caption?.slice(0,40)||'No caption'}…"${countSuffix}`, is_read:false })
+          await supabase.from('notifications').insert({ user_id:postData.author_id, post_id:postData.id, type:'like', message:`${likerName} liked your post "${postData.caption?.slice(0,40)||'No caption'}..."${countSuffix}`, is_read:false })
         }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
-        // Remove the like notification when user unlikes
         if (postData.author_id && postData.author_id !== currentUserId) {
           await supabase.from('notifications').delete()
             .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
@@ -575,7 +564,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const quoted    = parseQuoted(postData.quoted_message)
   const caption   = postData.caption || ''
   const isLong    = caption.length > 220
-  const displayCaption = isLong && !expanded ? caption.slice(0,220)+'…' : caption
+  const displayCaption = isLong && !expanded ? caption.slice(0,220)+'...' : caption
 
   const banner    = getBanner(postData.sub_type, postData.post_type)
   const isPastDue = postData.due_date && isPast(
@@ -593,7 +582,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     <>
       <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
-        {/* Status badges — pinned / official / locked merged into one compact row to avoid stacking clutter */}
         {(postData.is_pinned || postData.is_official || postData.is_locked) && (
           <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
             {postData.is_pinned && (
@@ -620,7 +608,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         )}
 
-        {/* Banner */}
         {banner && (
           <div style={{ background:banner.bg,padding:'7px 12px',display:'flex',alignItems:'center',gap:7 }}>
             <div style={{ width:20,height:20,borderRadius:5,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center' }}>{banner.icon}</div>
@@ -700,12 +687,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                   <span style={{ fontSize:11,color:colors.textMut,fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>Edited</span>
                 </>
               )}
-              {isGroupPost && isSuperadmin && !isOwn && (
-                <>
-                  <span style={{ margin:'0 4px',color:colors.border,fontSize:11.5 }}>·</span>
-                  <span style={{ fontSize:11,color:'#7C3AED',fontFamily:'"Instrument Sans",system-ui',fontStyle:'italic' }}>via superadmin</span>
-                </>
-              )}
             </div>
           </div>
 
@@ -738,7 +719,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
                   <>
                     <MenuDivider colors={colors}/>
                     <div style={{ padding:'6px 10px 2px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:colors.textSec,textTransform:'uppercase',letterSpacing:0.5 }}>
-                      {isSuperadmin ? '👑 Admin' : '🛡️ Mod'}
+                      {isSuperadmin ? 'Admin' : 'Mod'}
                     </div>
                     <MenuItem icon={<Pin size={14} color={postData.is_pinned?'#F59E0B':colors.textSec} fill={postData.is_pinned?'#F59E0B':'none'}/>} label={postData.is_pinned?'Unpin post':'Pin post'} colors={colors} onClick={() => { setShowMenu(false); handleTogglePin() }}/>
                     <MenuItem icon={<Lock size={14} color={postData.is_locked?'#64748B':colors.textSec}/>} label={postData.is_locked?'Unlock comments':'Lock comments'} colors={colors} onClick={() => { setShowMenu(false); handleToggleLock() }}/>
@@ -773,10 +754,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         )}
 
-        {/* Photos */}
         {photos.length>0 && <div style={{marginTop:caption||quoted?4:8}}><PhotoGrid photos={photos} onPhotoClick={setLightboxIndex}/></div>}
 
-        {/* Files */}
         {files.length>0 && (
           <div style={{ padding:'10px 12px 0',display:'flex',flexDirection:'column',gap:6 }}>
             {files.map((file,i) => (
@@ -797,7 +776,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         )}
 
-        {/* Likes + comment count */}
         {(likeCount > 0 || commentCount > 0) && (
           <div style={{ padding:'8px 12px 0',display:'flex',alignItems:'center',justifyContent:'space-between' }}>
             {likeCount > 0 ? (
@@ -817,7 +795,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             {commentCount > 0 && (
               <button onClick={() => !postData.is_locked && setShowComments(true)}
                 style={{ background:'none',border:'none',cursor:postData.is_locked?'default':'pointer',fontFamily:'"Instrument Sans",system-ui',fontSize:12.5,color:postData.is_locked?colors.textMut:colors.textSec,padding:0 }}>
-                {commentCount} comment{commentCount !== 1 ? 's' : ''}{postData.is_locked ? ' · 🔒' : ''}
+                {commentCount} comment{commentCount !== 1 ? 's' : ''}{postData.is_locked ? ' · locked' : ''}
               </button>
             )}
           </div>
@@ -832,7 +810,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             onClick={() => {
               if (postData.is_locked) return
               if (effectivelyMuted) {
-                toast.error(getMuteMessage() || 'You are muted and cannot comment.', { icon: '🔇', duration: 3500 })
+                toast.error(getMuteMessage() || 'You are muted and cannot comment.', { duration: 3500 })
                 return
               }
               setShowComments(true)
@@ -841,7 +819,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             label={postData.is_locked ? 'Locked' : 'Comment'}
             disabled={postData.is_locked} colors={colors}
           />
-          {/* Share — dropup, same container pattern as the ... menu */}
           <div ref={shareRef} style={{ flex:1,position:'relative' }}>
             <ActionBtn onClick={() => setShowShare(v => !v)} icon={<Share2 size={17} color={showShare?RED:colors.textSec}/>} label="Share" active={showShare} activeColor={RED} noflex colors={colors}/>
             {showShare && <ShareSheet post={postData} onClose={() => setShowShare(false)} anchorRef={shareRef}/>}
@@ -865,10 +842,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         @keyframes expandIn    { from{opacity:0;transform:scale(0.96)}      to{opacity:1;transform:scale(1)} }
         @keyframes spin        { from{transform:rotate(0deg)}               to{transform:rotate(360deg)} }
         @keyframes fadeIn      { from{opacity:0}                            to{opacity:1} }
-        /* shareDropUp: rises up from below like the ... menu drops down */
         @keyframes shareDropUp        { from{opacity:0;transform:translateY(6px)}                       to{opacity:1;transform:translateY(0)} }
         @keyframes shareDropUpDesktop { from{opacity:0;transform:translateX(-50%) translateY(6px)}      to{opacity:1;transform:translateX(-50%) translateY(0)} }
-        /* sheetSlideUp for CommentsSheet — must include translateX(-50%) so it doesn't override the centering transform */
         @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
       `}}/>
     </>
