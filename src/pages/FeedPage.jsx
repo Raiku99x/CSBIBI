@@ -28,18 +28,14 @@ function isScheduledFuture(post) {
   return new Date(post.scheduled_at) > new Date()
 }
 
-// Returns true if the current user can see this post
 function canSeePost(post, userId, isSuperadmin, superadminGroupView) {
-  // Scheduled future posts: only author or superadmin
   if (isScheduledFuture(post)) {
     if (post.author_id === userId || isSuperadmin) return true
     return false
   }
-  // Group posts
   if (post.visibility === 'group') {
     if (post.author_id === userId) return true
     if (Array.isArray(post.group_members) && post.group_members.includes(userId)) return true
-    // Superadmin sees group posts only if they've toggled it on
     if (isSuperadmin && superadminGroupView) return true
     return false
   }
@@ -66,8 +62,6 @@ export default function FeedPage() {
   const [autoOpenPhoto, setAutoOpenPhoto] = useState(false)
   const [autoOpenFile, setAutoOpenFile]   = useState(false)
   const [viewingUserId, setViewingUserId] = useState(null)
-
-  // Superadmin group view toggle
   const [superadminGroupView, setSuperadminGroupView] = useState(false)
 
   const sentinelRef = useRef(null)
@@ -75,7 +69,6 @@ export default function FeedPage() {
   const loadingMoreRef = useRef(false)
   const hasMoreRef = useRef(true)
 
-  // ── Initial load ──────────────────────────────────────────
   const fetchInitial = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
@@ -93,7 +86,6 @@ export default function FeedPage() {
     setLoading(false)
   }, [])
 
-  // ── Load more ─────────────────────────────────────────────
   const fetchMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMoreRef.current || !oldestCreatedAt.current) return
     loadingMoreRef.current = true
@@ -121,7 +113,6 @@ export default function FeedPage() {
     setLoadingMore(false)
   }, [])
 
-  // ── IntersectionObserver ──────────────────────────────────
   useEffect(() => {
     const sentinel = sentinelRef.current
     if (!sentinel) return
@@ -133,7 +124,6 @@ export default function FeedPage() {
     return () => observer.disconnect()
   }, [fetchMore, loading])
 
-  // ── Realtime new posts ────────────────────────────────────
   useEffect(() => {
     fetchInitial()
     supabase.from('subjects').select('*').order('name').then(({ data }) => { if (data) setSubjects(data) })
@@ -154,7 +144,6 @@ export default function FeedPage() {
     return () => supabase.removeChannel(channel)
   }, [fetchInitial, user?.id, isSuperadmin, superadminGroupView])
 
-  // ── Scroll to highlighted post ────────────────────────────
   useEffect(() => {
     if (!targetPostId) return
     let attempts = 0
@@ -178,12 +167,11 @@ export default function FeedPage() {
     return () => clearInterval(timer)
   }, [targetPostId, setSearchParams])
 
-  // ── Filter visible posts ──────────────────────────────────
   const visiblePosts = posts.filter(post => canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
 
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
-      toast.error(getMuteMessage(), { icon: '🔇', duration: 4000 })
+      toast.error(getMuteMessage(), { duration: 4000 })
       return
     }
     setCreateType(type)
@@ -229,7 +217,7 @@ export default function FeedPage() {
         <div style={{ margin:'0 0 6px', padding:'8px 12px', background: superadminGroupView ? '#F5F3FF' : 'white', border:`1px solid ${superadminGroupView ? '#DDD6FE' : '#E4E6EB'}`, borderLeft:`3px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, borderRadius:'0 8px 8px 0', display:'flex', alignItems:'center', gap:10 }}>
           <Users size={14} color={superadminGroupView ? '#7C3AED' : '#8A8D91'}/>
           <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:600, color: superadminGroupView ? '#5B21B6' : '#65676B' }}>
-            {superadminGroupView ? '👁️ Viewing all group posts (superadmin)' : 'Group posts hidden (your normal view)'}
+            {superadminGroupView ? 'Viewing all group posts (superadmin)' : 'Group posts hidden (your normal view)'}
           </span>
           <button
             onClick={() => setSuperadminGroupView(v => !v)}
@@ -254,7 +242,7 @@ export default function FeedPage() {
             onMouseEnter={e => { if (!effectivelyMuted) e.currentTarget.style.background = '#E4E6EB' }}
             onMouseLeave={e => { if (!effectivelyMuted) e.currentTarget.style.background = '#F0F2F5' }}
           >
-            {effectivelyMuted ? '🔇 You are muted and cannot post' : `What's on your mind, ${firstName}?`}
+            {effectivelyMuted ? 'You are muted and cannot post' : `What's on your mind, ${firstName}?`}
           </button>
         </div>
 
@@ -293,7 +281,7 @@ export default function FeedPage() {
             <div ref={sentinelRef} style={{ padding:'20px 0', display:'flex', justifyContent:'center', alignItems:'center', gap:8 }}>
               {loadingMore && <>
                 <div style={{ width:18, height:18, borderRadius:'50%', border:'2.5px solid #E4E6EB', borderTopColor:RED, animation:'spin 0.7s linear infinite', flexShrink:0 }}/>
-                <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>Loading more…</span>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, color:'#BCC0C4' }}>Loading more...</span>
               </>}
             </div>
           )}
@@ -344,7 +332,7 @@ function ScheduledBadge({ scheduledAt }) {
     <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:'#F5F3FF', borderTop:'1px solid #DDD6FE', borderLeft:'3px solid #7C3AED' }}>
       <Clock size={12} color="#7C3AED" />
       <span style={{ fontFamily:'"Instrument Sans", system-ui', fontWeight:700, fontSize:11.5, color:'#7C3AED' }}>
-        🕐 Scheduled · Publishes {label}
+        Scheduled · Publishes {label}
       </span>
     </div>
   )
@@ -365,7 +353,9 @@ function ComposeBtn({ icon, color, bg, label, onClick, disabled }) {
 function EmptyFeed({ onPost }) {
   return (
     <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', padding:'48px 24px', textAlign:'center' }}>
-      <div style={{ fontSize:40, marginBottom:10 }}>📭</div>
+      <div style={{ marginBottom:10 }}>
+        <Megaphone size={40} color="#BCC0C4"/>
+      </div>
       <p style={{ fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:17, color:'#050505', margin:'0 0 5px' }}>No posts yet</p>
       <p style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13.5, color:'#65676B', margin:'0 0 18px' }}>Be the first to share something.</p>
       <button onClick={onPost} style={{ padding:'9px 22px', borderRadius:8, border:'none', background:RED, color:'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:13.5, boxShadow:'0 3px 12px rgba(192,57,43,0.28)' }}>
