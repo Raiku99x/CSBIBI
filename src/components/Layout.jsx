@@ -330,6 +330,7 @@ export default function Layout({ children, onOpenSearch }) {
   function openMessages(dmTarget) {
     setMessagesDMTarget(dmTarget || null)
     setShowMessages(true)
+    setDmUnread(0)
   }
 
   async function handleSignOut() {
