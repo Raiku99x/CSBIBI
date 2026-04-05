@@ -325,12 +325,14 @@ export default function Layout({ children, onOpenSearch }) {
     return () => supabase.removeChannel(ch)
   }, [profile])
 
-  // FIX #1: openMessages now correctly accepts a full partner object OR a userId string
-  // so the DM target is always forwarded properly to MessagesPage
-  function openMessages(dmTarget) {
+  async function openMessages(dmTarget) {
     setMessagesDMTarget(dmTarget || null)
     setShowMessages(true)
     setDmUnread(0)
+    await supabase.from('direct_messages')
+      .update({ is_read: true })
+      .eq('receiver_id', profile.id)
+      .eq('is_read', false)
   }
 
   async function handleSignOut() {
