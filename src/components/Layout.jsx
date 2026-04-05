@@ -329,10 +329,13 @@ export default function Layout({ children, onOpenSearch }) {
     setMessagesDMTarget(dmTarget || null)
     setShowMessages(true)
     setDmUnread(0)
-    await supabase.from('direct_messages')
-      .update({ is_read: true })
-      .eq('receiver_id', profile.id)
-      .eq('is_read', false)
+    if (profile?.id) {
+      supabase.from('direct_messages')
+        .update({ is_read: true })
+        .eq('receiver_id', profile.id)
+        .eq('is_read', false)
+        .then(() => setDmUnread(0))
+    }
   }
 
   async function handleSignOut() {
