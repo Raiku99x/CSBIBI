@@ -1,7 +1,11 @@
 import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { X, ChevronDown, Loader2, MessageSquareQuote, Eye, EyeOff, ClipboardPaste, Trash2, Image, Paperclip, Plus, FileText } from 'lucide-react'
+import {
+  X, ChevronDown, Loader2, MessageSquareQuote, Eye, EyeOff,
+  ClipboardPaste, Trash2, Image, Paperclip, Plus, FileText,
+  MessageCircle, Megaphone, Bell, CalendarCheck, Folder
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
@@ -11,12 +15,13 @@ function dicebearUrl(name = '') {
   return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'U')}&backgroundColor=${hex}&textColor=ffffff`
 }
 
+// POST_TYPES — Icon replaces emoji
 const POST_TYPES = [
-  { sub_type: 'status',       post_type: 'status',       emoji: '💬', label: 'Status',       btnColor: '#0D7377', activeColor: '#050505', activeBg: '#F0F2F5', activeBorder: '#CED0D4' },
-  { sub_type: 'material',     post_type: 'status',       emoji: '📁', label: 'Material',     btnColor: '#1A5276', activeColor: '#1A5276', activeBg: '#EBF5FB', activeBorder: '#AED6F1' },
-  { sub_type: 'announcement', post_type: 'announcement', emoji: '📢', label: 'Announcement', btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
-  { sub_type: 'reminder',     post_type: 'announcement', emoji: '🔔', label: 'Reminder',     btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
-  { sub_type: 'deadline',     post_type: 'announcement', emoji: '📅', label: 'Deadline',     btnColor: '#922B21', activeColor: '#922B21', activeBg: '#FFF5F5', activeBorder: '#F5B7B1' },
+  { sub_type: 'status',       post_type: 'status',       Icon: MessageCircle, label: 'Status',       btnColor: '#0D7377', activeColor: '#050505', activeBg: '#F0F2F5', activeBorder: '#CED0D4' },
+  { sub_type: 'material',     post_type: 'status',       Icon: Folder,        label: 'Material',     btnColor: '#1A5276', activeColor: '#1A5276', activeBg: '#EBF5FB', activeBorder: '#AED6F1' },
+  { sub_type: 'announcement', post_type: 'announcement', Icon: Megaphone,     label: 'Announcement', btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
+  { sub_type: 'reminder',     post_type: 'announcement', Icon: Bell,          label: 'Reminder',     btnColor: '#C0392B', activeColor: '#C0392B', activeBg: '#FFF0EF', activeBorder: '#F5B7B1' },
+  { sub_type: 'deadline',     post_type: 'announcement', Icon: CalendarCheck, label: 'Deadline',     btnColor: '#922B21', activeColor: '#922B21', activeBg: '#FFF5F5', activeBorder: '#F5B7B1' },
 ]
 
 const MAX_PHOTOS = 20
@@ -94,14 +99,14 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
 
   // Photo state — start with existing photos
   const existingPhotos = parsePhotos(post.photo_url)
-  const [photoFiles, setPhotoFiles]     = useState([])           // new files to upload
-  const [photoPreviews, setPhotoPreviews] = useState([])          // previews of NEW files only
-  const [keptPhotos, setKeptPhotos]     = useState(existingPhotos) // existing URLs to keep
+  const [photoFiles, setPhotoFiles]     = useState([])
+  const [photoPreviews, setPhotoPreviews] = useState([])
+  const [keptPhotos, setKeptPhotos]     = useState(existingPhotos)
 
   // File state — start with existing files
   const existingFiles = parseFiles(post.file_url, post.file_name)
-  const [attachFiles, setAttachFiles]   = useState([])            // new files to upload
-  const [keptFiles, setKeptFiles]       = useState(existingFiles) // existing files to keep
+  const [attachFiles, setAttachFiles]   = useState([])
+  const [keptFiles, setKeptFiles]       = useState(existingFiles)
 
   const [loading, setLoading]           = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
@@ -148,7 +153,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
       const text = await navigator.clipboard.readText()
       if (text) { set('quoted_message', text); toast.success('Message pasted!') }
       else toast.error('Clipboard is empty')
-    } catch { pasteAreaRef.current?.focus(); toast('Press Ctrl+V / Cmd+V to paste', { icon: '📋' }) }
+    } catch { pasteAreaRef.current?.focus(); toast('Press Ctrl+V / Cmd+V to paste') }
     finally { setPastingMsg(false) }
   }
 
@@ -271,14 +276,17 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
 
-      {/* Header — Save button + X */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505', flex: 1 }}>Edit Post</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={handleSave} disabled={loading}
             style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: loading ? '#7EC8C8' : selectedType.btnColor, color: 'white', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s', whiteSpace: 'nowrap' }}>
             {loading && <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} />}
-            {loading ? (uploadProgress || 'Saving…') : `Save ${selectedType.emoji}`}
+            {loading
+              ? (uploadProgress || 'Saving…')
+              : <><selectedType.Icon size={14}/> Save</>
+            }
           </button>
           <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: '50%', background: '#E4E6EB', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             onMouseEnter={e => e.currentTarget.style.background = '#CED0D4'}
@@ -296,8 +304,8 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
           <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E4E6EB' }} alt="" />
           <div>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>{profile?.display_name}</p>
-            <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType.activeColor }}>
-              {selectedType.emoji} {selectedType.label}
+            <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType.activeColor, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <selectedType.Icon size={11} /> {selectedType.label}
             </p>
           </div>
         </div>
@@ -315,7 +323,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 9px', borderRadius: 20, border: `1.5px solid ${isActive ? type.activeBorder : '#E4E6EB'}`, background: isActive ? type.activeBg : 'white', cursor: 'pointer', fontFamily: '"Instrument Sans", system-ui', fontWeight: isActive ? 700 : 500, fontSize: 12, color: isActive ? type.activeColor : '#65676B', transition: 'all 0.15s', whiteSpace: 'nowrap' }}
                   onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = type.activeBorder; e.currentTarget.style.background = type.activeBg + '80' } }}
                   onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#E4E6EB'; e.currentTarget.style.background = 'white' } }}>
-                  <span style={{ fontSize: 12 }}>{type.emoji}</span>
+                  <type.Icon size={12} color={isActive ? type.activeColor : '#65676B'} />
                   {type.label}
                 </button>
               )
@@ -358,7 +366,7 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
         {showDueDate && (
           <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
             <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-              📅 Due Date &amp; Time
+              <CalendarCheck size={12} color={isDeadline ? '#922B21' : '#65676B'}/> Due Date &amp; Time
               {isDeadline ? <span style={{ color: '#E41E3F' }}>*</span> : <span style={{ fontWeight: 400, color: '#BCC0C4', fontSize: 10, textTransform: 'none' }}>(optional)</span>}
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -435,7 +443,6 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#E41E3F', fontSize: 12, fontWeight: 600, fontFamily: '"Instrument Sans", system-ui' }}>Remove all</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-              {/* Existing photos */}
               {keptPhotos.map((url, i) => (
                 <div key={'kept-' + i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 10, overflow: 'hidden', background: '#E4E6EB' }}>
                   <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
@@ -445,7 +452,6 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
                   </button>
                 </div>
               ))}
-              {/* New photos */}
               {photoPreviews.map((url, i) => (
                 <div key={'new-' + i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 10, overflow: 'hidden', background: '#E4E6EB', outline: '2px solid #0D7377', outlineOffset: 1 }}>
                   <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
@@ -499,9 +505,9 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
           </div>
         )}
 
-      </div>{/* end scroll */}
+      </div>
 
-      {/* Fixed footer — Add to your post, hidden when keyboard open */}
+      {/* Fixed footer */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
         <div style={{ padding: '8px 16px 12px', display: 'flex', alignItems: 'center' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
@@ -513,8 +519,8 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
           </div>
         </div>
         {!isMaterial && !isAnnouncement && (
-          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>
-            💡 Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
+          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Folder size={12} color="#8A8D91"/> Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
           </p>
         )}
       </div>
