@@ -1,6 +1,7 @@
 import { useSavedPosts } from '../contexts/SavedPostsContext'
 import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
+import { useMuteGate } from '../hooks/useMuteGate'
 import { useDarkMode } from '../contexts/DarkModeContext'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatDistanceToNow, format, isPast } from 'date-fns'
@@ -8,8 +9,8 @@ import {
   FileText, Download, BookOpen, Megaphone,
   Heart, MessageCircle, Share2, X, ChevronLeft, ChevronRight,
   MoreHorizontal, Bookmark, Bell, Clock, AlertCircle, Pencil, Trash2,
-  Link, MessageSquare, Check, Shield, Crown, Pin, Lock, BadgeCheck,
-  MessageCircleMore, Users, Globe
+  Link, Check, Shield, Crown, Pin, Lock, BadgeCheck,
+  MessageCircleMore, Users, Globe, VolumeX
 } from 'lucide-react'
 
 import EditPostModal from './EditPostModal'
@@ -25,7 +26,6 @@ function dicebearUrl(name = '') {
 }
 
 const RED  = '#C0392B'
-const BLUE = '#1A5276'
 
 function formatTime12(timeStr) {
   if (!timeStr) return null
@@ -42,15 +42,6 @@ function getBanner(subType, postType) {
   if (subType === 'announcement')  return { bg: `linear-gradient(90deg,${RED},${BLUE})`,      label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
   if (postType === 'announcement') return { bg: `linear-gradient(90deg,${RED},${BLUE})`,      label: 'ANNOUNCEMENT',  icon: <Megaphone size={12} color="white" /> }
   return null
-}
-
-function getTypeLabel(subType, postType) {
-  if (subType === 'material')      return 'Material'
-  if (subType === 'deadline')      return 'Deadline'
-  if (subType === 'reminder')      return 'Reminder'
-  if (subType === 'announcement')  return 'Announcement'
-  if (postType === 'announcement') return 'Announcement'
-  return 'Post'
 }
 
 function getQuoteBlockAccent(subType, postType) {
@@ -261,10 +252,13 @@ function ShareSheet({ post, onClose, anchorRef }) {
 
 function Lightbox({ photos, initialIndex, onClose }) {
   const [activeIdx, setActiveIdx] = useState(initialIndex)
+  const touchStartX = useRef(null)
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
   }, [])
+
   useEffect(() => {
     const onKey = e => {
       if (e.key === 'Escape') onClose()
@@ -274,12 +268,39 @@ function Lightbox({ photos, initialIndex, onClose }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [photos.length, onClose])
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const diff = touchStartX.current - e.changedTouches[0].clientX
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) setActiveIdx(i => Math.min(i+1, photos.length-1))
+      else          setActiveIdx(i => Math.max(i-1, 0))
+    }
+    touchStartX.current = null
+  }
+
   return (
-    <div style={{ position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.96)',display:'flex',alignItems:'center',justifyContent:'center' }}
-      onClick={e => { if(e.target===e.currentTarget) onClose() }}>
+    <div
+      style={{ position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.96)',display:'flex',alignItems:'center',justifyContent:'center' }}
+      onClick={e => { if(e.target===e.currentTarget) onClose() }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <button onClick={onClose} style={{ position:'absolute',top:14,right:14,width:38,height:38,borderRadius:9,background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}><X size={17} color="white"/></button>
-      {photos.length > 1 && <div style={{ position:'absolute',top:18,left:'50%',transform:'translateX(-50%)',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',color:'white',fontSize:12,fontWeight:600,fontFamily:'"Instrument Sans",system-ui',padding:'4px 12px',borderRadius:20 }}>{activeIdx+1}/{photos.length}</div>}
-      <img src={photos[activeIdx]} alt="" style={{ maxWidth:'92vw',maxHeight:'88vh',objectFit:'contain',borderRadius:8 }}/>
+      {photos.length > 1 && (
+        <div style={{ position:'absolute',top:18,left:'50%',transform:'translateX(-50%)',background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',color:'white',fontSize:12,fontWeight:600,fontFamily:'"Instrument Sans",system-ui',padding:'4px 12px',borderRadius:20 }}>
+          {activeIdx+1}/{photos.length}
+        </div>
+      )}
+      <img
+        src={photos[activeIdx]}
+        alt={`Photo ${activeIdx + 1} of ${photos.length}`}
+        style={{ maxWidth:'92vw',maxHeight:'88vh',objectFit:'contain',borderRadius:8,userSelect:'none',WebkitUserSelect:'none' }}
+      />
       {photos.length > 1 && <>
         <button onClick={() => setActiveIdx(i=>Math.max(i-1,0))} disabled={activeIdx===0} style={{ position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',width:40,height:40,borderRadius:9,background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',opacity:activeIdx===0?0.3:1 }}><ChevronLeft size={19} color="white"/></button>
         <button onClick={() => setActiveIdx(i=>Math.min(i+1,photos.length-1))} disabled={activeIdx===photos.length-1} style={{ position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',width:40,height:40,borderRadius:9,background:'rgba(255,255,255,0.12)',border:'1px solid rgba(255,255,255,0.18)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',opacity:activeIdx===photos.length-1?0.3:1 }}><ChevronRight size={19} color="white"/></button>
@@ -326,14 +347,14 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
         <span style={{ marginLeft:'auto',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:colors.textMut,fontStyle:'italic',paddingRight:4 }}>forwarded</span>
       </div>
       <div style={{ padding:'7px 4px 8px' }}>
-        <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13.5,color:colors.textPri,lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
+        <div style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13.5,color:colors.textPri,lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
           {displayText}
           {isLong && (
-            <button onClick={() => setExpanded(e => !e)} style={{ background:'none',border:'none',cursor:'pointer',color:accentColor,fontWeight:700,fontSize:13,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>
+            <button onClick={() => setExpanded(e => !e)} style={{ background:'none',border:'none',cursor:'pointer',color:accentColor,fontWeight:700,fontSize:13,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0,verticalAlign:'baseline' }}>
               {expanded ? 'See less' : 'See more'}
             </button>
           )}
-        </p>
+        </div>
       </div>
     </div>
   )
@@ -420,10 +441,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
   const { isModerator, isSuperadmin } = useRole()
   const { modMode } = useModMode()
+  const { effectivelyMuted, getMuteMessage } = useMuteGate()
   const canModerate = (isModerator || isSuperadmin) && modMode
 
   const isGroupPost = postData.visibility === 'group'
-  const isClassPost = !postData.visibility || postData.visibility === 'class'
   const groupMemberIds = postData.group_members || []
   const groupCount = groupMemberIds.length
 
@@ -494,6 +515,11 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
+        // Remove the like notification when user unlikes
+        if (postData.author_id && postData.author_id !== currentUserId) {
+          await supabase.from('notifications').delete()
+            .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+        }
       }
       const { data } = await supabase.from('likes').select('user_id, profiles(avatar_url, display_name)').eq('post_id', postData.id)
       if (data) {
@@ -566,27 +592,30 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     <>
       <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
-        {/* Pinned bar */}
-        {postData.is_pinned && (
-          <div style={{ background:'rgba(245,158,11,0.1)',padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid rgba(245,158,11,0.25)` }}>
-            <Pin size={11} color="#F59E0B" fill="#F59E0B"/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#92400E',letterSpacing:0.3 }}>PINNED POST</span>
-          </div>
-        )}
-
-        {/* Official bar */}
-        {postData.is_official && (
-          <div style={{ background:'rgba(22,163,74,0.08)',padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid rgba(22,163,74,0.2)` }}>
-            <BadgeCheck size={11} color="#16a34a" fill="#16a34a"/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#166534',letterSpacing:0.3 }}>OFFICIAL POST</span>
-          </div>
-        )}
-
-        {/* Locked bar */}
-        {postData.is_locked && (
-          <div style={{ background:colors.surface,padding:'5px 12px',display:'flex',alignItems:'center',gap:6,borderBottom:`1px solid ${colors.border}` }}>
-            <Lock size={11} color={colors.textSec}/>
-            <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.3 }}>Comments locked</span>
+        {/* Status badges — pinned / official / locked merged into one compact row to avoid stacking clutter */}
+        {(postData.is_pinned || postData.is_official || postData.is_locked) && (
+          <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
+            {postData.is_pinned && (
+              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#92400E',letterSpacing:0.2 }}>
+                <Pin size={11} color="#F59E0B" fill="#F59E0B"/> Pinned
+              </span>
+            )}
+            {postData.is_pinned && (postData.is_official || postData.is_locked) && (
+              <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+            )}
+            {postData.is_official && (
+              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#166534',letterSpacing:0.2 }}>
+                <BadgeCheck size={11} color="#16a34a" fill="#16a34a"/> Official
+              </span>
+            )}
+            {postData.is_official && postData.is_locked && (
+              <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+            )}
+            {postData.is_locked && (
+              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.2 }}>
+                <Lock size={11} color={colors.textSec}/> Comments locked
+              </span>
+            )}
           </div>
         )}
 
@@ -614,7 +643,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         <div style={{ padding:'10px 12px 8px',display:'flex',alignItems:'center',gap:9 }}>
           <img
             src={postData.profiles?.avatar_url || dicebearUrl(postData.profiles?.display_name)}
-            alt=""
+            alt={`${postData.profiles?.display_name || 'User'} avatar`}
             onClick={() => onUserClick?.(postData.profiles)}
             style={{ width:40,height:40,borderRadius:10,objectFit:'cover',flexShrink:0,border:`1.5px solid ${colors.border}`,cursor:onUserClick?'pointer':'default' }}
           />
@@ -730,10 +759,14 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         {(caption || quoted) && (
           <div style={{ padding:`0 12px ${photos.length>0?'8px':'0'}` }}>
             {caption && (
-              <p style={{ margin:0,fontSize:14.5,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
+              <div style={{ margin:0,fontSize:14.5,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
                 {displayCaption}
-                {isLong && <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0 }}>{expanded?'See less':'See more'}</button>}
-              </p>
+                {isLong && (
+                  <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0,verticalAlign:'baseline' }}>
+                    {expanded?'See less':'See more'}
+                  </button>
+                )}
+              </div>
             )}
             {quoted && <QuotedMessageBlock from={quoted.from} message={quoted.message} subType={postData.sub_type} postType={postData.post_type} colors={colors}/>}
           </div>
@@ -795,8 +828,15 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         <div style={{ display:'flex',alignItems:'center',padding:'0 6px 2px' }}>
           <ActionBtn onClick={handleLike} icon={<Heart size={17} fill={liked?RED:'none'} color={liked?RED:colors.textSec}/>} label="Like" active={liked} activeColor={RED} colors={colors}/>
           <ActionBtn
-            onClick={() => !postData.is_locked && setShowComments(true)}
-            icon={<MessageCircle size={17} color={postData.is_locked?colors.textMut:colors.textSec}/>}
+            onClick={() => {
+              if (postData.is_locked) return
+              if (effectivelyMuted) {
+                toast.error(getMuteMessage() || 'You are muted and cannot comment.', { icon: '🔇', duration: 3500 })
+                return
+              }
+              setShowComments(true)
+            }}
+            icon={<MessageCircle size={17} color={postData.is_locked?colors.textMut:effectivelyMuted?colors.textMut:colors.textSec}/>}
             label={postData.is_locked ? 'Locked' : 'Comment'}
             disabled={postData.is_locked} colors={colors}
           />
