@@ -159,7 +159,7 @@ function ShareSheet({ post, onClose, anchorRef }) {
   const [copiedMessenger, setCopiedMessenger] = useState(false)
   const { colors } = useDarkMode()
   const sheetRef = useRef()
-  const shareUrl = `${window.location.origin}/?post=${post.id}`
+  const shareUrl = `${window.location.origin}/p/${post.short_id}`
 
   useEffect(() => {
     function h(e) {
