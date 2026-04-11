@@ -71,7 +71,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
   useEffect(() => {
     refresh()
     supabase.from('profiles').select('id, display_name, avatar_url, email, username')
-      .neq('id', currentUserId).then(({ data }) => { if (data) setAllUsers(data) })
+    .neq('id', currentUserId).eq('is_verified', true).then(({ data }) => { if (data) setAllUsers(data) })
 
     const ch = supabase.channel('inbox-' + currentUserId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages' }, refresh)
