@@ -241,7 +241,7 @@ function ClassChat({ onBack, currentUser, profile }) {
   useEffect(() => {
     fetchMessages()
     supabase.from('profiles').select('id, display_name, avatar_url')
-      .neq('id', currentUser.id).then(({ data }) => { if (data) setUsers(data) })
+    .neq('id', currentUser.id).eq('is_verified', true).then(({ data }) => { if (data) setUsers(data) })
 
     const ch = supabase.channel('class-chat-msg')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, async (payload) => {
