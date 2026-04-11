@@ -228,19 +228,56 @@ export default function CodeGatePage() {
       const safeUsername = safeName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 
       await updateProfile({
-        display_name: safeName,
-        username:     safeUsername,
-        identifier:   codeRow.identifier,
-        section:      codeRow.section,
-        student_code: codeRow.code,
-        is_verified:  true,
-        avatar_url:   avatarUrl,
-        gender:       gender,
-        birthday:     birthday,
-      })
-
-      setSuccess(true)
-      toast.success(`Welcome, ${safeName.split(' ')[0]}! 🎉`)
+      display_name: safeName,
+      username:     safeUsername,
+      identifier:   codeRow.identifier,
+      section:      codeRow.section,
+      student_code: codeRow.code,
+      is_verified:  true,
+      avatar_url:   avatarUrl,
+      gender:       gender,
+      birthday:     birthday,
+    })
+    
+    try {
+      const verifiedAt = new Date().toISOString()
+    
+      const enrolledSubjectIds = [...selectedSubjects]
+    
+      let deadlineQuery = supabase
+        .from('posts')
+        .select('id')
+        .eq('post_type', 'announcement')
+        .not('due_date', 'is', null)
+        .lt('created_at', verifiedAt)
+    
+      if (enrolledSubjectIds.length > 0) {
+        deadlineQuery = deadlineQuery.or(
+          `subject_id.in.(${enrolledSubjectIds.join(',')}),subject_id.is.null`
+        )
+      } else {
+        deadlineQuery = deadlineQuery.is('subject_id', null)
+      }
+    
+      const { data: existingDeadlines } = await deadlineQuery
+    
+      if (existingDeadlines && existingDeadlines.length > 0) {
+        const completions = existingDeadlines.map(d => ({
+          user_id: user.id,
+          post_id: d.id,
+        }))
+        // upsert so no duplicates if somehow called twice
+        await supabase
+          .from('deadline_completions')
+          .upsert(completions, { onConflict: 'user_id,post_id' })
+      }
+    } catch (err) {
+      // Non-critical — don't block the success flow
+      console.error('Auto-complete deadlines failed:', err)
+    }
+    
+    setSuccess(true)
+    toast.success(`Welcome, ${safeName.split(' ')[0]}! 🎉`)
     } catch (err) {
       toast.error(err.message || 'Something went wrong')
     } finally {
