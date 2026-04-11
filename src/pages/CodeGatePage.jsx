@@ -225,7 +225,9 @@ export default function CodeGatePage() {
 
       // Sanitize before saving
       const safeName = sanitize(fullName.trim())
-      const safeUsername = safeName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+      const safeUsername = codeRow.identifier
+        ? codeRow.identifier.replace('@', '').toLowerCase()
+        : safeName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 
       await updateProfile({
       display_name: safeName,
