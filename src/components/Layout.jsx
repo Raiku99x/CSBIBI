@@ -269,6 +269,7 @@ export default function Layout({ children, onOpenSearch }) {
   const { onlineUsers } = usePresence(profile?.id, profile, appearOffline)
 
   const [showDrawer,     setShowDrawer]     = useState(false)
+  const [verifiedIds,    setVerifiedIds]    = useState(new Set())
   const [showNotifs,     setShowNotifs]     = useState(false)
   const [dmUnread,       setDmUnread]       = useState(0)
   const [showSaved,      setShowSaved]      = useState(false)
@@ -325,6 +326,15 @@ export default function Layout({ children, onOpenSearch }) {
     return () => supabase.removeChannel(ch)
   }, [profile])
 
+ useEffect(() => {
+    supabase.from('profiles')
+      .select('id')
+      .eq('is_verified', true)
+      .then(({ data }) => {
+        if (data) setVerifiedIds(new Set(data.map(p => p.id)))
+      })
+  }, [])
+  
   async function openMessages(dmTarget) {
     setMessagesDMTarget(dmTarget || null)
     setShowMessages(true)
@@ -484,7 +494,7 @@ export default function Layout({ children, onOpenSearch }) {
                 <div style={{ display:'flex',alignItems:'center',gap:7,padding:'4px 4px 10px' }}>
                   <div style={{ width:8,height:8,borderRadius:'50%',background:colors.online,boxShadow:`0 0 0 2px ${colors.online}40`,flexShrink:0 }}/>
                   <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:12,color:textSec,textTransform:'uppercase',letterSpacing:0.6 }}>ONLINE</span>
-                  <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:11,color:textMut }}>· {onlineUsers.length+(appearOffline?0:1)}</span>
+                  <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:11,color:textMut }}>· {onlineUsers.filter(u => verifiedIds.has(u.id)).length+(appearOffline?0:1)}</span>
                 </div>
                 <OnlineRow avatar={profile?.avatar_url||dicebearUrl(profile?.display_name)} name={profile?.display_name}
                   sublabel={appearOffline?'Appearing offline':'Online'} sublabelColor={appearOffline?textMut:colors.online} dotColor={appearOffline?colors.textMut:colors.online}
@@ -511,16 +521,16 @@ export default function Layout({ children, onOpenSearch }) {
                   }
                 />
                 {onlineUsers.length>0&&<div style={{ height:1,background:dividerCol,margin:'8px 4px' }}/>}
-                {onlineUsers.length===0
-                  ?<div style={{ padding:'20px 4px',textAlign:'center' }}><p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:textMut }}>No one else online</p></div>
-                  :onlineUsers.map(u=>(
-                    <OnlineRow key={u.id} avatar={u.avatar_url||dicebearUrl(u.display_name)} name={u.display_name}
-                      sublabel="Online" sublabelColor={colors.online} dotColor={colors.online}
-                      dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
-                      rightSlot={<DMBtn onClick={()=>openMessages(u)} surfaceBg={surfaceBg}/>}
-                    />
-                  ))
-                }
+                {onlineUsers.filter(u => verifiedIds.has(u.id)).length===0
+                    ?<div style={{ padding:'20px 4px',textAlign:'center' }}><p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:textMut }}>No one else online</p></div>
+                    :onlineUsers.filter(u => verifiedIds.has(u.id)).map(u=>(
+                      <OnlineRow key={u.id} avatar={u.avatar_url||dicebearUrl(u.display_name)} name={u.display_name}
+                        sublabel="Online" sublabelColor={colors.online} dotColor={colors.online}
+                        dark={dark} colors={colors} textPri={textPri} textMut={textMut} surfaceBg={surfaceBg} pageBg={pageBg}
+                        rightSlot={<DMBtn onClick={()=>openMessages(u)} surfaceBg={surfaceBg}/>}
+                      />
+                    ))
+                  }
                 <p style={{ margin:'16px 4px 0',fontFamily:'"Instrument Sans",system-ui',fontSize:10.5,color:textMut }}>Only active users shown</p>
               </div>
             </aside>
