@@ -212,6 +212,7 @@ export default function CreatePostModal({
         .from('profiles')
         .select('id, display_name, avatar_url')
         .neq('id', user.id)
+        .eq('is_verified', true)
         .order('display_name', { ascending: true })
         .limit(100)
 
