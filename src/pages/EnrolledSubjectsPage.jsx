@@ -46,24 +46,46 @@ export default function EnrolledSubjectsPage() {
   }, [user])
 
   async function toggle(subjectId, enrolled) {
-    setToggling(subjectId)
-    try {
-      if (enrolled) {
-        await supabase.from('user_subjects').delete().eq('user_id', user.id).eq('subject_id', subjectId)
-        setEnrolledIds(prev => { const s = new Set(prev); s.delete(subjectId); return s })
-        toast.success('Unenrolled')
-        if (selected?.id === subjectId) setSelected(null)
-      } else {
-        await supabase.from('user_subjects').insert({ user_id: user.id, subject_id: subjectId })
-        setEnrolledIds(prev => new Set([...prev, subjectId]))
-        toast.success('Enrolled!')
+  setToggling(subjectId)
+  try {
+    if (enrolled) {
+      await supabase.from('user_subjects').delete().eq('user_id', user.id).eq('subject_id', subjectId)
+      setEnrolledIds(prev => { const s = new Set(prev); s.delete(subjectId); return s })
+      toast.success('Unenrolled')
+      if (selected?.id === subjectId) setSelected(null)
+    } else {
+      await supabase.from('user_subjects').insert({ user_id: user.id, subject_id: subjectId })
+      setEnrolledIds(prev => new Set([...prev, subjectId]))
+      toast.success('Enrolled!')
+
+      try {
+        const { data: existingDeadlines } = await supabase
+          .from('posts')
+          .select('id')
+          .eq('post_type', 'announcement')
+          .not('due_date', 'is', null)
+          .eq('subject_id', subjectId)
+          .lt('created_at', new Date().toISOString())
+
+        if (existingDeadlines && existingDeadlines.length > 0) {
+          const completions = existingDeadlines.map(d => ({
+            user_id: user.id,
+            post_id: d.id,
+          }))
+          await supabase
+            .from('deadline_completions')
+            .upsert(completions, { onConflict: 'user_id,post_id' })
+        }
+      } catch (err) {
+        console.error('Auto-complete on enroll failed:', err)
       }
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setToggling(null)
     }
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    setToggling(null)
   }
+}
 
   const filtered = allSubjects.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
