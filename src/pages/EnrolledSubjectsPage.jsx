@@ -59,12 +59,14 @@ export default function EnrolledSubjectsPage() {
       toast.success('Enrolled!')
 
       try {
+        const today = new Date().toISOString().split('T')[0]
         const { data: existingDeadlines } = await supabase
           .from('posts')
           .select('id')
           .eq('post_type', 'announcement')
           .not('due_date', 'is', null)
           .eq('subject_id', subjectId)
+          .lt('due_date', today)
           .lt('created_at', new Date().toISOString())
 
         if (existingDeadlines && existingDeadlines.length > 0) {
