@@ -7,7 +7,7 @@ import PostCard from '../components/PostCard'
 import CreatePostModal from '../components/CreatePostModal'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
-import { Image, Megaphone, Paperclip, VolumeX, Clock, Users, Eye, EyeOff } from 'lucide-react'
+import { Image, Megaphone, Paperclip, VolumeX, Clock, Users, Eye, EyeOff, Radio } from 'lucide-react'
 import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
 import { useRole } from '../hooks/useRole'
@@ -64,18 +64,47 @@ export default function FeedPage() {
   const [viewingUserId, setViewingUserId] = useState(null)
   const [superadminGroupView, setSuperadminGroupView] = useState(false)
 
+  // ── Channel state ────────────────────────────────────────
+  // userChannel: the channel this user belongs to (from profile.section)
+  // viewingChannel: which channel the admin is currently viewing (null = own)
+  const userChannel = profile?.section || null
+  const [viewingChannel, setViewingChannel] = useState(null) // null = use userChannel
+  const [allChannels, setAllChannels] = useState([])
+
+  // The effective channel filter applied to the query
+  const activeChannel = isSuperadmin
+    ? (viewingChannel === '__ALL__' ? null : (viewingChannel || userChannel))
+    : userChannel
+
   const sentinelRef = useRef(null)
   const oldestCreatedAt = useRef(null)
   const loadingMoreRef = useRef(false)
   const hasMoreRef = useRef(true)
 
-  const fetchInitial = useCallback(async () => {
-    setLoading(true)
-    const { data } = await supabase
+  // ── Build query with channel filter ──────────────────────
+  function buildQuery(cursorDate = null) {
+    let q = supabase
       .from('posts')
       .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE)
+
+    if (cursorDate) q = q.lt('created_at', cursorDate)
+
+    // Channel filtering:
+    // - If viewingChannel === '__ALL__' (superadmin), no filter → see everything
+    // - If there's an activeChannel, show posts where channel = activeChannel OR channel IS NULL (global posts)
+    // - If no channel at all, show everything (unassigned users)
+    if (viewingChannel !== '__ALL__' && activeChannel) {
+      q = q.or(`channel.eq.${activeChannel},channel.is.null`)
+    }
+
+    return q
+  }
+
+  const fetchInitial = useCallback(async () => {
+    setLoading(true)
+    const { data } = await buildQuery()
     if (data) {
       setPosts(data)
       const more = data.length === PAGE_SIZE
@@ -84,18 +113,14 @@ export default function FeedPage() {
       if (data.length > 0) oldestCreatedAt.current = data[data.length - 1].created_at
     }
     setLoading(false)
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingChannel, activeChannel])
 
   const fetchMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMoreRef.current || !oldestCreatedAt.current) return
     loadingMoreRef.current = true
     setLoadingMore(true)
-    const { data } = await supabase
-      .from('posts')
-      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
-      .order('created_at', { ascending: false })
-      .lt('created_at', oldestCreatedAt.current)
-      .limit(PAGE_SIZE)
+    const { data } = await buildQuery(oldestCreatedAt.current)
     if (data && data.length > 0) {
       setPosts(prev => {
         const existingIds = new Set(prev.map(p => p.id))
@@ -111,7 +136,24 @@ export default function FeedPage() {
     }
     loadingMoreRef.current = false
     setLoadingMore(false)
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewingChannel, activeChannel])
+
+  // Fetch available channels for superadmin picker
+  useEffect(() => {
+    if (!isSuperadmin) return
+    supabase
+      .from('profiles')
+      .select('section')
+      .not('section', 'is', null)
+      .neq('section', '')
+      .then(({ data }) => {
+        if (data) {
+          const unique = [...new Set(data.map(p => p.section))].sort()
+          setAllChannels(unique)
+        }
+      })
+  }, [isSuperadmin])
 
   useEffect(() => {
     const sentinel = sentinelRef.current
@@ -135,14 +177,20 @@ export default function FeedPage() {
           .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
           .eq('id', payload.new.id)
           .single()
-        if (data && canSeePost(data, user?.id, isSuperadmin, superadminGroupView)) {
+        if (!data) return
+        // Check channel visibility for new post
+        const postChannel = data.channel
+        const canSeeChannel = viewingChannel === '__ALL__' ||
+          !postChannel ||
+          postChannel === activeChannel
+        if (canSeeChannel && canSeePost(data, user?.id, isSuperadmin, superadminGroupView)) {
           setPosts(prev =>
             prev.some(p => p.id === data.id) ? prev : [data, ...prev]
           )
         }
       }).subscribe()
     return () => supabase.removeChannel(channel)
-  }, [fetchInitial, user?.id, isSuperadmin, superadminGroupView])
+  }, [fetchInitial, user?.id, isSuperadmin, superadminGroupView, viewingChannel, activeChannel])
 
   useEffect(() => {
     if (!targetPostId) return
@@ -194,6 +242,11 @@ export default function FeedPage() {
 
   const firstName = profile?.display_name?.split(' ')[0] || 'there'
 
+  // Channel label for display
+  const channelLabel = viewingChannel === '__ALL__'
+    ? 'All Channels'
+    : (viewingChannel || userChannel || null)
+
   return (
     <div style={{ paddingTop: 6 }}>
       <SystemBanner/>
@@ -209,6 +262,37 @@ export default function FeedPage() {
               {getMuteMessage()} You can still read and like posts.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* ── Channel Banner ── */}
+      {userChannel && (
+        <div style={{
+          margin:'0 0 6px',
+          padding:'9px 12px',
+          background:'linear-gradient(135deg, rgba(13,115,119,0.08), rgba(26,82,118,0.08))',
+          border:'1px solid rgba(13,115,119,0.2)',
+          borderLeft:'3px solid #0D7377',
+          borderRadius:'0 8px 8px 0',
+          display:'flex', alignItems:'center', gap:10,
+        }}>
+          <Radio size={13} color="#0D7377"/>
+          <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:700, color:'#0D7377' }}>
+            {channelLabel ? `Channel: ${channelLabel}` : 'No channel assigned'}
+          </span>
+          {/* Superadmin channel switcher */}
+          {isSuperadmin && allChannels.length > 0 && (
+            <select
+              value={viewingChannel || userChannel || ''}
+              onChange={e => setViewingChannel(e.target.value || null)}
+              style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(13,115,119,0.3)', background:'white', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#0D7377', cursor:'pointer', outline:'none' }}
+            >
+              {allChannels.map(ch => (
+                <option key={ch} value={ch}>{ch}</option>
+              ))}
+              <option value="__ALL__">All Channels</option>
+            </select>
+          )}
         </div>
       )}
 
@@ -259,7 +343,7 @@ export default function FeedPage() {
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i}/>)}</div>
       ) : visiblePosts.length === 0 ? (
-        <EmptyFeed onPost={() => tryOpenCreate('status', '')}/>
+        <EmptyFeed onPost={() => tryOpenCreate('status', '')} channelLabel={channelLabel}/>
       ) : (
         <div>
           {visiblePosts.map(post => (
@@ -309,6 +393,10 @@ export default function FeedPage() {
           defaultSubType={createSubType}
           autoOpenPhoto={autoOpenPhoto}
           autoOpenFile={autoOpenFile}
+          // Pass the active channel so the modal can assign it to new posts
+          defaultChannel={viewingChannel === '__ALL__' ? null : (viewingChannel || userChannel)}
+          isSuperadmin={isSuperadmin}
+          allChannels={allChannels}
         />
       )}
 
@@ -350,14 +438,16 @@ function ComposeBtn({ icon, color, bg, label, onClick, disabled }) {
   )
 }
 
-function EmptyFeed({ onPost }) {
+function EmptyFeed({ onPost, channelLabel }) {
   return (
     <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', padding:'48px 24px', textAlign:'center' }}>
       <div style={{ marginBottom:10 }}>
         <Megaphone size={40} color="#BCC0C4"/>
       </div>
       <p style={{ fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:17, color:'#050505', margin:'0 0 5px' }}>No posts yet</p>
-      <p style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13.5, color:'#65676B', margin:'0 0 18px' }}>Be the first to share something.</p>
+      <p style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13.5, color:'#65676B', margin:'0 0 18px' }}>
+        {channelLabel ? `No posts in ${channelLabel} yet.` : 'Be the first to share something.'}
+      </p>
       <button onClick={onPost} style={{ padding:'9px 22px', borderRadius:8, border:'none', background:RED, color:'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:13.5, boxShadow:'0 3px 12px rgba(192,57,43,0.28)' }}>
         Create Post
       </button>
