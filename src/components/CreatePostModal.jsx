@@ -71,11 +71,13 @@ function QuotedMessagePreview({ from, message, accent }) {
   )
 }
 
-
 export default function CreatePostModal({
   onClose, onCreated, subjects,
   defaultType = 'status', defaultSubType = 'status',
   autoOpenPhoto = false, autoOpenFile = false,
+  defaultChannel = null,  
+  isSuperadmin = false,    
+  allChannels = [],        
 }) {
   const { user, profile } = useAuth()
   const { isSuperadmin } = useRole()
@@ -109,7 +111,7 @@ export default function CreatePostModal({
   const [photoFiles, setPhotoFiles]         = useState([])
   const [photoPreviews, setPhotoPreviews]   = useState([])
   const [attachFiles, setAttachFiles]       = useState([])
-  const [loading, setLoading]               = useState(false)
+  const [selectedChannel, setSelectedChannel] = useState(defaultChannel)
   const [uploadProgress, setUploadProgress] = useState('')
   const [showQuoteSection, setShowQuoteSection] = useState(false)
   const [showQuotePreview, setShowQuotePreview] = useState(false)
@@ -417,6 +419,7 @@ export default function CreatePostModal({
           scheduled_at: scheduledAt,
           visibility,
           group_members: group_members_ids,
+          channel: selectedChannel || null,
         })
         .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .single()
@@ -780,6 +783,41 @@ export default function CreatePostModal({
           <ChevronDown size={15} color="#65676B" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
         </div>
 
+        {isSuperadmin && allChannels.length > 0 && (
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <label style={{
+            fontFamily: '"Instrument Sans", system-ui',
+            fontSize: 11, fontWeight: 700, color: '#65676B',
+            textTransform: 'uppercase', letterSpacing: 0.5,
+            display: 'block', marginBottom: 5,
+          }}>
+            Post to Channel
+          </label>
+          <select
+            value={selectedChannel || ''}
+            onChange={e => setSelectedChannel(e.target.value || null)}
+            style={{
+              width: '100%', padding: '11px 36px 11px 14px',
+              borderRadius: 10, border: '1px solid #E4E6EB',
+              background: selectedChannel ? '#E6F4F4' : '#F7F8FA',
+              appearance: 'none',
+              fontFamily: '"Instrument Sans", system-ui',
+              fontSize: 14,
+              color: selectedChannel ? '#0D7377' : '#8A8D91',
+              fontWeight: selectedChannel ? 700 : 400,
+              cursor: 'pointer', outline: 'none',
+            }}
+          >
+            <option value="">All Channels (Global)</option>
+            {allChannels.map(ch => (
+              <option key={ch} value={ch}>{ch}</option>
+            ))}
+          </select>
+          <ChevronDown size={15} color={selectedChannel ? '#0D7377' : '#65676B'}
+            style={{ position: 'absolute', right: 12, top: '64%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        </div>
+      )}
+        
         {/* Due date */}
         {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
           <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
