@@ -2,7 +2,6 @@ import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useRole } from '../hooks/useRole'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','5C4A7A','6B5B8A','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','4A3A7A','3E3068']
 function dicebearUrl(name = '') {
@@ -43,7 +42,6 @@ const FILE_ACCEPT = [
   'application/x-zip-compressed',
 ].join(',')
 
-// POST_TYPES — Icon replaces emoji
 const POST_TYPES = [
   { sub_type: 'status',       post_type: 'status',       Icon: MessageCircle,  label: 'Status',       btnColor: '#0D7377', activeColor: '#050505', activeBg: '#F0F2F5', activeBorder: '#CED0D4' },
   { sub_type: 'material',     post_type: 'status',       Icon: Folder,         label: 'Material',     btnColor: '#1A5276', activeColor: '#1A5276', activeBg: '#EBF5FB', activeBorder: '#AED6F1' },
@@ -75,17 +73,17 @@ export default function CreatePostModal({
   onClose, onCreated, subjects,
   defaultType = 'status', defaultSubType = 'status',
   autoOpenPhoto = false, autoOpenFile = false,
-  defaultChannel = null,  
-  isSuperadmin = false,    
-  allChannels = [],        
+  defaultChannel = null,
+  isSuperadmin = false,
+  allChannels = [],
 }) {
   const { user, profile } = useAuth()
-  const { isSuperadmin } = useRole()
   const announcementTypes = useAnnouncementTypes()
 
   const initialType = POST_TYPES.find(t => t.sub_type === defaultSubType) || null
   const [selectedType, setSelectedType] = useState(defaultSubType !== 'status' ? initialType : null)
   const [typeError, setTypeError] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [form, setForm] = useState({
     caption: '', subject_id: '', announcement_type: '',
@@ -93,7 +91,6 @@ export default function CreatePostModal({
     scheduled_date: '', scheduled_time: '',
   })
 
-  // ── Visibility / Group state ──
   const [visibility, setVisibility]         = useState('class')
   const [groupMembers, setGroupMembers]     = useState([])
   const [memberSearch, setMemberSearch]     = useState('')
@@ -124,7 +121,6 @@ export default function CreatePostModal({
   const pasteAreaRef  = useRef()
   const typePickerRef = useRef()
 
-  // Hide footer when keyboard is open
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   useEffect(() => {
     const vv = window.visualViewport
@@ -140,7 +136,6 @@ export default function CreatePostModal({
     if (autoOpenFile)  { const t = setTimeout(() => fileRef.current?.click(),  150); return () => clearTimeout(t) }
   }, [autoOpenPhoto, autoOpenFile])
 
-  // Close visibility dropdown on outside click
   useEffect(() => {
     function h(e) {
       if (visibilityDropdownRef.current && !visibilityDropdownRef.current.contains(e.target)) {
@@ -182,7 +177,6 @@ export default function CreatePostModal({
     }
   }
 
-  // ── Visibility change ──
   function switchToClass() {
     setVisibility('class')
     setGroupMembers([])
@@ -196,7 +190,6 @@ export default function CreatePostModal({
     setShowVisibilityDropdown(false)
   }
 
-  // ── Subject change handler — clears group members with toast ──
   function handleSubjectChange(newSubjectId) {
     set('subject_id', newSubjectId)
     setMemberSearch('')
@@ -206,7 +199,6 @@ export default function CreatePostModal({
     }
   }
 
-  // ── Load all users when panel opens ──
   async function loadAllUsers() {
     setAllUsersLoading(true)
     try {
@@ -243,7 +235,6 @@ export default function CreatePostModal({
     setAllUsersLoading(false)
   }
 
-  // ── Member panel ──
   function openMemberPanel() {
     setPendingMembers([...groupMembers])
     setMemberSearch('')
@@ -270,7 +261,6 @@ export default function CreatePostModal({
     setMemberSearch('')
   }
 
-  // ── Search filters the already-loaded list ──
   useEffect(() => {
     if (!showMemberPanel) return
     if (!memberSearch.trim()) {
@@ -285,7 +275,6 @@ export default function CreatePostModal({
     return () => clearTimeout(searchTimeout.current)
   }, [memberSearch, allUsers, showMemberPanel])
 
-  // Reload users when subject changes while panel is open
   useEffect(() => {
     if (showMemberPanel) {
       setAllUsers([])
@@ -484,10 +473,8 @@ export default function CreatePostModal({
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
 
-      {/* ── MEMBER PANEL (full-screen overlay) ── */}
       {showMemberPanel && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 60, background: 'white', display: 'flex', flexDirection: 'column', animation: 'fullscreenIn 0.18s cubic-bezier(0.16,1,0.3,1)' }}>
-          {/* Panel header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
             <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 17, color: '#050505', flex: 1 }}>Select Members</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -500,8 +487,6 @@ export default function CreatePostModal({
               </button>
             </div>
           </div>
-
-          {/* Info tip */}
           <div style={{ margin: '10px 16px 0', padding: '9px 11px', background: '#EDE9FE', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
             <Users size={14} color="#5B21B6" style={{ flexShrink: 0, marginTop: 1 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
@@ -510,19 +495,11 @@ export default function CreatePostModal({
                 : 'No subject selected — you can add anyone. Select a subject in the post to filter by enrolled users.'}
             </p>
           </div>
-
-          {/* Search */}
           <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1.5px solid #DDD6FE', background: '#F9F7FF' }}>
               <Search size={14} color="#8A8D91" />
-              <input
-                autoFocus
-                type="text"
-                value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
-                placeholder="Search by name…"
-                style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', background: 'transparent' }}
-              />
+              <input autoFocus type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search by name…"
+                style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', background: 'transparent' }} />
               {allUsersLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
               {memberSearch && !allUsersLoading && (
                 <button type="button" onClick={() => setMemberSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}>
@@ -531,8 +508,6 @@ export default function CreatePostModal({
               )}
             </div>
           </div>
-
-          {/* Member list */}
           <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
             {allUsersLoading ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
@@ -566,11 +541,7 @@ export default function CreatePostModal({
               <div style={{ padding: '24px 0', textAlign: 'center' }}>
                 <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>
                   No results for "{memberSearch}"
-                  {form.subject_id && (
-                    <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>
-                      They may not be enrolled in this subject
-                    </span>
-                  )}
+                  {form.subject_id && <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>They may not be enrolled in this subject</span>}
                 </p>
               </div>
             ) : (
@@ -579,11 +550,9 @@ export default function CreatePostModal({
               </div>
             )}
           </div>
-
         </div>
       )}
 
-      {/* ── DISCARD DIALOG ── */}
       {discardDialogOpen && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: 'white', borderRadius: 16, padding: '22px 20px', maxWidth: 300, width: '100%', boxShadow: '0 16px 48px rgba(0,0,0,0.18)', animation: 'expandIn 0.16s ease' }}>
@@ -605,7 +574,6 @@ export default function CreatePostModal({
         </div>
       )}
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #E4E6EB', flexShrink: 0 }}>
         <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 18, color: '#050505', flex: 1 }}>Create Post</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -629,16 +597,12 @@ export default function CreatePostModal({
         </div>
       </div>
 
-      {/* Scrollable body */}
       <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '16px 16px 70px' }}>
 
-        {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <img src={profile?.avatar_url || dicebearUrl(profile?.display_name)} style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E4E6EB' }} alt="" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 15, color: '#050505' }}>{profile?.display_name}</p>
-
-            {/* Inline visibility control */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, position: 'relative' }} ref={visibilityDropdownRef}>
               <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: selectedType ? selectedType.activeColor : '#8A8D91' }}>
                 {selectedType
@@ -653,14 +617,10 @@ export default function CreatePostModal({
                     {visibility === 'group' ? <Users size={10}/> : <Globe size={10}/>} {visibilityLabel()}
                   </span>
                   <span style={{ fontSize: 12, color: '#CED0D4', margin: '0 1px' }}>·</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowVisibilityDropdown(v => !v)}
+                  <button type="button" onClick={() => setShowVisibilityDropdown(v => !v)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2 }}>
                     change
                   </button>
-
-                  {/* Inline dropdown */}
                   {showVisibilityDropdown && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 20, marginTop: 5, background: 'white', borderRadius: 10, border: '1.5px solid #E4E6EB', boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: 160, animation: 'expandIn 0.14s ease' }}>
                       <button type="button" onClick={switchToClass}
@@ -688,7 +648,6 @@ export default function CreatePostModal({
           </div>
         </div>
 
-        {/* ── GROUP MEMBER BUTTON ── */}
         {selectedType && visibility === 'group' && (
           <div style={{ marginBottom: 14, animation: 'expandIn 0.18s ease' }}>
             <button type="button" onClick={openMemberPanel}
@@ -696,7 +655,6 @@ export default function CreatePostModal({
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#7C3AED'; e.currentTarget.style.background = '#F5F3FF' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = groupError ? '#E41E3F' : groupMembers.length > 0 ? '#DDD6FE' : '#E4E6EB'; e.currentTarget.style.background = groupMembers.length > 0 ? '#F5F3FF' : '#FAFAFA' }}>
               <Users size={16} color={groupError ? '#E41E3F' : '#7C3AED'} style={{ flexShrink: 0 }} />
-
               <div style={{ flex: 1, minWidth: 0 }}>
                 {groupMembers.length > 0 ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, scrollbarWidth: 'none', msOverflowStyle: 'none' }} className="hide-scrollbar">
@@ -713,7 +671,6 @@ export default function CreatePostModal({
                   </span>
                 )}
               </div>
-
               {groupMembers.length > 0 && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, fontWeight: 700, color: '#7C3AED', background: '#EDE9FE', padding: '2px 8px', borderRadius: 20, border: '1px solid #DDD6FE', whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 4 }}>
                   ({groupMembers.length}) Edit
@@ -723,7 +680,6 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* ── POST TYPE PILLS ── */}
         <div ref={typePickerRef} style={{ marginBottom: 16, borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s', padding: typeError ? '8px' : '0' }}>
           <p style={{ margin: '0 0 7px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6, display: 'flex', alignItems: 'center', gap: 4 }}>
             {typeError && <X size={11} color="#E41E3F"/>}
@@ -745,7 +701,6 @@ export default function CreatePostModal({
           </div>
         </div>
 
-        {/* Textarea */}
         <div style={{ background: '#F7F8FA', borderRadius: 12, padding: '12px 14px', marginBottom: 12, border: '1.5px solid #E4E6EB' }}>
           <textarea autoFocus
             placeholder={
@@ -761,7 +716,6 @@ export default function CreatePostModal({
           />
         </div>
 
-        {/* Announcement category */}
         {isAnnouncement && (
           <div style={{ position: 'relative', marginBottom: 12 }}>
             <select value={form.announcement_type} onChange={e => set('announcement_type', e.target.value)}
@@ -773,7 +727,6 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Subject */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <select value={form.subject_id} onChange={e => handleSubjectChange(e.target.value)}
             style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: form.subject_id ? '#050505' : '#8A8D91', cursor: 'pointer', outline: 'none' }}>
@@ -784,41 +737,19 @@ export default function CreatePostModal({
         </div>
 
         {isSuperadmin && allChannels.length > 0 && (
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <label style={{
-            fontFamily: '"Instrument Sans", system-ui',
-            fontSize: 11, fontWeight: 700, color: '#65676B',
-            textTransform: 'uppercase', letterSpacing: 0.5,
-            display: 'block', marginBottom: 5,
-          }}>
-            Post to Channel
-          </label>
-          <select
-            value={selectedChannel || ''}
-            onChange={e => setSelectedChannel(e.target.value || null)}
-            style={{
-              width: '100%', padding: '11px 36px 11px 14px',
-              borderRadius: 10, border: '1px solid #E4E6EB',
-              background: selectedChannel ? '#E6F4F4' : '#F7F8FA',
-              appearance: 'none',
-              fontFamily: '"Instrument Sans", system-ui',
-              fontSize: 14,
-              color: selectedChannel ? '#0D7377' : '#8A8D91',
-              fontWeight: selectedChannel ? 700 : 400,
-              cursor: 'pointer', outline: 'none',
-            }}
-          >
-            <option value="">All Channels (Global)</option>
-            {allChannels.map(ch => (
-              <option key={ch} value={ch}>{ch}</option>
-            ))}
-          </select>
-          <ChevronDown size={15} color={selectedChannel ? '#0D7377' : '#65676B'}
-            style={{ position: 'absolute', right: 12, top: '64%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-        </div>
-      )}
-        
-        {/* Due date */}
+          <div style={{ position: 'relative', marginBottom: 12 }}>
+            <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 5 }}>
+              Post to Channel
+            </label>
+            <select value={selectedChannel || ''} onChange={e => setSelectedChannel(e.target.value || null)}
+              style={{ width: '100%', padding: '11px 36px 11px 14px', borderRadius: 10, border: '1px solid #E4E6EB', background: selectedChannel ? '#E6F4F4' : '#F7F8FA', appearance: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: selectedChannel ? '#0D7377' : '#8A8D91', fontWeight: selectedChannel ? 700 : 400, cursor: 'pointer', outline: 'none' }}>
+              <option value="">All Channels (Global)</option>
+              {allChannels.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+            </select>
+            <ChevronDown size={15} color={selectedChannel ? '#0D7377' : '#65676B'} style={{ position: 'absolute', right: 12, top: '64%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+        )}
+
         {selectedType && (isDeadline || (isAnnouncement && selectedType.sub_type === 'announcement')) && (
           <div style={{ marginBottom: 12, background: isDeadline ? '#FFF5F5' : '#F7F8FA', borderRadius: 10, padding: '12px 14px', border: `1px solid ${isDeadline ? '#F5B7B1' : '#E4E6EB'}` }}>
             <label style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: isDeadline ? '#922B21' : '#65676B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
@@ -834,7 +765,6 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Quoted message */}
         <div style={{ marginBottom: 12 }}>
           <button type="button" onClick={() => { setShowQuoteSection(v => !v); setShowQuotePreview(false) }}
             style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${showQuoteSection ? accent.border : '#E4E6EB'}`, background: showQuoteSection ? accent.bg : '#F7F8FA', cursor: 'pointer', transition: 'all 0.15s', fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13.5, color: showQuoteSection ? accent.color : '#65676B' }}>
@@ -890,7 +820,6 @@ export default function CreatePostModal({
           )}
         </div>
 
-        {/* Schedule — superadmin only */}
         {isSuperadmin && (
           <div style={{ marginBottom: 12 }}>
             <button type="button" onClick={() => { setShowSchedule(v => !v); if (showSchedule) { set('scheduled_date', ''); set('scheduled_time', '') } }}
@@ -914,7 +843,6 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* Photo previews */}
         {photoPreviews.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -942,7 +870,6 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* File list */}
         {attachFiles.length > 0 && (
           <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -969,7 +896,6 @@ export default function CreatePostModal({
 
       </div>
 
-      {/* ── FIXED FOOTER ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 51, background: 'white', borderTop: '1px solid #E4E6EB', display: keyboardOpen ? 'none' : 'block' }}>
         <div style={{ padding: '8px 16px 12px', display: 'flex', alignItems: 'center' }}>
           <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 14, color: '#050505', flex: 1 }}>Add to your post</span>
