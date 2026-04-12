@@ -13,7 +13,8 @@ import {
   ChevronUp, ChevronDown, Pencil, Check, Archive,
   Star, AlertTriangle,
   Download, ToggleLeft, ToggleRight,
-  Wrench, Mail, Radio, Search, CheckSquare, Square
+  Wrench, Mail, Radio, Search, CheckSquare, Square,
+  Volume2, UserX, UserCheck, LogOut, ChevronDown as CD
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -174,7 +175,15 @@ export default function AdminDashboard({ onClose }) {
           ) : (
             <>
               {tab === 'overview'  && <OverviewTab stats={stats} users={users}/>}
-              {tab === 'users'     && <UsersTab users={users} currentUserId={user.id} isSuperadmin={isSuperadmin} onViewUser={setViewingUserId}/>}
+              {tab === 'users'     && (
+                <UsersTab
+                  users={users}
+                  currentUserId={user.id}
+                  isSuperadmin={isSuperadmin}
+                  onViewUser={setViewingUserId}
+                  onUsersChange={loadAll}
+                />
+              )}
               {tab === 'banners'   && <BannersTab banners={banners} newBanner={newBanner} setNewBanner={setNewBanner} bannerHours={bannerHours} setBannerHours={setBannerHours} onPost={postBanner} onDelete={deleteBanner} posting={postingBanner}/>}
               {tab === 'posts'     && <PostsTab currentUserId={user.id} isSuperadmin={isSuperadmin} onEditPost={setEditingPost}/>}
               {tab === 'types'     && <AnnouncementTypesTab/>}
@@ -262,11 +271,20 @@ function StatusPill({ icon, color, label }) {
 }
 
 // ── Users ─────────────────────────────────────────────────────
-function UsersTab({ users, currentUserId, isSuperadmin, onViewUser }) {
+function UsersTab({ users, currentUserId, isSuperadmin, onViewUser, onUsersChange }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  // Track per-user action loading state
+  const [actionLoadingId, setActionLoadingId] = useState(null)
+  // Mute duration picker state
+  const [mutePickerUserId, setMutePickerUserId] = useState(null)
+  const [muteHours, setMuteHours] = useState('24')
+  // Local optimistic user list
+  const [localUsers, setLocalUsers] = useState(users)
 
-  const filtered = users.filter(u => {
+  useEffect(() => { setLocalUsers(users) }, [users])
+
+  const filtered = localUsers.filter(u => {
     const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
     if (!matchSearch) return false
     if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
@@ -274,6 +292,90 @@ function UsersTab({ users, currentUserId, isSuperadmin, onViewUser }) {
     if (filter === 'banned') return u.is_banned
     return true
   })
+
+  function optimisticUpdate(userId, patch) {
+    setLocalUsers(prev => prev.map(u => u.id === userId ? { ...u, ...patch } : u))
+  }
+
+  async function handleMute(u) {
+    setMutePickerUserId(null)
+    setActionLoadingId(u.id)
+    try {
+      const hours = parseInt(muteHours) || 24
+      const mutedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+      await supabase.from('profiles').update({ is_muted: true, muted_until: mutedUntil }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'mute_user', target_type: 'profile', target_id: u.id, metadata: { hours } })
+      await supabase.from('notifications').insert({ user_id: u.id, type: 'announcement', message: `🔇 You have been muted for ${hours} hours by a moderator.`, is_read: false })
+      optimisticUpdate(u.id, { is_muted: true, muted_until: mutedUntil })
+      toast.success(`${u.display_name} muted for ${hours}h`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
+
+  async function handleUnmute(u) {
+    setActionLoadingId(u.id)
+    try {
+      await supabase.from('profiles').update({ is_muted: false, muted_until: null }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'unmute_user', target_type: 'profile', target_id: u.id })
+      await supabase.from('notifications').insert({ user_id: u.id, type: 'announcement', message: `🔊 Your mute has been lifted by a moderator.`, is_read: false })
+      optimisticUpdate(u.id, { is_muted: false, muted_until: null })
+      toast.success(`${u.display_name} unmuted`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
+
+  async function handleBan(u) {
+    const reason = window.prompt(`Ban reason for ${u.display_name}:`)
+    if (!reason?.trim()) return
+    setActionLoadingId(u.id)
+    try {
+      await supabase.from('profiles').update({ is_banned: true, banned_at: new Date().toISOString(), banned_reason: reason.trim() }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'ban_user', target_type: 'profile', target_id: u.id, metadata: { reason: reason.trim() } })
+      optimisticUpdate(u.id, { is_banned: true, banned_reason: reason.trim() })
+      toast.success(`${u.display_name} banned`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
+
+  async function handleUnban(u) {
+    setActionLoadingId(u.id)
+    try {
+      await supabase.from('profiles').update({ is_banned: false, banned_at: null, banned_reason: null }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'unban_user', target_type: 'profile', target_id: u.id })
+      await supabase.from('notifications').insert({ user_id: u.id, type: 'announcement', message: `✅ Your account suspension has been lifted.`, is_read: false })
+      optimisticUpdate(u.id, { is_banned: false, banned_at: null, banned_reason: null })
+      toast.success(`${u.display_name} unbanned`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
+
+  async function handleForceLogout(u) {
+    if (!window.confirm(`Force logout ${u.display_name}? They'll be signed out immediately.`)) return
+    setActionLoadingId(u.id)
+    try {
+      const now = new Date().toISOString()
+      await supabase.from('profiles').update({ force_logout_at: now }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'force_logout', target_type: 'profile', target_id: u.id, metadata: { force_logout_at: now } })
+      await supabase.from('notifications').insert({ user_id: u.id, type: 'announcement', message: `🔐 You have been signed out by an administrator.`, is_read: false })
+      toast.success(`${u.display_name} will be signed out`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
+
+  async function handlePromoteDemote(u) {
+    const isMod = u.role === 'moderator'
+    if (!window.confirm(isMod ? `Remove ${u.display_name}'s Moderator role?` : `Promote ${u.display_name} to Moderator?`)) return
+    setActionLoadingId(u.id)
+    try {
+      const newRole = isMod ? 'user' : 'moderator'
+      await supabase.from('profiles').update({ role: newRole }).eq('id', u.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: isMod ? 'demote_from_moderator' : 'promote_to_moderator', target_type: 'profile', target_id: u.id })
+      await supabase.from('notifications').insert({ user_id: u.id, type: 'announcement', message: isMod ? `ℹ️ Your Moderator role has been removed.` : `🛡️ You've been promoted to Moderator.`, is_read: false })
+      optimisticUpdate(u.id, { role: newRole })
+      toast.success(isMod ? `${u.display_name} demoted` : `${u.display_name} is now a Moderator`)
+    } catch (err) { toast.error(err.message) }
+    finally { setActionLoadingId(null) }
+  }
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
@@ -292,27 +394,186 @@ function UsersTab({ users, currentUserId, isSuperadmin, onViewUser }) {
         ))}
       </div>
       <p style={{ margin:'4px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91' }}>{filtered.length} user{filtered.length!==1?'s':''}</p>
-      {filtered.map(u => (
-        <div key={u.id} onClick={() => onViewUser(u.id)}
-          style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'12px 14px',display:'flex',alignItems:'center',gap:12,cursor:'pointer',transition:'background 0.12s' }}
-          onMouseEnter={e => e.currentTarget.style.background='#F7F8FA'}
-          onMouseLeave={e => e.currentTarget.style.background='white'}>
-          <img src={u.avatar_url||dicebearUrl(u.display_name)} style={{ width:40,height:40,borderRadius:11,objectFit:'cover',flexShrink:0 }} alt=""/>
-          <div style={{ flex:1,minWidth:0 }}>
-            <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' }}>
-              <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:14,color:'#050505' }}>{u.display_name}</span>
-              {u.id === currentUserId && <span style={{ fontSize:10,fontWeight:600,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>You</span>}
-              {u.role === 'superadmin' && <span style={{ fontSize:10,fontWeight:700,color:'#92400E',background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Admin</span>}
-              {u.role === 'moderator'  && <span style={{ fontSize:10,fontWeight:700,color:BLUE,background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Mod</span>}
-              {u.is_banned && <span style={{ fontSize:10,fontWeight:700,color:RED,background:'#FEE2E2',border:'1px solid #FECACA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Banned</span>}
-              {u.is_muted  && <span style={{ fontSize:10,fontWeight:700,color:'#C2410C',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Muted</span>}
-            </div>
-            <p style={{ margin:'1px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
-          </div>
-          <ChevronRight size={16} color="#BCC0C4"/>
+
+      {/* Mute duration picker dropdown */}
+      {mutePickerUserId && (
+        <div style={{ background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' }}>
+          <VolumeX size={14} color="#C2410C"/>
+          <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:13,fontWeight:600,color:'#92400E',flex:1 }}>
+            Muting {localUsers.find(u => u.id === mutePickerUserId)?.display_name} for:
+          </span>
+          <select value={muteHours} onChange={e => setMuteHours(e.target.value)}
+            style={{ padding:'6px 10px',borderRadius:8,border:'1px solid #FED7AA',background:'white',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',outline:'none' }}>
+            <option value="1">1 hour</option>
+            <option value="6">6 hours</option>
+            <option value="24">24 hours</option>
+            <option value="72">3 days</option>
+            <option value="168">1 week</option>
+          </select>
+          <button
+            onClick={() => handleMute(localUsers.find(u => u.id === mutePickerUserId))}
+            style={{ padding:'6px 14px',borderRadius:8,border:'none',background:'#C2410C',color:'white',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13 }}>
+            Confirm
+          </button>
+          <button
+            onClick={() => setMutePickerUserId(null)}
+            style={{ padding:'6px 10px',borderRadius:8,border:'1px solid #FED7AA',background:'white',color:'#65676B',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13 }}>
+            Cancel
+          </button>
         </div>
-      ))}
+      )}
+
+      {filtered.map(u => {
+        const isLoading = actionLoadingId === u.id
+        const isSelf = u.id === currentUserId
+        const isSuperadminUser = u.role === 'superadmin'
+
+        return (
+          <div key={u.id}
+            style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'10px 12px',display:'flex',alignItems:'center',gap:10,transition:'background 0.12s' }}
+            onMouseEnter={e => e.currentTarget.style.background='#F7F8FA'}
+            onMouseLeave={e => e.currentTarget.style.background='white'}>
+
+            {/* Avatar — clickable to open profile */}
+            <img
+              src={u.avatar_url||dicebearUrl(u.display_name)}
+              onClick={() => onViewUser(u.id)}
+              style={{ width:38,height:38,borderRadius:10,objectFit:'cover',flexShrink:0,cursor:'pointer' }}
+              alt=""
+            />
+
+            {/* Name + badges — clickable to open profile */}
+            <div style={{ flex:1,minWidth:0,cursor:'pointer' }} onClick={() => onViewUser(u.id)}>
+              <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13.5,color:'#050505' }}>{u.display_name}</span>
+                {isSelf && <span style={{ fontSize:10,fontWeight:600,color:'#8A8D91',fontFamily:'"Instrument Sans",system-ui' }}>You</span>}
+                {u.role === 'superadmin' && <span style={{ fontSize:10,fontWeight:700,color:'#92400E',background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Admin</span>}
+                {u.role === 'moderator'  && <span style={{ fontSize:10,fontWeight:700,color:BLUE,background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Mod</span>}
+                {u.is_banned && <span style={{ fontSize:10,fontWeight:700,color:RED,background:'#FEE2E2',border:'1px solid #FECACA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Banned</span>}
+                {u.is_muted  && <span style={{ fontSize:10,fontWeight:700,color:'#C2410C',background:'#FFF7ED',border:'1px solid #FED7AA',borderRadius:8,padding:'1px 6px',fontFamily:'"Instrument Sans",system-ui' }}>Muted</span>}
+              </div>
+              <p style={{ margin:'1px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
+            </div>
+
+            {/* ── QUICK ACTION BUTTONS ── */}
+            {!isSelf && !isSuperadminUser && !isLoading && (
+              <div style={{ display:'flex',gap:4,flexShrink:0,alignItems:'center' }}>
+
+                {/* Mute / Unmute — visible to all mods */}
+                {u.is_muted ? (
+                  <QuickBtn
+                    icon={<Volume2 size={14}/>}
+                    title="Unmute"
+                    color={GREEN}
+                    bg="#F0FDF4"
+                    onClick={() => handleUnmute(u)}
+                  />
+                ) : (
+                  <QuickBtn
+                    icon={<VolumeX size={14}/>}
+                    title="Mute"
+                    color="#C2410C"
+                    bg="#FFF7ED"
+                    onClick={() => { setMutePickerUserId(u.id); setMuteHours('24') }}
+                    active={mutePickerUserId === u.id}
+                  />
+                )}
+
+                {/* View Profile — visible to all mods */}
+                <QuickBtn
+                  icon={<ChevronRight size={14}/>}
+                  title="View Profile"
+                  color="#65676B"
+                  bg="#F0F2F5"
+                  onClick={() => onViewUser(u.id)}
+                />
+
+                {/* Superadmin-only actions */}
+                {isSuperadmin && (
+                  <>
+                    {/* Ban / Unban */}
+                    {u.is_banned ? (
+                      <QuickBtn
+                        icon={<UserCheck size={14}/>}
+                        title="Unban"
+                        color={GREEN}
+                        bg="#F0FDF4"
+                        onClick={() => handleUnban(u)}
+                      />
+                    ) : (
+                      <QuickBtn
+                        icon={<UserX size={14}/>}
+                        title="Ban"
+                        color={RED}
+                        bg="#FEE2E2"
+                        onClick={() => handleBan(u)}
+                      />
+                    )}
+
+                    {/* Promote / Demote mod */}
+                    {(u.role === 'user' || u.role === 'moderator') && (
+                      <QuickBtn
+                        icon={<Shield size={14}/>}
+                        title={u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}
+                        color={u.role === 'moderator' ? '#65676B' : BLUE}
+                        bg={u.role === 'moderator' ? '#F0F2F5' : '#EBF5FB'}
+                        onClick={() => handlePromoteDemote(u)}
+                      />
+                    )}
+
+                    {/* Force Logout */}
+                    <QuickBtn
+                      icon={<LogOut size={14}/>}
+                      title="Force Logout"
+                      color="#7C3AED"
+                      bg="#F5F3FF"
+                      onClick={() => handleForceLogout(u)}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Loading spinner */}
+            {isLoading && (
+              <div style={{ flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:32,height:32 }}>
+                <Loader2 size={16} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
+              </div>
+            )}
+
+            {/* Self / superadmin target: just arrow to profile */}
+            {(isSelf || isSuperadminUser) && !isLoading && (
+              <button onClick={() => onViewUser(u.id)}
+                style={{ width:30,height:30,borderRadius:8,background:'#F0F2F5',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                <ChevronRight size={15} color="#BCC0C4"/>
+              </button>
+            )}
+          </div>
+        )
+      })}
     </div>
+  )
+}
+
+// ── Quick action icon button ──────────────────────────────────
+function QuickBtn({ icon, title, color, bg, onClick, active }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: 30, height: 30, borderRadius: 8, border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        background: hovered || active ? bg : 'transparent',
+        color: hovered || active ? color : '#BCC0C4',
+        transition: 'all 0.12s',
+        outline: active ? `2px solid ${color}40` : 'none',
+      }}>
+      {icon}
+    </button>
   )
 }
 
@@ -464,7 +725,6 @@ function AnnouncementTypesTab() {
     const idx = sorted.findIndex(t => t.id === type.id)
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1
     if (swapIdx < 0 || swapIdx >= sorted.length) return
-
     const a = sorted[idx]
     const b = sorted[swapIdx]
     await Promise.all([
@@ -482,8 +742,6 @@ function AnnouncementTypesTab() {
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
-
-      {/* Info card */}
       <div style={{ background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:10,padding:'10px 14px',display:'flex',gap:8 }}>
         <Tag size={15} color={BLUE} style={{ flexShrink:0,marginTop:1 }}/>
         <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:BLUE,lineHeight:1.5 }}>
@@ -491,7 +749,6 @@ function AnnouncementTypesTab() {
         </p>
       </div>
 
-      {/* Add new type */}
       <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px' }}>
         <p style={{ margin:'0 0 10px',fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>
           Add New Type
@@ -512,7 +769,6 @@ function AnnouncementTypesTab() {
         </div>
       </div>
 
-      {/* Types list */}
       <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',overflow:'hidden' }}>
         <div style={{ padding:'12px 16px',borderBottom:'1px solid #F0F2F5',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
           <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>
@@ -531,8 +787,6 @@ function AnnouncementTypesTab() {
         ) : (
           types.map((type, idx) => (
             <div key={type.id} style={{ padding:'11px 14px',borderBottom:idx < types.length-1?'1px solid #F0F2F5':'none',display:'flex',alignItems:'center',gap:10,animation:'fadeIn 0.15s ease',opacity:type.is_visible?1:0.55 }}>
-
-              {/* Order buttons */}
               <div style={{ display:'flex',flexDirection:'column',gap:1,flexShrink:0 }}>
                 <button onClick={() => moveType(type,'up')} disabled={idx===0}
                   style={{ background:'none',border:'none',cursor:idx===0?'default':'pointer',color:idx===0?'#E4E6EB':'#BCC0C4',padding:'1px 2px',display:'flex',transition:'color 0.12s' }}
@@ -548,14 +802,12 @@ function AnnouncementTypesTab() {
                 </button>
               </div>
 
-              {/* Label / edit field */}
               {editingId === type.id ? (
                 <input
                   value={editLabel}
                   onChange={e => setEditLabel(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') saveEdit(type.id); if (e.key === 'Escape') setEditingId(null) }}
-                  autoFocus
-                  maxLength={40}
+                  autoFocus maxLength={40}
                   style={{ flex:1,padding:'6px 10px',borderRadius:8,border:`1.5px solid #0D7377`,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',outline:'none',background:'white' }}
                 />
               ) : (
@@ -565,7 +817,6 @@ function AnnouncementTypesTab() {
                 </span>
               )}
 
-              {/* Actions */}
               <div style={{ display:'flex',gap:4,flexShrink:0 }}>
                 {editingId === type.id ? (
                   <>
@@ -680,8 +931,6 @@ function SubjectsTab() {
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
-
-      {/* Header row */}
       <div style={{ display:'flex',gap:8,alignItems:'center' }}>
         <div style={{ display:'flex',gap:6,flex:1,flexWrap:'wrap' }}>
           {['all','active','featured','archived'].map(f => (
@@ -698,12 +947,9 @@ function SubjectsTab() {
         </button>
       </div>
 
-      {/* Add form */}
       {showAdd && (
         <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px',animation:'fadeIn 0.18s ease' }}>
-          <p style={{ margin:'0 0 10px',fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>
-            New Subject
-          </p>
+          <p style={{ margin:'0 0 10px',fontFamily:'"Instrument Sans",system-ui',fontSize:12,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>New Subject</p>
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Subject name *" maxLength={80}
             style={{ width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:8 }}/>
           <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Short description (optional)" rows={2} maxLength={200}
@@ -716,7 +962,6 @@ function SubjectsTab() {
         </div>
       )}
 
-      {/* Subjects list */}
       <p style={{ margin:'2px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91' }}>{filtered.length} subject{filtered.length!==1?'s':''}</p>
 
       {filtered.length === 0 ? (
@@ -730,8 +975,6 @@ function SubjectsTab() {
           const isEditing = editingId === subject.id
           return (
             <div key={subject.id} style={{ background:'white',borderRadius:12,border:`1px solid ${subject.is_archived?'#E4E6EB':subject.is_featured?'#FDE68A':'#DADDE1'}`,padding:'14px 16px',display:'flex',flexDirection:'column',gap:8,opacity:subject.is_archived?0.65:1,animation:'fadeIn 0.15s ease' }}>
-
-              {/* Top row: name + badges + actions */}
               <div style={{ display:'flex',alignItems:'flex-start',gap:10 }}>
                 <div style={{ flex:1,minWidth:0 }}>
                   {isEditing ? (
@@ -757,8 +1000,6 @@ function SubjectsTab() {
                     </>
                   )}
                 </div>
-
-                {/* Action buttons */}
                 <div style={{ display:'flex',gap:4,flexShrink:0,flexWrap:'wrap',justifyContent:'flex-end' }}>
                   {isEditing ? (
                     <>
@@ -796,16 +1037,13 @@ function SystemControlsTab({ users, currentUserId }) {
   async function fetchMaintenance() {
     setLoadingMaintenance(true)
     const { data } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'maintenance_mode')
-      .single()
+      .from('app_settings').select('value').eq('key', 'maintenance_mode').single()
     if (data?.value) {
       try {
         const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value
         setMaintenanceOn(parsed.enabled ?? false)
         setMaintenanceMsg(parsed.message ?? '')
-      } catch { /* malformed value, ignore */ }
+      } catch {}
     }
     setLoadingMaintenance(false)
   }
@@ -824,9 +1062,7 @@ function SystemControlsTab({ users, currentUserId }) {
       if (error) throw error
       setMaintenanceOn(enabled)
       toast.success(enabled ? '🔧 Maintenance mode enabled' : '✅ Maintenance mode disabled')
-    } catch (err) {
-      toast.error(err.message)
-    }
+    } catch (err) { toast.error(err.message) }
     setSavingMaintenance(false)
   }
 
@@ -834,23 +1070,19 @@ function SystemControlsTab({ users, currentUserId }) {
     setExportingCsv(true)
     try {
       const headers = ['Name', 'Email', 'Role', 'Join Date', 'Muted', 'Mute Expires', 'Banned', 'Ban Reason']
-      const rows = users
-        .filter(u => u.id !== currentUserId) // optionally keep or remove this
-        .map(u => [
-          u.display_name ?? '',
-          u.email ?? '',
-          u.role ?? 'user',
-          u.created_at ? format(new Date(u.created_at), 'yyyy-MM-dd') : '',
-          u.is_muted ? 'Yes' : 'No',
-          u.muted_until ? format(new Date(u.muted_until), 'yyyy-MM-dd HH:mm') : '',
-          u.is_banned ? 'Yes' : 'No',
-          u.banned_reason ?? '',
-        ])
-
+      const rows = users.map(u => [
+        u.display_name ?? '',
+        u.email ?? '',
+        u.role ?? 'user',
+        u.created_at ? format(new Date(u.created_at), 'yyyy-MM-dd') : '',
+        u.is_muted ? 'Yes' : 'No',
+        u.muted_until ? format(new Date(u.muted_until), 'yyyy-MM-dd HH:mm') : '',
+        u.is_banned ? 'Yes' : 'No',
+        u.banned_reason ?? '',
+      ])
       const csvContent = [headers, ...rows]
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\n')
-
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -861,16 +1093,12 @@ function SystemControlsTab({ users, currentUserId }) {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
       toast.success(`Exported ${rows.length} users`)
-    } catch (err) {
-      toast.error('Export failed')
-    }
+    } catch { toast.error('Export failed') }
     setExportingCsv(false)
   }
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
-
-      {/* Section header */}
       <div style={{ background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 14px',display:'flex',gap:8,alignItems:'flex-start' }}>
         <AlertTriangle size={15} color="#92400E" style={{ flexShrink:0,marginTop:1 }}/>
         <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:'#92400E',lineHeight:1.5 }}>
@@ -878,7 +1106,6 @@ function SystemControlsTab({ users, currentUserId }) {
         </p>
       </div>
 
-      {/* Maintenance Mode */}
       <div style={{ background:'white',borderRadius:12,border:`1px solid ${maintenanceOn?'#FED7AA':'#DADDE1'}`,padding:'16px' }}>
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
@@ -892,14 +1119,10 @@ function SystemControlsTab({ users, currentUserId }) {
               </p>
             </div>
           </div>
-
-          {/* Toggle */}
           {loadingMaintenance ? (
             <Loader2 size={20} color="#BCC0C4" style={{ animation:'spin 0.8s linear infinite',flexShrink:0 }}/>
           ) : (
-            <button
-              onClick={() => saveMaintenance(!maintenanceOn)}
-              disabled={savingMaintenance}
+            <button onClick={() => saveMaintenance(!maintenanceOn)} disabled={savingMaintenance}
               style={{ background:'none',border:'none',cursor:'pointer',padding:0,flexShrink:0,opacity:savingMaintenance?0.6:1,transition:'opacity 0.12s' }}>
               {maintenanceOn
                 ? <ToggleRight size={36} color="#C2410C"/>
@@ -908,22 +1131,14 @@ function SystemControlsTab({ users, currentUserId }) {
             </button>
           )}
         </div>
-
-        {/* Custom message */}
         <div>
           <label style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5,display:'block',marginBottom:6 }}>
             Maintenance Message
           </label>
-          <textarea
-            value={maintenanceMsg}
-            onChange={e => setMaintenanceMsg(e.target.value)}
-            rows={2}
+          <textarea value={maintenanceMsg} onChange={e => setMaintenanceMsg(e.target.value)} rows={2}
             placeholder="The app is undergoing maintenance. Please check back shortly."
-            style={{ width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}
-          />
-          <button
-            onClick={() => saveMaintenance(maintenanceOn)}
-            disabled={savingMaintenance}
+            style={{ width:'100%',padding:'9px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}/>
+          <button onClick={() => saveMaintenance(maintenanceOn)} disabled={savingMaintenance}
             style={{ display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:10,border:'none',background:'#0D7377',color:'white',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,transition:'opacity 0.12s',opacity:savingMaintenance?0.7:1 }}>
             {savingMaintenance ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Check size={13}/>}
             Save Message
@@ -931,7 +1146,6 @@ function SystemControlsTab({ users, currentUserId }) {
         </div>
       </div>
 
-      {/* Export Users CSV */}
       <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'16px' }}>
         <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:12 }}>
           <div style={{ width:36,height:36,borderRadius:10,background:'#F0FDF4',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
@@ -944,8 +1158,6 @@ function SystemControlsTab({ users, currentUserId }) {
             </p>
           </div>
         </div>
-
-        {/* Fields preview */}
         <div style={{ display:'flex',gap:6,flexWrap:'wrap',marginBottom:12 }}>
           {['Name', 'Email', 'Role', 'Join Date', 'Muted', 'Banned'].map(field => (
             <span key={field} style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#65676B',background:'#F0F2F5',borderRadius:6,padding:'3px 8px' }}>
@@ -953,16 +1165,12 @@ function SystemControlsTab({ users, currentUserId }) {
             </span>
           ))}
         </div>
-
-        <button
-          onClick={exportCsv}
-          disabled={exportingCsv || users.length === 0}
+        <button onClick={exportCsv} disabled={exportingCsv || users.length === 0}
           style={{ display:'flex',alignItems:'center',gap:6,padding:'9px 16px',borderRadius:10,border:'none',background:users.length>0?GREEN:'#E4E6EB',color:users.length>0?'white':'#BCC0C4',cursor:users.length>0?'pointer':'default',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,transition:'opacity 0.12s',opacity:exportingCsv?0.7:1 }}>
           {exportingCsv ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Download size={13}/>}
           Export CSV
         </button>
       </div>
-
     </div>
   )
 }
@@ -971,12 +1179,8 @@ function SystemControlsTab({ users, currentUserId }) {
 function ActionBtn({ icon, color, title, onClick, loading: isLoading }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      disabled={isLoading}
-      title={title}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <button onClick={onClick} disabled={isLoading} title={title}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{ width:30,height:30,borderRadius:8,border:`1px solid ${hovered?color:'#E4E6EB'}`,background:hovered?`${color}15`:'white',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:hovered?color:'#BCC0C4',transition:'all 0.12s',flexShrink:0 }}>
       {isLoading ? <Loader2 size={12} style={{ animation:'spin 0.8s linear infinite' }}/> : icon}
     </button>
@@ -1070,24 +1274,17 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
 
   function toggleSelect(id) {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
 
   function toggleSelectAll() {
-    if (paginated.every(p => selected.has(p.id))) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(paginated.map(p => p.id)))
-    }
+    if (paginated.every(p => selected.has(p.id))) { setSelected(new Set()) }
+    else { setSelected(new Set(paginated.map(p => p.id))) }
   }
 
   async function bulkDelete() {
     if (selected.size === 0) return
-    if (!window.confirm(`Permanently delete ${selected.size} post${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    if (!window.confirm(`Permanently delete ${selected.size} post${selected.size !== 1 ? 's' : ''}?`)) return
     setDeleting(true)
     const ids = [...selected]
     const { error } = await supabase.from('posts').delete().in('id', ids)
@@ -1107,7 +1304,7 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
   }
 
   if (loading) return (
-    <div style={{ display:'flex', justifyContent:'center', padding:48 }}>
+    <div style={{ display:'flex',justifyContent:'center',padding:48 }}>
       <Loader2 size={24} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
     </div>
   )
@@ -1115,109 +1312,88 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
   const allPageSelected = paginated.length > 0 && paginated.every(p => selected.has(p.id))
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-
-      <div style={{ display:'flex', gap:8 }}>
-        <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, background:'white', borderRadius:10, border:'1px solid #E4E6EB', padding:'0 12px', height:38 }}>
+    <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+      <div style={{ display:'flex',gap:8 }}>
+        <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'0 12px',height:38 }}>
           <Search size={14} color='#BCC0C4'/>
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} placeholder='Search posts, authors…'
-            style={{ flex:1, border:'none', outline:'none', fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#050505', background:'transparent' }}/>
+            style={{ flex:1,border:'none',outline:'none',fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
         </div>
       </div>
-
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+      <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
         {['all','announcements','status','deleted'].map(f => (
           <button key={f} onClick={() => { setFilter(f); setPage(0); setSelected(new Set()) }}
-            style={{ padding:'5px 12px', borderRadius:20, border:`1.5px solid ${filter===f ? RED : '#E4E6EB'}`, background:filter===f ? '#FADBD8' : 'white', color:filter===f ? RED : '#65676B', fontFamily:'Instrument Sans, system-ui', fontWeight:filter===f ? 700 : 500, fontSize:12, cursor:'pointer' }}>
+            style={{ padding:'5px 12px',borderRadius:20,border:`1.5px solid ${filter===f?RED:'#E4E6EB'}`,background:filter===f?'#FADBD8':'white',color:filter===f?RED:'#65676B',fontFamily:'Instrument Sans, system-ui',fontWeight:filter===f?700:500,fontSize:12,cursor:'pointer' }}>
             {f.charAt(0).toUpperCase()+f.slice(1)}
           </button>
         ))}
       </div>
-
-      <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'space-between' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      <div style={{ display:'flex',alignItems:'center',gap:8,justifyContent:'space-between' }}>
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
           <button onClick={toggleSelectAll}
-            style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', fontFamily:'Instrument Sans, system-ui', fontSize:12, fontWeight:600, color:'#65676B', padding:'4px 0' }}>
-            {allPageSelected
-              ? <CheckSquare size={15} color={RED}/>
-              : <Square size={15} color='#BCC0C4'/>}
+            style={{ display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontFamily:'Instrument Sans, system-ui',fontSize:12,fontWeight:600,color:'#65676B',padding:'4px 0' }}>
+            {allPageSelected ? <CheckSquare size={15} color={RED}/> : <Square size={15} color='#BCC0C4'/>}
             {allPageSelected ? 'Deselect all' : 'Select all'}
           </button>
-          {selected.size > 0 && (
-            <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:12, color:'#65676B' }}>
-              {selected.size} selected
-            </span>
-          )}
+          {selected.size > 0 && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:12,color:'#65676B' }}>{selected.size} selected</span>}
         </div>
         {selected.size > 0 && (
           <button onClick={bulkDelete} disabled={deleting}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:10, border:'none', background:RED, color:'white', cursor:'pointer', fontFamily:'Instrument Sans, system-ui', fontWeight:700, fontSize:13, opacity:deleting ? 0.7 : 1 }}>
+            style={{ display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:10,border:'none',background:RED,color:'white',cursor:'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:13,opacity:deleting?0.7:1 }}>
             {deleting ? <Loader2 size={13} style={{ animation:'spin 0.8s linear infinite' }}/> : <Trash2 size={13}/>}
             Delete {selected.size}
           </button>
         )}
       </div>
-
-      <p style={{ margin:'0 0 2px', fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#8A8D91' }}>
-        {filtered.length} post{filtered.length !== 1 ? 's' : ''}
+      <p style={{ margin:'0 0 2px',fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91' }}>
+        {filtered.length} post{filtered.length!==1?'s':''}
         {totalPages > 1 && ` · Page ${page+1} of ${totalPages}`}
       </p>
-
       {paginated.length === 0 ? (
-        <div style={{ background:'white', borderRadius:12, border:'1px solid #DADDE1', padding:'40px 0', textAlign:'center' }}>
-          <div style={{ fontSize:36, marginBottom:8 }}>📭</div>
-          <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#65676B' }}>No posts found</p>
+        <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'40px 0',textAlign:'center' }}>
+          <div style={{ fontSize:36,marginBottom:8 }}>📭</div>
+          <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#65676B' }}>No posts found</p>
         </div>
       ) : (
         paginated.map(post => (
           <div key={post.id}
-            style={{ background:'white', borderRadius:12, border:`1px solid ${selected.has(post.id) ? RED+'60' : '#DADDE1'}`, padding:'11px 14px', display:'flex', alignItems:'flex-start', gap:10, transition:'border-color 0.12s' }}>
-            <button onClick={() => toggleSelect(post.id)}
-              style={{ background:'none', border:'none', cursor:'pointer', padding:'2px 0', flexShrink:0, marginTop:1 }}>
-              {selected.has(post.id)
-                ? <CheckSquare size={16} color={RED}/>
-                : <Square size={16} color='#BCC0C4'/>}
+            style={{ background:'white',borderRadius:12,border:`1px solid ${selected.has(post.id)?RED+'60':'#DADDE1'}`,padding:'11px 14px',display:'flex',alignItems:'flex-start',gap:10,transition:'border-color 0.12s' }}>
+            <button onClick={() => toggleSelect(post.id)} style={{ background:'none',border:'none',cursor:'pointer',padding:'2px 0',flexShrink:0,marginTop:1 }}>
+              {selected.has(post.id) ? <CheckSquare size={16} color={RED}/> : <Square size={16} color='#BCC0C4'/>}
             </button>
-            <img src={post.profiles?.avatar_url || dicebearUrl(post.profiles?.display_name)} style={{ width:34, height:34, borderRadius:9, objectFit:'cover', flexShrink:0 }} alt=''/>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:2 }}>
-                <span style={{ fontFamily:'Instrument Sans, system-ui', fontWeight:700, fontSize:13, color:'#050505' }}>{post.profiles?.display_name || 'Unknown'}</span>
-                <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#BCC0C4', fontWeight:500 }}>·</span>
-                <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, color:post.post_type==='announcement' ? '#0D7377' : '#65676B', fontWeight:600, background:post.post_type==='announcement' ? '#E6F4F4' : '#F0F2F5', padding:'1px 6px', borderRadius:6 }}>
-                  {post.sub_type || post.post_type}
+            <img src={post.profiles?.avatar_url||dicebearUrl(post.profiles?.display_name)} style={{ width:34,height:34,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=''/>
+            <div style={{ flex:1,minWidth:0 }}>
+              <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2 }}>
+                <span style={{ fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{post.profiles?.display_name||'Unknown'}</span>
+                <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4',fontWeight:500 }}>·</span>
+                <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:post.post_type==='announcement'?'#0D7377':'#65676B',fontWeight:600,background:post.post_type==='announcement'?'#E6F4F4':'#F0F2F5',padding:'1px 6px',borderRadius:6 }}>
+                  {post.sub_type||post.post_type}
                 </span>
-                {post.subjects?.name && (
-                  <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#8A8D91' }}>· {post.subjects.name}</span>
-                )}
-                {post.is_deleted && (
-                  <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, fontWeight:700, color:RED, background:'#FEE2E2', padding:'1px 6px', borderRadius:6 }}>Deleted</span>
-                )}
+                {post.subjects?.name && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91' }}>· {post.subjects.name}</span>}
+                {post.is_deleted && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:RED,background:'#FEE2E2',padding:'1px 6px',borderRadius:6 }}>Deleted</span>}
               </div>
-              <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#050505', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                {post.caption || <span style={{ color:'#BCC0C4', fontStyle:'italic' }}>No caption</span>}
+              <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
+                {post.caption||<span style={{ color:'#BCC0C4',fontStyle:'italic' }}>No caption</span>}
               </p>
-              <p style={{ margin:'3px 0 0', fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#BCC0C4' }}>
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix:true })}
+              <p style={{ margin:'3px 0 0',fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4' }}>
+                {formatDistanceToNow(new Date(post.created_at),{addSuffix:true})}
               </p>
             </div>
-            <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-              {isSuperadmin && !post.is_deleted && (
-                <ActionBtn icon={<Pencil size={13}/>} color='#0D7377' title='Edit post' onClick={() => onEditPost(post)}/>
-              )}
+            <div style={{ display:'flex',gap:4,flexShrink:0 }}>
+              {isSuperadmin && !post.is_deleted && <ActionBtn icon={<Pencil size={13}/>} color='#0D7377' title='Edit post' onClick={() => onEditPost(post)}/>}
               <ActionBtn icon={<Trash2 size={13}/>} color={RED} title='Delete post' onClick={() => deleteSingle(post)}/>
             </div>
           </div>
         ))
       )}
-
       {totalPages > 1 && (
-        <div style={{ display:'flex', gap:8, justifyContent:'center', paddingTop:4 }}>
-          <button onClick={() => setPage(p => Math.max(0, p-1))} disabled={page===0}
-            style={{ padding:'7px 16px', borderRadius:10, border:'1px solid #E4E6EB', background:'white', color:page===0 ? '#BCC0C4' : '#050505', cursor:page===0 ? 'default' : 'pointer', fontFamily:'Instrument Sans, system-ui', fontWeight:600, fontSize:13 }}>
+        <div style={{ display:'flex',gap:8,justifyContent:'center',paddingTop:4 }}>
+          <button onClick={() => setPage(p => Math.max(0,p-1))} disabled={page===0}
+            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===0?'#BCC0C4':'#050505',cursor:page===0?'default':'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:600,fontSize:13 }}>
             ← Prev
           </button>
-          <button onClick={() => setPage(p => Math.min(totalPages-1, p+1))} disabled={page===totalPages-1}
-            style={{ padding:'7px 16px', borderRadius:10, border:'1px solid #E4E6EB', background:'white', color:page===totalPages-1 ? '#BCC0C4' : '#050505', cursor:page===totalPages-1 ? 'default' : 'pointer', fontFamily:'Instrument Sans, system-ui', fontWeight:600, fontSize:13 }}>
+          <button onClick={() => setPage(p => Math.min(totalPages-1,p+1))} disabled={page===totalPages-1}
+            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===totalPages-1?'#BCC0C4':'#050505',cursor:page===totalPages-1?'default':'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:600,fontSize:13 }}>
             Next →
           </button>
         </div>
@@ -1248,13 +1424,7 @@ function SystemDMTab({ users, currentUserId }) {
     try {
       if (mode === 'broadcast') {
         const targets = users.filter(u => u.id !== currentUserId)
-        const inserts = targets.map(u => ({
-          user_id: u.id,
-          type: 'system_dm',
-          message: message.trim(),
-          is_read: false,
-          created_at: new Date().toISOString(),
-        }))
+        const inserts = targets.map(u => ({ user_id: u.id, type: 'system_dm', message: message.trim(), is_read: false, created_at: new Date().toISOString() }))
         const CHUNK = 50
         for (let i = 0; i < inserts.length; i += CHUNK) {
           await supabase.from('notifications').insert(inserts.slice(i, i + CHUNK))
@@ -1262,114 +1432,93 @@ function SystemDMTab({ users, currentUserId }) {
         toast.success(`📡 Broadcast sent to ${targets.length} users`)
         setSent(prev => [{ mode:'broadcast', message:message.trim(), count:targets.length, time:new Date() }, ...prev])
       } else {
-        await supabase.from('notifications').insert({
-          user_id: recipientId,
-          type: 'system_dm',
-          message: message.trim(),
-          is_read: false,
-          created_at: new Date().toISOString(),
-        })
+        await supabase.from('notifications').insert({ user_id: recipientId, type: 'system_dm', message: message.trim(), is_read: false, created_at: new Date().toISOString() })
         const recipient = users.find(u => u.id === recipientId)
-        toast.success(`✉️ Sent to ${recipient?.display_name || 'user'}`)
+        toast.success(`✉️ Sent to ${recipient?.display_name||'user'}`)
         setSent(prev => [{ mode:'single', message:message.trim(), recipient:recipient?.display_name, time:new Date() }, ...prev])
       }
-      setMessage('')
-      setRecipientId('')
-      setSearch('')
-    } catch (err) {
-      toast.error(err.message)
-    }
+      setMessage(''); setRecipientId(''); setSearch('')
+    } catch (err) { toast.error(err.message) }
     setSending(false)
   }
 
   const canSend = message.trim() && (mode === 'broadcast' || recipientId)
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-
-      <div style={{ background:'#EBF5FB', border:'1px solid #AED6F1', borderRadius:10, padding:'10px 14px', display:'flex', gap:8 }}>
-        <Mail size={15} color={BLUE} style={{ flexShrink:0, marginTop:1 }}/>
-        <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:12, color:BLUE, lineHeight:1.5 }}>
+    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+      <div style={{ background:'#EBF5FB',border:'1px solid #AED6F1',borderRadius:10,padding:'10px 14px',display:'flex',gap:8 }}>
+        <Mail size={15} color={BLUE} style={{ flexShrink:0,marginTop:1 }}/>
+        <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:12,color:BLUE,lineHeight:1.5 }}>
           System DMs are delivered as in-app notifications. Recipients see them as a message from the system.
         </p>
       </div>
-
-      <div style={{ display:'flex', gap:6, padding:4, background:'#F0F2F5', borderRadius:10 }}>
-        {[
-          { key:'single',    label:'Single User',   icon:<Mail size={14}/> },
-          { key:'broadcast', label:'Broadcast All',  icon:<Radio size={14}/> },
-        ].map(({ key, label, icon }) => (
+      <div style={{ display:'flex',gap:6,padding:4,background:'#F0F2F5',borderRadius:10 }}>
+        {[{ key:'single', label:'Single User', icon:<Mail size={14}/> },{ key:'broadcast', label:'Broadcast All', icon:<Radio size={14}/> }].map(({ key, label, icon }) => (
           <button key={key} onClick={() => { setMode(key); setRecipientId(''); setSearch('') }}
-            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 0', borderRadius:8, border:'none', cursor:'pointer', fontFamily:'Instrument Sans, system-ui', fontWeight:600, fontSize:13, background:mode===key ? (key==='broadcast' ? '#C0392B' : 'white') : 'transparent', color:mode===key ? (key==='broadcast' ? 'white' : '#050505') : '#65676B', boxShadow:mode===key && key==='single' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition:'all 0.15s' }}>
+            style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px 0',borderRadius:8,border:'none',cursor:'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:600,fontSize:13,background:mode===key?(key==='broadcast'?'#C0392B':'white'):'transparent',color:mode===key?(key==='broadcast'?'white':'#050505'):'#65676B',boxShadow:mode===key&&key==='single'?'0 1px 4px rgba(0,0,0,0.1)':'none',transition:'all 0.15s' }}>
             {icon} {label}
           </button>
         ))}
       </div>
-
       {mode === 'single' && (
-        <div style={{ background:'white', borderRadius:12, border:'1px solid #DADDE1', overflow:'hidden' }}>
-          <div style={{ padding:'10px 14px', borderBottom:'1px solid #F0F2F5', display:'flex', alignItems:'center', gap:8 }}>
+        <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',overflow:'hidden' }}>
+          <div style={{ padding:'10px 14px',borderBottom:'1px solid #F0F2F5',display:'flex',alignItems:'center',gap:8 }}>
             <Search size={14} color='#BCC0C4'/>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder='Search users…'
-              style={{ flex:1, border:'none', outline:'none', fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#050505', background:'transparent' }}/>
+              style={{ flex:1,border:'none',outline:'none',fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
           </div>
-          <div style={{ maxHeight:200, overflowY:'auto' }}>
+          <div style={{ maxHeight:200,overflowY:'auto' }}>
             {filteredUsers.slice(0,20).map(u => (
-              <div key={u.id} onClick={() => { setRecipientId(u.id); setSearch(u.display_name || '') }}
-                style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', cursor:'pointer', background:recipientId===u.id ? '#E6F4F4' : 'white', borderBottom:'1px solid #F0F2F5', transition:'background 0.1s' }}
-                onMouseEnter={e => { if(recipientId !== u.id) e.currentTarget.style.background = '#F7F8FA' }}
-                onMouseLeave={e => { if(recipientId !== u.id) e.currentTarget.style.background = 'white' }}>
-                <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width:32, height:32, borderRadius:9, objectFit:'cover', flexShrink:0 }} alt=''/>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontWeight:700, fontSize:13, color:'#050505' }}>{u.display_name}</p>
-                  <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#8A8D91', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.email}</p>
+              <div key={u.id} onClick={() => { setRecipientId(u.id); setSearch(u.display_name||'') }}
+                style={{ display:'flex',alignItems:'center',gap:10,padding:'10px 14px',cursor:'pointer',background:recipientId===u.id?'#E6F4F4':'white',borderBottom:'1px solid #F0F2F5',transition:'background 0.1s' }}
+                onMouseEnter={e=>{ if(recipientId!==u.id) e.currentTarget.style.background='#F7F8FA' }}
+                onMouseLeave={e=>{ if(recipientId!==u.id) e.currentTarget.style.background='white' }}>
+                <img src={u.avatar_url||dicebearUrl(u.display_name)} style={{ width:32,height:32,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=''/>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{u.display_name}</p>
+                  <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
                 </div>
-                {recipientId === u.id && <Check size={15} color='#0D7377'/>}
+                {recipientId===u.id && <Check size={15} color='#0D7377'/>}
               </div>
             ))}
-            {filteredUsers.length === 0 && (
-              <p style={{ textAlign:'center', padding:'20px 0', fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#8A8D91', margin:0 }}>No users found</p>
-            )}
+            {filteredUsers.length===0 && <p style={{ textAlign:'center',padding:'20px 0',fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#8A8D91',margin:0 }}>No users found</p>}
           </div>
         </div>
       )}
-
       {mode === 'broadcast' && (
-        <div style={{ background:'#FEF9C3', border:'1px solid #FDE68A', borderRadius:10, padding:'10px 14px', display:'flex', gap:8 }}>
-          <AlertTriangle size={15} color='#92400E' style={{ flexShrink:0, marginTop:1 }}/>
-          <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:12, color:'#92400E', lineHeight:1.5 }}>
-            This will send a notification to all {users.length - 1} users. Use sparingly.
+        <div style={{ background:'#FEF9C3',border:'1px solid #FDE68A',borderRadius:10,padding:'10px 14px',display:'flex',gap:8 }}>
+          <AlertTriangle size={15} color='#92400E' style={{ flexShrink:0,marginTop:1 }}/>
+          <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:12,color:'#92400E',lineHeight:1.5 }}>
+            This will send a notification to all {users.length-1} users. Use sparingly.
           </p>
         </div>
       )}
-
-      <div style={{ background:'white', borderRadius:12, border:'1px solid #DADDE1', padding:'14px 16px' }}>
-        <label style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, fontWeight:700, color:'#65676B', textTransform:'uppercase', letterSpacing:0.5, display:'block', marginBottom:8 }}>
-          {mode === 'broadcast' ? '📡 Broadcast Message' : '✉️ Message'}
+      <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'14px 16px' }}>
+        <label style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5,display:'block',marginBottom:8 }}>
+          {mode==='broadcast'?'📡 Broadcast Message':'✉️ Message'}
         </label>
         <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4}
-          placeholder={mode === 'broadcast' ? 'Type a message to send to everyone…' : 'Type your message…'}
-          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #E4E6EB', fontFamily:'Instrument Sans, system-ui', fontSize:14, color:'#050505', resize:'none', outline:'none', background:'#F7F8FA', boxSizing:'border-box', marginBottom:10 }}/>
-        <button onClick={sendDM} disabled={sending || !canSend}
-          style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 18px', borderRadius:10, border:'none', background:!canSend ? '#E4E6EB' : (mode==='broadcast' ? '#C0392B' : '#0D7377'), color:!canSend ? '#BCC0C4' : 'white', cursor:!canSend ? 'default' : 'pointer', fontFamily:'Instrument Sans, system-ui', fontWeight:700, fontSize:14, transition:'all 0.12s', opacity:sending ? 0.7 : 1 }}>
-          {sending ? <Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }}/> : <Send size={14}/>}
-          {mode === 'broadcast' ? 'Broadcast' : 'Send'}
+          placeholder={mode==='broadcast'?'Type a message to send to everyone…':'Type your message…'}
+          style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid #E4E6EB',fontFamily:'Instrument Sans, system-ui',fontSize:14,color:'#050505',resize:'none',outline:'none',background:'#F7F8FA',boxSizing:'border-box',marginBottom:10 }}/>
+        <button onClick={sendDM} disabled={sending||!canSend}
+          style={{ display:'flex',alignItems:'center',gap:6,padding:'10px 18px',borderRadius:10,border:'none',background:!canSend?'#E4E6EB':(mode==='broadcast'?'#C0392B':'#0D7377'),color:!canSend?'#BCC0C4':'white',cursor:!canSend?'default':'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:14,transition:'all 0.12s',opacity:sending?0.7:1 }}>
+          {sending?<Loader2 size={14} style={{ animation:'spin 0.8s linear infinite' }}/>:<Send size={14}/>}
+          {mode==='broadcast'?'Broadcast':'Send'}
         </button>
       </div>
-
-      {sent.length > 0 && (
+      {sent.length>0 && (
         <div>
-          <p style={{ margin:'4px 0 6px', fontFamily:'Instrument Sans, system-ui', fontSize:11, fontWeight:700, color:'#65676B', textTransform:'uppercase', letterSpacing:0.5 }}>Sent this session</p>
-          {sent.map((s, i) => (
-            <div key={i} style={{ background:'white', borderRadius:10, border:'1px solid #E4E6EB', padding:'10px 14px', marginBottom:6 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                {s.mode === 'broadcast'
-                  ? <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, fontWeight:700, color:'#C0392B', background:'#FADBD8', padding:'1px 7px', borderRadius:8 }}>📡 Broadcast · {s.count} users</span>
-                  : <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, fontWeight:700, color:'#0D7377', background:'#E6F4F4', padding:'1px 7px', borderRadius:8 }}>✉️ To {s.recipient}</span>
+          <p style={{ margin:'4px 0 6px',fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:'#65676B',textTransform:'uppercase',letterSpacing:0.5 }}>Sent this session</p>
+          {sent.map((s,i) => (
+            <div key={i} style={{ background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'10px 14px',marginBottom:6 }}>
+              <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:4 }}>
+                {s.mode==='broadcast'
+                  ?<span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:'#C0392B',background:'#FADBD8',padding:'1px 7px',borderRadius:8 }}>📡 Broadcast · {s.count} users</span>
+                  :<span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:'#0D7377',background:'#E6F4F4',padding:'1px 7px',borderRadius:8 }}>✉️ To {s.recipient}</span>
                 }
-                <span style={{ fontFamily:'Instrument Sans, system-ui', fontSize:11, color:'#BCC0C4' }}>{formatDistanceToNow(s.time, { addSuffix:true })}</span>
+                <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4' }}>{formatDistanceToNow(s.time,{addSuffix:true})}</span>
               </div>
-              <p style={{ margin:0, fontFamily:'Instrument Sans, system-ui', fontSize:13, color:'#050505', lineHeight:1.4 }}>{s.message}</p>
+              <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',lineHeight:1.4 }}>{s.message}</p>
             </div>
           ))}
         </div>
