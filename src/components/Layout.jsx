@@ -212,7 +212,6 @@ function LeftSidebar({
         {/* Preferences */}
         <div style={{ marginBottom:4 }}>
           <p style={{ margin:'4px 10px 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:10,fontWeight:700,color:textMut,textTransform:'uppercase',letterSpacing:0.8 }}>Preferences</p>
-          <DarkModeToggle dark={dark} colors={colors} surfaceBg={surfaceBg} textPri={textPri} textSec={textSec}/>
           <SidebarBtn dark={dark} surfaceBg={surfaceBg} textPri={textPri} icon={<Info size={16} color="#0D7377"/>} label="About CSB" onClick={()=>{ onClose?.(); setShowAbout(true) }}/>
         </div>
 
