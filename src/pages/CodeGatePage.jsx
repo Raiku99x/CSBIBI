@@ -122,13 +122,11 @@ export default function CodeGatePage() {
     e.preventDefault()
     const trimmed = code.trim().toLowerCase()
     if (!trimmed) { setCodeError('invalid'); return }
-    // Sanity check — no script injection in code field
     if (trimmed.length > 100 || /<|>|script/i.test(trimmed)) { setCodeError('invalid'); return }
 
     setLoading(true)
     setCodeError('')
     try {
-      // Single query — avoids race condition between two sequential fetches
       const { data: row } = await supabase
         .from('allowed_codes').select('*').eq('code', trimmed).single()
 
@@ -150,7 +148,6 @@ export default function CodeGatePage() {
     let ok = true
     setNameError(''); setGenderError(''); setBdayError('')
 
-    // Full name validation
     if (!fullName.trim()) { setNameError('Full name is required'); ok = false }
     else if (fullName.trim().length < 2) { setNameError('Name is too short'); ok = false }
     else if (fullName.trim().length > 50) { setNameError('Name is too long'); ok = false }
@@ -158,7 +155,6 @@ export default function CodeGatePage() {
 
     if (!gender) { setGenderError('Please select your gender'); ok = false }
 
-    // Birthday validation
     if (!birthday) {
       setBdayError('Birthday is required'); ok = false
     } else {
@@ -223,65 +219,76 @@ export default function CodeGatePage() {
         await supabase.from('user_subjects').insert(inserts)
       }
 
-      // Sanitize before saving
       const safeName = sanitize(fullName.trim())
       const safeUsername = codeRow.identifier
         ? codeRow.identifier.replace('@', '').toLowerCase()
         : safeName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 
       await updateProfile({
-      display_name: safeName,
-      username:     safeUsername,
-      identifier:   codeRow.identifier,
-      section:      codeRow.section,
-      student_code: codeRow.code,
-      is_verified:  true,
-      avatar_url:   avatarUrl,
-      gender:       gender,
-      birthday:     birthday,
-    })
-    
-    try {
-      const verifiedAt = new Date().toISOString()
-    
-      const enrolledSubjectIds = [...selectedSubjects]
-    
-      const today = new Date().toISOString().split('T')[0]
-      const { data: existingDeadlines } = await supabase
-        .from('posts')
-        .select('id')
-        .eq('post_type', 'announcement')
-        .not('due_date', 'is', null)
-        .lt('due_date', today)
-        .lt('created_at', verifiedAt)
-    
-      if (enrolledSubjectIds.length > 0) {
-        deadlineQuery = deadlineQuery.or(
-          `subject_id.in.(${enrolledSubjectIds.join(',')}),subject_id.is.null`
-        )
-      } else {
-        deadlineQuery = deadlineQuery.is('subject_id', null)
+        display_name: safeName,
+        username:     safeUsername,
+        identifier:   codeRow.identifier,
+        section:      codeRow.section,
+        student_code: codeRow.code,
+        is_verified:  true,
+        avatar_url:   avatarUrl,
+        gender:       gender,
+        birthday:     birthday,
+      })
+
+      // ── Auto-complete PAST DUE deadlines only ─────────────
+      // Only mark deadlines as done if their due date (+ time) is already in the past.
+      // We never touch today's or future deadlines.
+      try {
+        const enrolledSubjectIds = [...selectedSubjects]
+        const now = new Date()
+
+        // Fetch deadlines from enrolled subjects + general (no subject)
+        let deadlineQuery = supabase
+          .from('posts')
+          .select('id, due_date, due_time')
+          .eq('post_type', 'announcement')
+          .not('due_date', 'is', null)
+
+        if (enrolledSubjectIds.length > 0) {
+          deadlineQuery = deadlineQuery.or(
+            `subject_id.in.(${enrolledSubjectIds.join(',')}),subject_id.is.null`
+          )
+        } else {
+          deadlineQuery = deadlineQuery.is('subject_id', null)
+        }
+
+        const { data: allDeadlines } = await deadlineQuery
+
+        // Filter client-side: only truly past-due (respecting due_time)
+        const pastDueDeadlines = (allDeadlines || []).filter(d => {
+          const [y, m, day] = d.due_date.split('-').map(Number)
+          const dt = new Date(y, m - 1, day)
+          if (d.due_time) {
+            const [h, min] = d.due_time.split(':').map(Number)
+            dt.setHours(h, min, 0, 0)
+          } else {
+            dt.setHours(23, 59, 0, 0)
+          }
+          return dt < now
+        })
+
+        if (pastDueDeadlines.length > 0) {
+          const completions = pastDueDeadlines.map(d => ({
+            user_id: user.id,
+            post_id: d.id,
+          }))
+          await supabase
+            .from('deadline_completions')
+            .upsert(completions, { onConflict: 'user_id,post_id' })
+        }
+      } catch (err) {
+        // Non-critical — don't block the success flow
+        console.error('Auto-complete past-due deadlines failed:', err)
       }
-    
-      const { data: existingDeadlines } = await deadlineQuery
-    
-      if (existingDeadlines && existingDeadlines.length > 0) {
-        const completions = existingDeadlines.map(d => ({
-          user_id: user.id,
-          post_id: d.id,
-        }))
-        // upsert so no duplicates if somehow called twice
-        await supabase
-          .from('deadline_completions')
-          .upsert(completions, { onConflict: 'user_id,post_id' })
-      }
-    } catch (err) {
-      // Non-critical — don't block the success flow
-      console.error('Auto-complete deadlines failed:', err)
-    }
-    
-    setSuccess(true)
-    toast.success(`Welcome, ${safeName.split(' ')[0]}! 🎉`)
+
+      setSuccess(true)
+      toast.success(`Welcome, ${safeName.split(' ')[0]}! 🎉`)
     } catch (err) {
       toast.error(err.message || 'Something went wrong')
     } finally {
