@@ -246,11 +246,13 @@ export default function CodeGatePage() {
     
       const enrolledSubjectIds = [...selectedSubjects]
     
-      let deadlineQuery = supabase
+      const today = new Date().toISOString().split('T')[0]
+      const { data: existingDeadlines } = await supabase
         .from('posts')
         .select('id')
         .eq('post_type', 'announcement')
         .not('due_date', 'is', null)
+        .lt('due_date', today)
         .lt('created_at', verifiedAt)
     
       if (enrolledSubjectIds.length > 0) {
