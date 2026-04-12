@@ -942,11 +942,6 @@ export default function CreatePostModal({
             )}
           </div>
         </div>
-        {!isMaterial && !isAnnouncement && (
-          <p style={{ margin: 0, padding: '0 16px 10px', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Folder size={12} color="#8A8D91"/> Switch to <strong>Material</strong> or <strong>Announcement</strong> to attach files.
-          </p>
-        )}
       </div>
 
       <input ref={photoRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/avif,image/heic,image/heif" multiple style={{ display: 'none' }} onChange={handlePhoto} />
