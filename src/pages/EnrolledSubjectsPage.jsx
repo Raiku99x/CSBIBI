@@ -6,7 +6,7 @@ import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
 import {
   BookMarked, BookOpen, Plus, Minus, FileText, Image,
-  ChevronLeft, File, AppWindow, Loader2, Search, X
+  ChevronLeft, File, AppWindow, Loader2, Search, X, Radio
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -24,7 +24,7 @@ function getColor(name) {
 }
 
 export default function EnrolledSubjectsPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [allSubjects, setAllSubjects] = useState([])
   const [enrolledIds, setEnrolledIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
@@ -32,62 +32,79 @@ export default function EnrolledSubjectsPage() {
   const [selected, setSelected] = useState(null)
   const [search, setSearch] = useState('')
 
+  // User's channel — subjects are filtered to show only those assigned to the
+  // user's channel OR global subjects (channel = null)
+  const userChannel = profile?.section || null
+
   useEffect(() => {
     async function load() {
+      // Fetch subjects: only those matching userChannel OR global (null channel)
+      let subjectQuery = supabase
+        .from('subjects')
+        .select('*')
+        .order('name')
+
+      if (userChannel) {
+        // Show subjects assigned to user's channel OR global subjects (no channel)
+        subjectQuery = subjectQuery.or(`channel.eq.${userChannel},channel.is.null`)
+      }
+      // If user has no channel, show all subjects (shouldn't normally happen
+      // after verification, but graceful fallback)
+
       const [{ data: subjects }, { data: enrolled }] = await Promise.all([
-        supabase.from('subjects').select('*').order('name'),
+        subjectQuery,
         supabase.from('user_subjects').select('subject_id').eq('user_id', user.id),
       ])
       if (subjects) setAllSubjects(subjects)
       if (enrolled) setEnrolledIds(new Set(enrolled.map(e => e.subject_id)))
       setLoading(false)
     }
-    if (user) load()
-  }, [user])
+    if (user && profile !== null) load()
+  }, [user, profile, userChannel])
 
   async function toggle(subjectId, enrolled) {
-  setToggling(subjectId)
-  try {
-    if (enrolled) {
-      await supabase.from('user_subjects').delete().eq('user_id', user.id).eq('subject_id', subjectId)
-      setEnrolledIds(prev => { const s = new Set(prev); s.delete(subjectId); return s })
-      toast.success('Unenrolled')
-      if (selected?.id === subjectId) setSelected(null)
-    } else {
-      await supabase.from('user_subjects').insert({ user_id: user.id, subject_id: subjectId })
-      setEnrolledIds(prev => new Set([...prev, subjectId]))
-      toast.success('Enrolled!')
+    setToggling(subjectId)
+    try {
+      if (enrolled) {
+        await supabase.from('user_subjects').delete().eq('user_id', user.id).eq('subject_id', subjectId)
+        setEnrolledIds(prev => { const s = new Set(prev); s.delete(subjectId); return s })
+        toast.success('Unenrolled')
+        if (selected?.id === subjectId) setSelected(null)
+      } else {
+        await supabase.from('user_subjects').insert({ user_id: user.id, subject_id: subjectId })
+        setEnrolledIds(prev => new Set([...prev, subjectId]))
+        toast.success('Enrolled!')
 
-      try {
-        const today = new Date().toISOString().split('T')[0]
-        const { data: existingDeadlines } = await supabase
-          .from('posts')
-          .select('id')
-          .eq('post_type', 'announcement')
-          .not('due_date', 'is', null)
-          .eq('subject_id', subjectId)
-          .lt('due_date', today)
-          .lt('created_at', new Date().toISOString())
+        try {
+          const today = new Date().toISOString().split('T')[0]
+          const { data: existingDeadlines } = await supabase
+            .from('posts')
+            .select('id')
+            .eq('post_type', 'announcement')
+            .not('due_date', 'is', null)
+            .eq('subject_id', subjectId)
+            .lt('due_date', today)
+            .lt('created_at', new Date().toISOString())
 
-        if (existingDeadlines && existingDeadlines.length > 0) {
-          const completions = existingDeadlines.map(d => ({
-            user_id: user.id,
-            post_id: d.id,
-          }))
-          await supabase
-            .from('deadline_completions')
-            .upsert(completions, { onConflict: 'user_id,post_id' })
+          if (existingDeadlines && existingDeadlines.length > 0) {
+            const completions = existingDeadlines.map(d => ({
+              user_id: user.id,
+              post_id: d.id,
+            }))
+            await supabase
+              .from('deadline_completions')
+              .upsert(completions, { onConflict: 'user_id,post_id' })
+          }
+        } catch (err) {
+          console.error('Auto-complete on enroll failed:', err)
         }
-      } catch (err) {
-        console.error('Auto-complete on enroll failed:', err)
       }
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setToggling(null)
     }
-  } catch (err) {
-    toast.error(err.message)
-  } finally {
-    setToggling(null)
   }
-}
 
   const filtered = allSubjects.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -115,9 +132,19 @@ export default function EnrolledSubjectsPage() {
           <div style={{ width:48, height:48, borderRadius:14, background:'#E6F4F4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <BookMarked size={22} color="#0D7377"/>
           </div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin:0, fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:20, color:'#050505' }}>Subjects</p>
-            <p style={{ margin:'2px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#65676B' }}>{enrolledIds.size} enrolled · {allSubjects.length} total</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+              <p style={{ margin:0, fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#65676B' }}>
+                {enrolledIds.size} enrolled · {allSubjects.length} available
+              </p>
+              {userChannel && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, background: 'rgba(13,115,119,0.10)', border: '1px solid rgba(13,115,119,0.22)', fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 11, color: '#0D7377' }}>
+                  <Radio size={9} color="#0D7377" />
+                  {userChannel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10, background:'#F0F2F5', borderRadius:22, padding:'0 14px', height:40 }}>
@@ -127,6 +154,15 @@ export default function EnrolledSubjectsPage() {
           {search && <button onClick={() => setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', display:'flex' }}><X size={15} color="#65676B"/></button>}
         </div>
       </div>
+
+      {!loading && userChannel && allSubjects.length === 0 && (
+        <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderLeft: '4px solid #F59E0B', borderRadius: '0 10px 10px 0', padding: '11px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Radio size={14} color="#C2410C" style={{ flexShrink: 0 }} />
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#92400E', lineHeight: 1.4 }}>
+            No subjects have been assigned to the <strong>{userChannel}</strong> channel yet. Ask your admin to add subjects for your channel.
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -148,7 +184,12 @@ export default function EnrolledSubjectsPage() {
               ))}
             </Section>
           )}
-          {filtered.length === 0 && <EmptyCard emoji="🔍" title="No subjects found" subtitle="Try a different search term"/>}
+          {filtered.length === 0 && allSubjects.length > 0 && (
+            <EmptyCard emoji="🔍" title="No subjects found" subtitle="Try a different search term"/>
+          )}
+          {allSubjects.length === 0 && !userChannel && (
+            <EmptyCard emoji="📚" title="No subjects yet" subtitle="Your admin hasn't added any subjects yet"/>
+          )}
         </>
       )}
     </div>
@@ -204,7 +245,7 @@ function SubjectDetail({ subject, isEnrolled, userId, onBack, onToggle }) {
   const [posts, setPosts]             = useState([])
   const [apps, setApps]               = useState([])
   const [loading, setLoading]         = useState(true)
-  const [viewingUserId, setViewingUserId] = useState(null)  // ← NEW
+  const [viewingUserId, setViewingUserId] = useState(null)
   const color = getColor(subject.name)
 
   useEffect(() => {
@@ -240,6 +281,11 @@ function SubjectDetail({ subject, isEnrolled, userId, onBack, onToggle }) {
             <div style={{ flex:1, minWidth:0 }}>
               <p style={{ margin:0, fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:18, color:'#050505' }}>{subject.name}</p>
               {subject.description && <p style={{ margin:'4px 0 0', fontFamily:'"Instrument Sans",system-ui', fontSize:13, color:'#65676B', lineHeight:1.4 }}>{subject.description}</p>}
+              {subject.channel && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginTop:6, padding:'2px 8px', borderRadius:20, background:'rgba(13,115,119,0.10)', border:'1px solid rgba(13,115,119,0.22)', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:11, color:'#0D7377' }}>
+                  <Radio size={9} color="#0D7377"/> {subject.channel}
+                </span>
+              )}
             </div>
             <ToggleBtn enrolled={isEnrolled} onToggle={onToggle}/>
           </div>
@@ -272,7 +318,6 @@ function SubjectDetail({ subject, isEnrolled, userId, onBack, onToggle }) {
         />
       )}
 
-      {/* User profile panel */}
       {viewingUserId && (
         <UserProfilePage
           userId={viewingUserId}
@@ -296,7 +341,6 @@ function ToggleBtn({ enrolled, onToggle }) {
   )
 }
 
-// onUserClick passed down from SubjectDetail
 function TabContent({ activeTab, posts, filePosts, mediaPosts, apps, userId, color, subject, onUserClick }) {
   if (activeTab === 'posts') {
     return posts.length === 0
