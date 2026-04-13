@@ -615,10 +615,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               </div>
             )}
             {postData.is_official && (
-              <div title="Official" style={{ flexShrink:0 }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2.5c.8 0 1.5.4 2 1 .6-.3 1.3-.3 1.9 0 .5.3.9.8 1 1.4.6.2 1.1.6 1.4 1.1.3.6.3 1.3 0 1.9.5.5.8 1.2.8 2s-.3 1.5-.8 2c.3.6.3 1.3 0 1.9-.3.5-.8.9-1.4 1.1-.2.6-.6 1.1-1.1 1.4-.6.3-1.3.3-1.9 0-.5.6-1.2.9-2 .9s-1.5-.3-2-.9c-.6.3-1.3.3-1.9 0-.5-.3-.9-.8-1.1-1.4-.6-.2-1.1-.6-1.4-1.1-.3-.6-.3-1.9 0-1.9-.5-.5-.8-1.2-.8-2s.3-1.5.8-2c-.3-.6-.3-1.3 0-1.9.3-.5.8-.9 1.4-1.1.2-.6.6-1.1 1.1-1.4.6-.3 1.3-.3 1.9 0 .5-.6 1.2-1 2-1z" fill="rgba(255,255,255,0.55)" stroke="rgba(255,255,255,0.35)" strokeWidth="0.3"/>
-                  <path d="M8.5 12l2.5 2.5 5-5" stroke="rgba(255,255,255,0.95)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <div title="Official" style={{ width:20,height:20,borderRadius:'50%',background:'rgba(255,255,255,0.25)',border:'1.5px solid rgba(255,255,255,0.5)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             )}
