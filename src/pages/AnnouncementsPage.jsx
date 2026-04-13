@@ -334,7 +334,7 @@ function LoadingSkeleton() {
 const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { isDone, toggleDone, doneIds, loading: completionsLoading } = useDeadlineCompletions()
   const [togglingId, setTogglingId] = useState(null)
 
@@ -342,6 +342,9 @@ export default function AnnouncementsPage() {
   const [loading, setLoading]       = useState(true)
   const [filter, setFilter]         = useState('All')
   const [typeFilter, setTypeFilter] = useState('All Types')
+
+  // The user's channel — used to filter deadlines to only show relevant ones
+  const userChannel = profile?.section || null
 
   async function handleToggleDone(postId) {
     setTogglingId(postId)
@@ -351,16 +354,29 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     async function load() {
+      // Get enrolled subjects
       const { data: enrolled } = await supabase
         .from('user_subjects').select('subject_id').eq('user_id', user.id)
       const subjectIds = enrolled?.map(e => e.subject_id) || []
 
+      // Build deadline query
+      // Channel filtering logic:
+      //   - Show deadlines where post.channel = userChannel (user's own channel posts)
+      //   - OR post.channel IS NULL (global posts visible to all channels)
+      //   - AND subject is enrolled by the user OR subject is null (general)
       let query = supabase
-        .from('posts').select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+        .from('posts')
+        .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .eq('post_type', 'announcement')
         .not('due_date', 'is', null)
         .order('due_date', { ascending: true })
 
+      // Apply channel filter: only show deadlines from user's channel or global (null channel)
+      if (userChannel) {
+        query = query.or(`channel.eq.${userChannel},channel.is.null`)
+      }
+
+      // Apply subject enrollment filter
       if (subjectIds.length > 0) {
         query = query.or(`subject_id.in.(${subjectIds.join(',')}),subject_id.is.null`)
       } else {
@@ -371,8 +387,8 @@ export default function AnnouncementsPage() {
       if (data) setDeadlines(data)
       setLoading(false)
     }
-    if (user) load()
-  }, [user])
+    if (user && profile !== null) load()
+  }, [user, profile, userChannel])
 
   const isDueSoon = (d) => {
     const dl = getDeadlineDate(d.due_date, d.due_time)
@@ -421,7 +437,9 @@ export default function AnnouncementsPage() {
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: 'white' }}>Deadlines</p>
-              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>From your enrolled subjects</p>
+              <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                {userChannel ? `${userChannel} channel · enrolled subjects` : 'From your enrolled subjects'}
+              </p>
             </div>
             {!isPageLoading && (
               <div style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', padding: '4px 12px', borderRadius: 20, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13 }}>
@@ -463,7 +481,7 @@ export default function AnnouncementsPage() {
       {isPageLoading ? (
         <LoadingSkeleton />
       ) : deadlines.length === 0 ? (
-        <EmptyState icon={<Clock size={40}/>} title="No deadlines yet" subtitle="Enroll in subjects to see their deadlines" />
+        <EmptyState icon={<Clock size={40}/>} title="No deadlines yet" subtitle={userChannel ? `No deadlines found for ${userChannel} channel` : 'Enroll in subjects to see their deadlines'} />
       ) : displayItems.length === 0 ? (
         <EmptyState
           icon={emptyConfig[filter]?.icon || <Clock size={40}/>}
