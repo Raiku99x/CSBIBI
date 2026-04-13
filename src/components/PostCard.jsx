@@ -615,13 +615,11 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               </div>
             )}
             {postData.is_official && (
-              <div title="Official" style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.2)',border:'1.5px solid rgba(255,255,255,0.5)',padding:'3px 8px 3px 5px',borderRadius:20,flexShrink:0 }}>
-                <div style={{ width:16,height:16,borderRadius:'50%',background:'rgba(255,255,255,0.9)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2.5 2.5L8 3" stroke="rgba(0,0,0,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:10.5,color:'rgba(255,255,255,0.95)',letterSpacing:0.3 }}>Official</span>
+              <div title="Official" style={{ flexShrink:0 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L12 14l-4.8 2.5.9-5.2L4.3 7.6l5.3-.8z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
+                  <path d="M9 12l2 2 4-4" stroke="rgba(0,0,0,0.4)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
             )}
           </div>
