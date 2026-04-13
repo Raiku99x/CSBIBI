@@ -617,8 +617,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             {postData.is_official && (
               <div title="Official" style={{ flexShrink:0 }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2l1.8 1.2 2.1-.4 1.2 1.8 2.1.4.4 2.1 1.8 1.2-.4 2.1 1.2 1.8-1.2 1.8.4 2.1-2.1.4-1.2 1.8-2.1-.4-1.8 1.2-1.8-1.2-2.1.4-1.2-1.8-2.1-.4-.4-2.1-1.8-1.2.4-2.1-1.2-1.8 1.2-1.8-.4-2.1 2.1-.4 1.2-1.8 2.1.4z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5"/>
-                  <path d="M9 12l2 2 4-4" stroke="rgba(0,150,80,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 2.5c.8 0 1.5.4 2 1 .6-.3 1.3-.3 1.9 0 .5.3.9.8 1 1.4.6.2 1.1.6 1.4 1.1.3.6.3 1.3 0 1.9.5.5.8 1.2.8 2s-.3 1.5-.8 2c.3.6.3 1.3 0 1.9-.3.5-.8.9-1.4 1.1-.2.6-.6 1.1-1.1 1.4-.6.3-1.3.3-1.9 0-.5.6-1.2.9-2 .9s-1.5-.3-2-.9c-.6.3-1.3.3-1.9 0-.5-.3-.9-.8-1.1-1.4-.6-.2-1.1-.6-1.4-1.1-.3-.6-.3-1.3 0-1.9-.5-.5-.8-1.2-.8-2s.3-1.5.8-2c-.3-.6-.3-1.3 0-1.9.3-.5.8-.9 1.4-1.1.2-.6.6-1.1 1.1-1.4.6-.3 1.3-.3 1.9 0 .5-.6 1.2-1 2-1z" fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.4)" strokeWidth="0.3"/>
+                  <path d="M9 12l2 2 4-4" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             )}
