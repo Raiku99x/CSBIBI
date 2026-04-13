@@ -23,6 +23,9 @@ function dicebearUrl(name = '') {
 const RED = '#C0392B'
 const PAGE_SIZE = 20
 
+// Sentinel value — never shown to users, only used internally
+const ALL_CHANNELS = '__ALL__'
+
 function isScheduledFuture(post) {
   if (!post.scheduled_at) return false
   return new Date(post.scheduled_at) > new Date()
@@ -65,15 +68,20 @@ export default function FeedPage() {
   const [superadminGroupView, setSuperadminGroupView] = useState(false)
 
   // ── Channel state ────────────────────────────────────────
-  // userChannel: the channel this user belongs to (from profile.section)
-  // viewingChannel: which channel the admin is currently viewing (null = own)
+  // userChannel: the section/channel this user belongs to (from profile.section)
+  // viewingChannel (superadmin only): which channel the admin is currently browsing
+  // Regular users NEVER know about other channels — they just see their own feed filtered by section
   const userChannel = profile?.section || null
+
+  // Only superadmin has a viewingChannel concept. Regular users always use their own channel.
   const [viewingChannel, setViewingChannel] = useState(null) // null = use userChannel
   const [allChannels, setAllChannels] = useState([])
 
-  // The effective channel filter applied to the query
+  // The effective channel filter applied to the query.
+  // For regular users: always their own section (no switcher, no awareness of others).
+  // For superadmin: can be their own, a specific other channel, or ALL_CHANNELS (see everything).
   const activeChannel = isSuperadmin
-    ? (viewingChannel === '__ALL__' ? null : (viewingChannel || userChannel))
+    ? (viewingChannel === ALL_CHANNELS ? null : (viewingChannel || userChannel))
     : userChannel
 
   const sentinelRef = useRef(null)
@@ -81,7 +89,6 @@ export default function FeedPage() {
   const loadingMoreRef = useRef(false)
   const hasMoreRef = useRef(true)
 
-  // ── Build query with channel filter ──────────────────────
   function buildQuery(cursorDate = null) {
     let q = supabase
       .from('posts')
@@ -92,10 +99,10 @@ export default function FeedPage() {
     if (cursorDate) q = q.lt('created_at', cursorDate)
 
     // Channel filtering:
-    // - If viewingChannel === '__ALL__' (superadmin), no filter → see everything
-    // - If there's an activeChannel, show posts where channel = activeChannel OR channel IS NULL (global posts)
-    // - If no channel at all, show everything (unassigned users)
-    if (viewingChannel !== '__ALL__' && activeChannel) {
+    // - Superadmin viewing ALL_CHANNELS: no channel filter, sees everything
+    // - Has an activeChannel: show posts where channel = activeChannel OR channel IS NULL (global posts)
+    // - No channel at all (unassigned user): show everything
+    if (!(isSuperadmin && viewingChannel === ALL_CHANNELS) && activeChannel) {
       q = q.or(`channel.eq.${activeChannel},channel.is.null`)
     }
 
@@ -139,7 +146,7 @@ export default function FeedPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingChannel, activeChannel])
 
-  // Fetch available channels for superadmin picker
+  // Superadmin-only: fetch distinct channel names for the switcher
   useEffect(() => {
     if (!isSuperadmin) return
     supabase
@@ -178,12 +185,14 @@ export default function FeedPage() {
           .eq('id', payload.new.id)
           .single()
         if (!data) return
-        // Check channel visibility for new post
+        // Apply channel filter to incoming realtime posts
         const postChannel = data.channel
-        const canSeeChannel = viewingChannel === '__ALL__' ||
+        const isViewingAll = isSuperadmin && viewingChannel === ALL_CHANNELS
+        const passesChannelFilter = isViewingAll ||
           !postChannel ||
+          !activeChannel ||
           postChannel === activeChannel
-        if (canSeeChannel && canSeePost(data, user?.id, isSuperadmin, superadminGroupView)) {
+        if (passesChannelFilter && canSeePost(data, user?.id, isSuperadmin, superadminGroupView)) {
           setPosts(prev =>
             prev.some(p => p.id === data.id) ? prev : [data, ...prev]
           )
@@ -242,10 +251,10 @@ export default function FeedPage() {
 
   const firstName = profile?.display_name?.split(' ')[0] || 'there'
 
-  // Channel label for display
-  const channelLabel = viewingChannel === '__ALL__'
+  // Label shown in the superadmin channel switcher UI only
+  const adminChannelLabel = viewingChannel === ALL_CHANNELS
     ? 'All Channels'
-    : (viewingChannel || userChannel || null)
+    : (viewingChannel || userChannel || 'No channel')
 
   return (
     <div style={{ paddingTop: 6 }}>
@@ -265,8 +274,12 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/* ── Channel Banner ── */}
-      {userChannel && (
+      {/*
+        ── SUPERADMIN-ONLY: Channel switcher ──
+        Regular users never see this. They just see their channel's posts silently filtered.
+        No banner, no label, no hint that other channels exist.
+      */}
+      {isSuperadmin && allChannels.length > 0 && (
         <div style={{
           margin:'0 0 6px',
           padding:'9px 12px',
@@ -278,30 +291,27 @@ export default function FeedPage() {
         }}>
           <Radio size={13} color="#0D7377"/>
           <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:700, color:'#0D7377' }}>
-            {channelLabel ? `Channel: ${channelLabel}` : 'No channel assigned'}
+            Viewing: {adminChannelLabel}
           </span>
-          {/* Superadmin channel switcher */}
-          {isSuperadmin && allChannels.length > 0 && (
-            <select
-              value={viewingChannel || userChannel || ''}
-              onChange={e => setViewingChannel(e.target.value || null)}
-              style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(13,115,119,0.3)', background:'white', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#0D7377', cursor:'pointer', outline:'none' }}
-            >
-              {allChannels.map(ch => (
-                <option key={ch} value={ch}>{ch}</option>
-              ))}
-              <option value="__ALL__">All Channels</option>
-            </select>
-          )}
+          <select
+            value={viewingChannel || userChannel || ''}
+            onChange={e => setViewingChannel(e.target.value || null)}
+            style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(13,115,119,0.3)', background:'white', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#0D7377', cursor:'pointer', outline:'none' }}
+          >
+            {allChannels.map(ch => (
+              <option key={ch} value={ch}>{ch}</option>
+            ))}
+            <option value={ALL_CHANNELS}>All Channels</option>
+          </select>
         </div>
       )}
 
-      {/* Superadmin group view toggle */}
+      {/* Superadmin group view toggle — also superadmin-only */}
       {isSuperadmin && (
         <div style={{ margin:'0 0 6px', padding:'8px 12px', background: superadminGroupView ? '#F5F3FF' : 'white', border:`1px solid ${superadminGroupView ? '#DDD6FE' : '#E4E6EB'}`, borderLeft:`3px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, borderRadius:'0 8px 8px 0', display:'flex', alignItems:'center', gap:10 }}>
           <Users size={14} color={superadminGroupView ? '#7C3AED' : '#8A8D91'}/>
           <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:600, color: superadminGroupView ? '#5B21B6' : '#65676B' }}>
-            {superadminGroupView ? 'Viewing all group posts (superadmin)' : 'Group posts hidden (your normal view)'}
+            {superadminGroupView ? 'Viewing all group posts (superadmin)' : 'Group posts hidden (normal view)'}
           </span>
           <button
             onClick={() => setSuperadminGroupView(v => !v)}
@@ -343,7 +353,7 @@ export default function FeedPage() {
       {loading ? (
         <div>{Array.from({ length: 3 }).map((_, i) => <PostSkeleton key={i}/>)}</div>
       ) : visiblePosts.length === 0 ? (
-        <EmptyFeed onPost={() => tryOpenCreate('status', '')} channelLabel={channelLabel}/>
+        <EmptyFeed onPost={() => tryOpenCreate('status', '')}/>
       ) : (
         <div>
           {visiblePosts.map(post => (
@@ -393,8 +403,13 @@ export default function FeedPage() {
           defaultSubType={createSubType}
           autoOpenPhoto={autoOpenPhoto}
           autoOpenFile={autoOpenFile}
-          // Pass the active channel so the modal can assign it to new posts
-          defaultChannel={viewingChannel === '__ALL__' ? null : (viewingChannel || userChannel)}
+          // Pass the active channel so new posts are tagged to the correct channel.
+          // Superadmin viewing ALL_CHANNELS posts to null (global), otherwise use their active channel.
+          defaultChannel={
+            isSuperadmin && viewingChannel === ALL_CHANNELS
+              ? null
+              : (viewingChannel || userChannel)
+          }
           isSuperadmin={isSuperadmin}
           allChannels={allChannels}
         />
@@ -438,7 +453,7 @@ function ComposeBtn({ icon, color, bg, label, onClick, disabled }) {
   )
 }
 
-function EmptyFeed({ onPost, channelLabel }) {
+function EmptyFeed({ onPost }) {
   return (
     <div style={{ background:'white', borderTop:'1px solid #E4E6EB', borderBottom:'1px solid #E4E6EB', padding:'48px 24px', textAlign:'center' }}>
       <div style={{ marginBottom:10 }}>
@@ -446,7 +461,7 @@ function EmptyFeed({ onPost, channelLabel }) {
       </div>
       <p style={{ fontFamily:'"Bricolage Grotesque",system-ui', fontWeight:800, fontSize:17, color:'#050505', margin:'0 0 5px' }}>No posts yet</p>
       <p style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:13.5, color:'#65676B', margin:'0 0 18px' }}>
-        {channelLabel ? `No posts in ${channelLabel} yet.` : 'Be the first to share something.'}
+        Be the first to share something.
       </p>
       <button onClick={onPost} style={{ padding:'9px 22px', borderRadius:8, border:'none', background:RED, color:'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:13.5, boxShadow:'0 3px 12px rgba(192,57,43,0.28)' }}>
         Create Post
