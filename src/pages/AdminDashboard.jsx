@@ -32,7 +32,7 @@ function dicebearUrl(name = '') {
 }
 
 export default function AdminDashboard({ onClose }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { isSuperadmin, isModerator } = useRole()
   const { modMode } = useModMode()
 
