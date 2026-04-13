@@ -274,49 +274,29 @@ export default function FeedPage() {
         </div>
       )}
 
-      {/*
-        ── SUPERADMIN-ONLY: Channel switcher ──
-        Regular users never see this. They just see their channel's posts silently filtered.
-        No banner, no label, no hint that other channels exist.
-      */}
-      {isSuperadmin && allChannels.length > 0 && (
-        <div style={{
-          margin:'0 0 6px',
-          padding:'9px 12px',
-          background:'linear-gradient(135deg, rgba(13,115,119,0.08), rgba(26,82,118,0.08))',
-          border:'1px solid rgba(13,115,119,0.2)',
-          borderLeft:'3px solid #0D7377',
-          borderRadius:'0 8px 8px 0',
-          display:'flex', alignItems:'center', gap:10,
-        }}>
-          <Radio size={13} color="#0D7377"/>
-          <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:700, color:'#0D7377' }}>
-            Viewing: {adminChannelLabel}
-          </span>
-          <select
-            value={viewingChannel || userChannel || ''}
-            onChange={e => setViewingChannel(e.target.value || null)}
-            style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(13,115,119,0.3)', background:'white', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#0D7377', cursor:'pointer', outline:'none' }}
-          >
-            {allChannels.map(ch => (
-              <option key={ch} value={ch}>{ch}</option>
-            ))}
-            <option value={ALL_CHANNELS}>All Channels</option>
-          </select>
-        </div>
-      )}
-
-      {/* Superadmin group view toggle — also superadmin-only */}
+      {/* SUPERADMIN-ONLY: Combined channel switcher + group view toggle */}
       {isSuperadmin && (
-        <div style={{ margin:'0 0 6px', padding:'8px 12px', background: superadminGroupView ? '#F5F3FF' : 'white', border:`1px solid ${superadminGroupView ? '#DDD6FE' : '#E4E6EB'}`, borderLeft:`3px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, borderRadius:'0 8px 8px 0', display:'flex', alignItems:'center', gap:10 }}>
-          <Users size={14} color={superadminGroupView ? '#7C3AED' : '#8A8D91'}/>
-          <span style={{ flex:1, fontFamily:'"Instrument Sans",system-ui', fontSize:13, fontWeight:600, color: superadminGroupView ? '#5B21B6' : '#65676B' }}>
-            {superadminGroupView ? 'Viewing all group posts (superadmin)' : 'Group posts hidden (normal view)'}
+        <div style={{ margin:'0 0 6px', padding:'7px 12px', background:'white', border:'1px solid #E4E6EB', borderLeft:'3px solid #0D7377', borderRadius:'0 8px 8px 0', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          <Radio size={13} color="#0D7377" style={{ flexShrink:0 }}/>
+          {allChannels.length > 0 && (
+            <select
+              value={viewingChannel || userChannel || ''}
+              onChange={e => setViewingChannel(e.target.value || null)}
+              style={{ padding:'4px 8px', borderRadius:8, border:'1px solid #E4E6EB', background:'#F7F8FA', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color:'#0D7377', cursor:'pointer', outline:'none' }}
+            >
+              {allChannels.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+              <option value={ALL_CHANNELS}>All Channels</option>
+            </select>
+          )}
+          <div style={{ width:1, height:16, background:'#E4E6EB', flexShrink:0 }}/>
+          <Users size={13} color={superadminGroupView ? '#7C3AED' : '#8A8D91'} style={{ flexShrink:0 }}/>
+          <span style={{ fontFamily:'"Instrument Sans",system-ui', fontSize:12, fontWeight:600, color: superadminGroupView ? '#5B21B6' : '#65676B', flex:1 }}>
+            Group posts
           </span>
           <button
             onClick={() => setSuperadminGroupView(v => !v)}
-            style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:8, border:`1.5px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, background: superadminGroupView ? '#7C3AED' : 'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color: superadminGroupView ? 'white' : '#65676B', transition:'all 0.15s' }}>
-            {superadminGroupView ? <><EyeOff size={12}/> Disable</> : <><Eye size={12}/> Enable</>}
+            style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:8, border:`1.5px solid ${superadminGroupView ? '#7C3AED' : '#CED0D4'}`, background: superadminGroupView ? '#7C3AED' : 'white', cursor:'pointer', fontFamily:'"Instrument Sans",system-ui', fontWeight:700, fontSize:12, color: superadminGroupView ? 'white' : '#65676B', transition:'all 0.15s' }}>
+            {superadminGroupView ? <><EyeOff size={11}/> Hide</> : <><Eye size={11}/> Show</>}
           </button>
         </div>
       )}
