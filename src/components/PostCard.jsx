@@ -614,6 +614,16 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             <span style={{ color:'white',fontSize:11,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',letterSpacing:0.7,textTransform:'uppercase',flex:1 }}>
               {banner.label}{postData.announcement_type ? ` · ${postData.announcement_type}` : ''}
             </span>
+            {postData.is_official && (
+              <div title="Official" style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20,marginRight:postData.due_date?4:0 }}>
+                <div style={{ width:16,height:16,borderRadius:'50%',background:'#22C55E',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:700 }}>Official</span>
+              </div>
+            )}
             {postData.due_date && (
               <div style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20 }}>
                 {isPastDue && <AlertCircle size={10} color="white"/>}
@@ -626,7 +636,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             )}
           </div>
         )}
-
         {/* Header */}
         <div style={{ padding:'10px 12px 8px',display:'flex',alignItems:'center',gap:9 }}>
           <img
