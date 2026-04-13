@@ -615,8 +615,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               </div>
             )}
             {postData.is_official && (
-              <div title="Official" style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(255,255,255,0.18)',padding:'3px 10px',borderRadius:20 }}>
-                <BadgeCheck size={14} color="#22C55E" fill="#22C55E"/>
+              <div title="Official" style={{ width:20,height:20,borderRadius:'50%',background:'#22C55E',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
             )}
           </div>
