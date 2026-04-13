@@ -181,6 +181,7 @@ export default function AdminDashboard({ onClose }) {
                   users={users}
                   currentUserId={user.id}
                   isSuperadmin={isSuperadmin}
+                  currentUserChannel={profile?.section || null}
                   onViewUser={setViewingUserId}
                   onUsersChange={loadAll}
                 />
@@ -272,27 +273,26 @@ function StatusPill({ icon, color, label }) {
 }
 
 // ── Users ─────────────────────────────────────────────────────
-function UsersTab({ users, currentUserId, isSuperadmin, onViewUser, onUsersChange }) {
-  const [search, setSearch] = useState('')
+function UsersTab({ users, currentUserId, isSuperadmin, currentUserChannel, onViewUser, onUsersChange }) {  const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
-  // Track per-user action loading state
   const [actionLoadingId, setActionLoadingId] = useState(null)
-  // Mute duration picker state
   const [mutePickerUserId, setMutePickerUserId] = useState(null)
   const [muteHours, setMuteHours] = useState('24')
-  // Local optimistic user list
   const [localUsers, setLocalUsers] = useState(users)
 
   useEffect(() => { setLocalUsers(users) }, [users])
 
-  const filtered = localUsers.filter(u => {
-    const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
-    if (!matchSearch) return false
-    if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
-    if (filter === 'muted')  return u.is_muted
-    if (filter === 'banned') return u.is_banned
-    return true
-  })
+const filtered = localUsers.filter(u => {
+  if (!isSuperadmin && currentUserChannel) {
+    if (u.section !== currentUserChannel) return false
+  }
+  const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+  if (!matchSearch) return false
+  if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
+  if (filter === 'muted')  return u.is_muted
+  if (filter === 'banned') return u.is_banned
+  return true
+})
 
   function optimisticUpdate(userId, patch) {
     setLocalUsers(prev => prev.map(u => u.id === userId ? { ...u, ...patch } : u))
