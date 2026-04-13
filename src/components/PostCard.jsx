@@ -615,9 +615,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               </div>
             )}
             {postData.is_official && (
-              <div title="Official" style={{ width:20,height:20,borderRadius:'50%',background:'#22C55E',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <div title="Official" style={{ width:20,height:20,borderRadius:'50%',background:'rgba(255,255,255,0.25)',border:'1.5px solid rgba(255,255,255,0.6)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
                 <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             )}
