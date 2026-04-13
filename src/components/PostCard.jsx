@@ -584,18 +584,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
         {(postData.is_pinned || postData.is_official || postData.is_locked) && (
           <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
-            {postData.is_pinned && (
-              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#92400E',letterSpacing:0.2 }}>
-                <Pin size={11} color="#F59E0B" fill="#F59E0B"/> Pinned
-              </span>
-            )}
             {postData.is_pinned && (postData.is_official || postData.is_locked) && (
               <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-            )}
-            {postData.is_official && (
-              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#166534',letterSpacing:0.2 }}>
-                <BadgeCheck size={11} color="#16a34a" fill="#16a34a"/> Official
-              </span>
             )}
             {postData.is_official && postData.is_locked && (
               <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
