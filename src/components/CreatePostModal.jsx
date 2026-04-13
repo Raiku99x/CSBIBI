@@ -202,14 +202,20 @@ export default function CreatePostModal({
   async function loadAllUsers() {
     setAllUsersLoading(true)
     try {
+      const userChannel = profile?.section || null
+
       let query = supabase
         .from('profiles')
-        .select('id, display_name, avatar_url')
+        .select('id, display_name, avatar_url, username, section')
         .neq('id', user.id)
         .eq('is_verified', true)
         .order('display_name', { ascending: true })
         .limit(100)
-
+      
+      if (userChannel) {
+        query = query.eq('section', userChannel)
+      }
+      
       if (form.subject_id) {
         const { data: enrolled } = await supabase
           .from('user_subjects')
@@ -491,8 +497,8 @@ export default function CreatePostModal({
             <Users size={14} color="#5B21B6" style={{ flexShrink: 0, marginTop: 1 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
               {form.subject_id
-                ? "Showing only users enrolled in the selected subject. Can't find someone? They may not be enrolled in this subject."
-                : 'No subject selected — you can add anyone. Select a subject in the post to filter by enrolled users.'}
+                ? "Showing users in your channel enrolled in the selected subject."
+                : 'Showing members in your channel. Select a subject to filter by enrolled users.'}
             </p>
           </div>
           <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
@@ -529,7 +535,10 @@ export default function CreatePostModal({
                       onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#FAFAFA' }}
                       onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'white' }}>
                       <img src={u.avatar_url || dicebearUrl(u.display_name)} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1.5px solid #E4E6EB' }} alt="" />
-                      <span style={{ flex: 1, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505' }}>{u.display_name}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 600, color: '#050505', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name}</span>
+                        {u.username && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91', display: 'block' }}>@{u.username}</span>}
+                      </div>
                       <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checked ? '#7C3AED' : '#CED0D4'}`, background: checked ? '#7C3AED' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
                         {checked && <Check size={12} color="white" strokeWidth={3} />}
                       </div>
