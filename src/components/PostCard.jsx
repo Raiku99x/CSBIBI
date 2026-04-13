@@ -604,22 +604,24 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
             <span style={{ color:'white',fontSize:11,fontWeight:700,fontFamily:'"Instrument Sans",system-ui',letterSpacing:0.7,textTransform:'uppercase',flex:1 }}>
               {banner.label}{postData.announcement_type ? ` · ${postData.announcement_type}` : ''}
             </span>
-            
             {postData.due_date && (
-            <div style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20 }}>
-              {isPastDue && <AlertCircle size={10} color="white"/>}
-              <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:600 }}>
-                {isPastDue ? 'Past due · ' : 'Due · '}
-                {format(new Date(postData.due_date + 'T00:00:00'), 'MMM d, yyyy')}
-                {postData.due_time ? ` · ${formatTime12(postData.due_time)}` : ''}
-              </span>
-            </div>
-          )}
-          {postData.is_official && (
-            <div title="Official" style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(255,255,255,0.18)',padding:'3px 10px',borderRadius:20 }}>
-              <BadgeCheck size={14} color="#22C55E" fill="#22C55E"/>
-            </div>
-          )}
+              <div style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.18)',padding:'2px 9px',borderRadius:20 }}>
+                {isPastDue && <AlertCircle size={10} color="white"/>}
+                <span style={{ color:'rgba(255,255,255,0.93)',fontSize:11,fontFamily:'"Instrument Sans",system-ui',fontWeight:600 }}>
+                  {isPastDue ? 'Past due · ' : 'Due · '}
+                  {format(new Date(postData.due_date + 'T00:00:00'), 'MMM d, yyyy')}
+                  {postData.due_time ? ` · ${formatTime12(postData.due_time)}` : ''}
+                </span>
+              </div>
+            )}
+            {postData.is_official && (
+              <div title="Official" style={{ display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(255,255,255,0.18)',padding:'3px 10px',borderRadius:20 }}>
+                <BadgeCheck size={14} color="#22C55E" fill="#22C55E"/>
+              </div>
+            )}
+          </div>
+        )}
+
             
         {/* Header */}
         <div style={{ padding:'10px 12px 8px',display:'flex',alignItems:'center',gap:9 }}>
