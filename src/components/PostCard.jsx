@@ -615,10 +615,13 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
               </div>
             )}
             {postData.is_official && (
-              <div title="Official" style={{ width:20,height:20,borderRadius:'50%',background:'rgba(255,255,255,0.25)',border:'1.5px solid rgba(255,255,255,0.6)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+              <div title="Official" style={{ display:'flex',alignItems:'center',gap:4,background:'rgba(255,255,255,0.2)',border:'1.5px solid rgba(255,255,255,0.5)',padding:'3px 8px 3px 5px',borderRadius:20,flexShrink:0 }}>
+                <div style={{ width:16,height:16,borderRadius:'50%',background:'rgba(255,255,255,0.9)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2.5 2.5L8 3" stroke="rgba(0,0,0,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:10.5,color:'rgba(255,255,255,0.95)',letterSpacing:0.3 }}>Official</span>
               </div>
             )}
           </div>
