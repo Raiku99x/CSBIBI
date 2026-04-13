@@ -5,7 +5,7 @@ import { useNavVisibility } from '../components/Layout'
 import { formatDistanceToNow } from 'date-fns'
 import {
   Send, Trash2, AtSign, Loader2,
-  ArrowLeft, Search, X, Check, CheckCheck, Users, Plus
+  ArrowLeft, Search, X, Check, CheckCheck, Users, Plus, Radio
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -22,8 +22,28 @@ const DESKTOP_BP = 1024
 
 const isTouchDevice = () => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
+// ── Channel badge ─────────────────────────────────────────────────────────
+function ChannelBadge({ channel, style = {} }) {
+  if (!channel) return null
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '2px 8px', borderRadius: 20,
+      background: 'rgba(13,115,119,0.12)',
+      border: '1px solid rgba(13,115,119,0.25)',
+      fontFamily: '"Instrument Sans", system-ui',
+      fontWeight: 700, fontSize: 11, color: '#0D7377',
+      letterSpacing: 0.3,
+      ...style,
+    }}>
+      <Radio size={9} color="#0D7377" />
+      {channel}
+    </span>
+  )
+}
+
 // ── Inbox ─────────────────────────────────────────────────────────────────
-function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
+function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel }) {
   const [dmConvos, setDmConvos]       = useState([])
   const [allUsers, setAllUsers]       = useState([])
   const [latestGroup, setLatestGroup] = useState(null)
@@ -32,15 +52,21 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
   const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
-    const { data: dmRows } = await supabase
+    // Only fetch DMs within the same channel
+    let dmQuery = supabase
       .from('direct_messages')
-      .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username)')
+      .select('*, sender:profiles!direct_messages_sender_id_fkey(id, display_name, avatar_url, email, username, section), receiver:profiles!direct_messages_receiver_id_fkey(id, display_name, avatar_url, email, username, section)')
       .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
       .order('created_at', { ascending: false })
+
+    const { data: dmRows } = await dmQuery
 
     const seen = new Map()
     for (const msg of dmRows || []) {
       const pid = msg.sender_id === currentUserId ? msg.receiver_id : msg.sender_id
+      const partnerProfile = msg.sender_id === currentUserId ? msg.receiver : msg.sender
+      // Filter: only show DMs from same channel
+      if (userChannel && partnerProfile?.section && partnerProfile.section !== userChannel) continue
       if (!seen.has(pid)) seen.set(pid, msg)
     }
 
@@ -59,26 +85,44 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
       }))
     )
 
-    const { data: gc } = await supabase
+    // Group chat: filter by channel
+    let groupQuery = supabase
       .from('chat')
       .select('*, sender:profiles!chat_sender_id_fkey(*)')
       .order('created_at', { ascending: false })
       .limit(1)
+
+    if (userChannel) {
+      groupQuery = groupQuery.eq('channel', userChannel)
+    }
+
+    const { data: gc } = await groupQuery
     if (gc?.[0]) setLatestGroup(gc[0])
     setLoading(false)
-  }, [currentUserId])
+  }, [currentUserId, userChannel])
 
   useEffect(() => {
     refresh()
-    supabase.from('profiles').select('id, display_name, avatar_url, email, username')
-    .neq('id', currentUserId).eq('is_verified', true).then(({ data }) => { if (data) setAllUsers(data) })
+
+    // Only load users from the same channel
+    let usersQuery = supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, email, username, section')
+      .neq('id', currentUserId)
+      .eq('is_verified', true)
+
+    if (userChannel) {
+      usersQuery = usersQuery.eq('section', userChannel)
+    }
+
+    usersQuery.then(({ data }) => { if (data) setAllUsers(data) })
 
     const ch = supabase.channel('inbox-' + currentUserId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages' }, refresh)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, refresh)
       .subscribe()
     return () => supabase.removeChannel(ch)
-  }, [refresh, currentUserId])
+  }, [refresh, currentUserId, userChannel])
 
   const q = search.toLowerCase()
   const filteredDMs  = dmConvos.filter(c => c.partner?.display_name?.toLowerCase().includes(q))
@@ -89,14 +133,27 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 8 }}>
-        <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505', flexShrink: 0 }}>Messages</span>
-        <button onClick={() => setShowNew(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          {showNew ? <X size={14} color={RED} /> : <Plus size={14} color="#65676B" strokeWidth={2.5} />}
-          <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: showNew ? RED : '#65676B' }}>
-            {showNew ? 'Close' : 'New Message'}
-          </span>
-        </button>
+      <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
+            {userChannel && <ChannelBadge channel={userChannel} />}
+          </div>
+          <button onClick={() => setShowNew(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {showNew ? <X size={14} color={RED} /> : <Plus size={14} color="#65676B" strokeWidth={2.5} />}
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: showNew ? RED : '#65676B' }}>
+              {showNew ? 'Close' : 'New Message'}
+            </span>
+          </button>
+        </div>
+        {userChannel && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', background: 'rgba(13,115,119,0.06)', border: '1px solid rgba(13,115,119,0.15)', borderRadius: 8 }}>
+            <Radio size={12} color="#0D7377" />
+            <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#0D7377', fontWeight: 600 }}>
+              You're in channel <strong>{userChannel}</strong> — messages stay within your channel
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: '10px 12px 6px', background: 'white', borderBottom: '1px solid #F0F2F5', flexShrink: 0 }}>
@@ -117,11 +174,25 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
           <>
             {showNew && newableUsers.length > 0 && (
               <div>
-                <SectionLabel label="Start a conversation" />
+                <SectionLabel label={`Start a conversation · ${userChannel || 'all users'}`} />
                 {newableUsers.map(u => (
                   <ConvoRow key={u.id} avatar={u.avatar_url || dicebearUrl(u.display_name)} name={u.display_name} preview="Tap to message" onClick={() => onOpenDM(u)} />
                 ))}
+                {newableUsers.length === 0 && (
+                  <div style={{ padding: '16px 14px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91', textAlign: 'center' }}>
+                    No other members in channel {userChannel}
+                  </div>
+                )}
                 <Divider />
+              </div>
+            )}
+            {showNew && newableUsers.length === 0 && allUsers.length === 0 && (
+              <div style={{ padding: '24px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📡</div>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 14, fontWeight: 700, color: '#050505' }}>No one else in your channel</p>
+                <p style={{ margin: '4px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#65676B' }}>
+                  {userChannel ? `Channel "${userChannel}" has no other verified members yet.` : 'No other verified members yet.'}
+                </p>
               </div>
             )}
             {groupVisible && (
@@ -134,12 +205,17 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
                     <Users size={20} color="white" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>Class Chat</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>
+                          {userChannel ? `${userChannel} Chat` : 'Class Chat'}
+                        </span>
+                        {userChannel && <ChannelBadge channel={userChannel} />}
+                      </div>
                       {latestGroup && <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#BCC0C4', flexShrink: 0 }}>{formatDistanceToNow(new Date(latestGroup.created_at), { addSuffix: false })}</span>}
                     </div>
                     <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {latestGroup ? (latestGroup.sender_id === currentUserId ? `You: ${latestGroup.content}` : `${latestGroup.sender?.display_name}: ${latestGroup.content}`) : 'Group chat for the whole class'}
+                      {latestGroup ? (latestGroup.sender_id === currentUserId ? `You: ${latestGroup.content}` : `${latestGroup.sender?.display_name}: ${latestGroup.content}`) : `Group chat for ${userChannel || 'the whole class'}`}
                     </p>
                   </div>
                 </button>
@@ -167,6 +243,11 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId }) {
                 <div style={{ fontSize: 40, marginBottom: 10 }}>💬</div>
                 <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505', margin: '0 0 4px' }}>No conversations</p>
                 <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#65676B', margin: 0 }}>Tap + to start a new message</p>
+              </div>
+            )}
+            {!showNew && filteredDMs.length === 0 && groupVisible && (
+              <div style={{ padding: '24px 14px', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No direct messages yet — tap + to start one</p>
               </div>
             )}
           </>
@@ -215,7 +296,7 @@ function ConvoRow({ avatar, name, preview, timestamp, unread = 0, onClick }) {
 }
 
 // ── ClassChat ─────────────────────────────────────────────────────────────
-function ClassChat({ onBack, currentUser, profile }) {
+function ClassChat({ onBack, currentUser, profile, userChannel }) {
   const [messages, setMessages]       = useState([])
   const [users, setUsers]             = useState([])
   const [text, setText]               = useState('')
@@ -229,22 +310,48 @@ function ClassChat({ onBack, currentUser, profile }) {
   const inputRef   = useRef()
 
   const fetchMessages = useCallback(async () => {
-    const { data } = await supabase
+    let q = supabase
       .from('chat')
       .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
       .order('created_at', { ascending: true })
       .limit(100)
+
+    // Filter by channel — only show messages in your channel room
+    if (userChannel) {
+      q = q.eq('channel', userChannel)
+    } else {
+      // If no channel, show messages where channel is null (global)
+      q = q.is('channel', null)
+    }
+
+    const { data } = await q
     if (data) setMessages(data)
     setLoading(false)
-  }, [])
+  }, [userChannel])
 
   useEffect(() => {
     fetchMessages()
-    supabase.from('profiles').select('id, display_name, avatar_url')
-    .neq('id', currentUser.id).eq('is_verified', true).then(({ data }) => { if (data) setUsers(data) })
 
-    const ch = supabase.channel('class-chat-msg')
+    // Only show users from the same channel for tagging
+    let usersQuery = supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .neq('id', currentUser.id)
+      .eq('is_verified', true)
+
+    if (userChannel) {
+      usersQuery = usersQuery.eq('section', userChannel)
+    }
+
+    usersQuery.then(({ data }) => { if (data) setUsers(data) })
+
+    const channelName = userChannel ? `class-chat-${userChannel}` : 'class-chat-global'
+    const ch = supabase.channel(channelName)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, async (payload) => {
+        // Only add if same channel
+        const msgChannel = payload.new.channel
+        const belongs = userChannel ? msgChannel === userChannel : !msgChannel
+        if (!belongs) return
         const { data } = await supabase.from('chat')
           .select('*, sender:profiles!chat_sender_id_fkey(*), tagged:profiles!chat_tag_user_id_fkey(*)')
           .eq('id', payload.new.id).single()
@@ -255,7 +362,7 @@ function ClassChat({ onBack, currentUser, profile }) {
       )
       .subscribe()
     return () => supabase.removeChannel(ch)
-  }, [fetchMessages, currentUser.id])
+  }, [fetchMessages, currentUser.id, userChannel])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -278,6 +385,8 @@ function ClassChat({ onBack, currentUser, profile }) {
         receiver_id: null,
         tag_user_id: tagUser ? tagUser.id : null,
         tag_public: tagUser ? tagPublic : null,
+        // Tag the message with the user's channel
+        channel: userChannel || null,
       }).select('id').single()
       if (error) throw error
 
@@ -312,8 +421,13 @@ function ClassChat({ onBack, currentUser, profile }) {
         <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: 'linear-gradient(135deg, #0084FF 0%, #0D7377 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Users size={18} color="white" />
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>Class Chat</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505' }}>
+              {userChannel ? `${userChannel} Chat` : 'Class Chat'}
+            </p>
+            {userChannel && <ChannelBadge channel={userChannel} />}
+          </div>
           <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
             {users.length + 1} members · Live
@@ -322,14 +436,21 @@ function ClassChat({ onBack, currentUser, profile }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
+        {/* Channel room header */}
+        {messages.length === 0 && !loading && (
+          <div style={{ margin: '12px 0', padding: '12px 14px', background: 'rgba(13,115,119,0.08)', border: '1px solid rgba(13,115,119,0.18)', borderRadius: 10, textAlign: 'center' }}>
+            <Radio size={18} color="#0D7377" style={{ marginBottom: 6 }} />
+            <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 14, color: '#0D7377' }}>
+              {userChannel ? `${userChannel} channel room` : 'Global chat room'}
+            </p>
+            <p style={{ margin: '3px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#65676B' }}>
+              Only members of {userChannel ? `channel "${userChannel}"` : 'this class'} can see these messages.
+            </p>
+          </div>
+        )}
         {loading ? (
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Loader2 size={26} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
-          </div>
-        ) : grouped.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <div style={{ fontSize: 44 }}>💬</div>
-            <p style={{ fontFamily: '"Instrument Sans", system-ui', color: '#65676B', fontSize: 14, margin: 0 }}>No messages yet — say hello!</p>
           </div>
         ) : grouped.map(m => (
           <GroupBubble key={m.id} msg={m} currentUserId={currentUser.id} onDelete={deleteMessage} />
@@ -354,9 +475,11 @@ function ClassChat({ onBack, currentUser, profile }) {
               </IconBtn>
               {showTagMenu && (
                 <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, width: 230, background: 'white', borderRadius: 12, border: '1px solid #E4E6EB', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 50, animation: 'slideUp 0.18s ease' }}>
-                  <p style={{ margin: 0, padding: '10px 14px 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>Tag someone</p>
+                  <p style={{ margin: 0, padding: '10px 14px 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 11, fontWeight: 700, color: '#65676B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Tag someone {userChannel && `· ${userChannel}`}
+                  </p>
                   {users.length === 0
-                    ? <p style={{ margin: 0, padding: '10px 14px 12px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No other members yet</p>
+                    ? <p style={{ margin: 0, padding: '10px 14px 12px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BCC0C4' }}>No other members in this channel</p>
                     : users.map(u => (
                       <button key={u.id} type="button" onClick={() => { setTagUser(u); setShowTagMenu(false) }}
                         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', border: 'none', cursor: 'pointer', background: 'transparent', textAlign: 'left', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#050505', transition: 'background 0.1s' }}
@@ -377,7 +500,7 @@ function ClassChat({ onBack, currentUser, profile }) {
               onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px' }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) { e.preventDefault(); send(e) } }}
               onFocus={() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300) }}
-              placeholder="Message the class…"
+              placeholder={userChannel ? `Message ${userChannel} channel…` : 'Message the class…'}
               style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 100, overflow: 'hidden', display: 'block' }}
             />
           </div>
@@ -439,13 +562,16 @@ function GroupBubble({ msg, currentUserId, onDelete }) {
 }
 
 // ── DMConversation ────────────────────────────────────────────────────────
-function DMConversation({ partner, currentUserId, onBack }) {
+function DMConversation({ partner, currentUserId, userChannel, onBack }) {
   const [messages, setMessages] = useState([])
   const [text, setText]         = useState('')
   const [loading, setLoading]   = useState(true)
   const [sending, setSending]   = useState(false)
   const bottomRef = useRef()
   const inputRef  = useRef()
+
+  // Cross-channel guard
+  const isCrossChannel = userChannel && partner?.section && partner.section !== userChannel
 
   const fetchMessages = useCallback(async () => {
     const { data } = await supabase
@@ -460,6 +586,7 @@ function DMConversation({ partner, currentUserId, onBack }) {
   }, [currentUserId, partner.id])
 
   useEffect(() => {
+    if (isCrossChannel) { setLoading(false); return }
     fetchMessages()
     const ch = supabase.channel(`dm-${[currentUserId, partner.id].sort().join('-')}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
@@ -478,18 +605,25 @@ function DMConversation({ partner, currentUserId, onBack }) {
       )
       .subscribe()
     return () => supabase.removeChannel(ch)
-  }, [fetchMessages, currentUserId, partner.id])
+  }, [fetchMessages, currentUserId, partner.id, isCrossChannel])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   async function send(e) {
     e.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() || isCrossChannel) return
     setSending(true)
     const content = text.trim()
     setText('')
     try {
-      const { error } = await supabase.from('direct_messages').insert({ sender_id: currentUserId, receiver_id: partner.id, content, is_read: false })
+      const { error } = await supabase.from('direct_messages').insert({
+        sender_id: currentUserId,
+        receiver_id: partner.id,
+        content,
+        is_read: false,
+        // Store channel for reference (both should have same channel)
+        channel: userChannel || null,
+      })
       if (error) throw error
     } catch (err) {
       toast.error(err.message)
@@ -517,49 +651,69 @@ function DMConversation({ partner, currentUserId, onBack }) {
         </button>
         <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} alt="" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.display_name}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 14.5, color: '#050505', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{partner.display_name}</p>
+            {partner.section && <ChannelBadge channel={partner.section} />}
+          </div>
           <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#8A8D91' }}>@{partner.username || partner.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
-        {loading ? (
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Loader2 size={24} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
-          </div>
-        ) : grouped.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 60, height: 60, borderRadius: 18, objectFit: 'cover' }} alt="" />
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505' }}>{partner.display_name}</p>
-              <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#8A8D91' }}>Send a message to start chatting</p>
-            </div>
-          </div>
-        ) : grouped.map(msg => (
-          <DMBubble key={msg.id} msg={msg} isOwn={msg.sender_id === currentUserId} onDelete={deleteMsg} />
-        ))}
-        <div ref={bottomRef} />
-      </div>
+      {isCrossChannel && (
+        <div style={{ margin: 12, padding: '16px', background: '#FFF3E0', border: '1px solid #FFB74D', borderRadius: 12, textAlign: 'center' }}>
+          <Radio size={24} color="#E65100" style={{ marginBottom: 8 }} />
+          <p style={{ margin: '0 0 4px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 15, color: '#E65100' }}>Different channel</p>
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#BF360C', lineHeight: 1.5 }}>
+            You're in <strong>{userChannel}</strong> but {partner.display_name} is in <strong>{partner.section}</strong>. Cross-channel messaging is not allowed.
+          </p>
+        </div>
+      )}
 
-      <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
-        <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
-            <textarea ref={inputRef} rows={1} value={text}
-              onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) { e.preventDefault(); send(e) } }}
-              onFocus={() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300) }}
-              placeholder={`Message ${partner.display_name}…`}
-              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 120, overflow: 'hidden', display: 'block' }}
-            />
+      {!isCrossChannel && (
+        <>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 10px 4px', display: 'flex', flexDirection: 'column', gap: 2, background: '#E9EBEE' }}>
+            {loading ? (
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Loader2 size={24} color={RED} style={{ animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : grouped.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <img src={partner.avatar_url || dicebearUrl(partner.display_name)} style={{ width: 60, height: 60, borderRadius: 18, objectFit: 'cover' }} alt="" />
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ margin: '0 0 4px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505' }}>{partner.display_name}</p>
+                  <p style={{ margin: '0 0 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#8A8D91' }}>Send a message to start chatting</p>
+                  {userChannel && (
+                    <ChannelBadge channel={userChannel} style={{ display: 'inline-flex' }} />
+                  )}
+                </div>
+              </div>
+            ) : grouped.map(msg => (
+              <DMBubble key={msg.id} msg={msg} isOwn={msg.sender_id === currentUserId} onDelete={deleteMsg} />
+            ))}
+            <div ref={bottomRef} />
           </div>
-          <button type="submit" disabled={sending || !text.trim()}
-            style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: text.trim() ? RED : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s', boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none' }}
-            onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
-            onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-            {sending ? <Loader2 size={17} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
-          </button>
-        </form>
-      </div>
+
+          <div style={{ flexShrink: 0, background: 'white', borderTop: '1px solid #E4E6EB', padding: '8px 10px' }}>
+            <form onSubmit={send} style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+              <div style={{ flex: 1, background: '#F0F2F5', borderRadius: 22, padding: '8px 14px' }}>
+                <textarea ref={inputRef} rows={1} value={text}
+                  onChange={e => { setText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice()) { e.preventDefault(); send(e) } }}
+                  onFocus={() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300) }}
+                  placeholder={`Message ${partner.display_name}…`}
+                  style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14.5, color: '#050505', resize: 'none', lineHeight: 1.4, maxHeight: 120, overflow: 'hidden', display: 'block' }}
+                />
+              </div>
+              <button type="submit" disabled={sending || !text.trim()}
+                style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: text.trim() ? RED : '#E4E6EB', border: 'none', cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s, transform 0.1s', boxShadow: text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none' }}
+                onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
+                onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+                {sending ? <Loader2 size={17} color="white" style={{ animation: 'spin 0.8s linear infinite' }} /> : <Send size={16} color={text.trim() ? 'white' : '#BCC0C4'} />}
+              </button>
+            </form>
+          </div>
+        </>
+      )}
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
@@ -619,19 +773,14 @@ function IconBtn({ onClick, active, children, title }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────
-// FIX #1 + #2:
-//   - Accepts `asModal` prop: when true, uses height:'100%' instead of calculating
-//     dvh-based height, so it fills the MessagesOverlay container correctly.
-//   - Accepts `initialDMTarget` prop: a full partner profile object. When provided,
-//     opens directly into that DM conversation on mount.
-//   - Accepts `onClose` prop: used by the modal close button (header X).
 export default function MessagesPage({ asModal = false, onClose, initialDMTarget }) {
   const { user, profile } = useAuth()
   const navCtx = useNavVisibility()
   const setHideNav = navCtx?.setHideNav ?? (() => {})
 
-  // FIX #1: initialDMTarget is now a full partner object (id, display_name, avatar_url, etc.)
-  // so DMConversation can render immediately without a separate profile fetch.
+  // User's channel comes from their profile.section
+  const userChannel = profile?.section || null
+
   const [view, setView] = useState(() => {
     if (initialDMTarget && initialDMTarget.id) {
       return { type: 'dm', partner: initialDMTarget }
@@ -639,7 +788,6 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
     return 'inbox'
   })
 
-  // FIX #9: detect desktop so we don't subtract non-existent bottom nav height
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BP)
   useEffect(() => {
     const fn = () => setIsDesktop(window.innerWidth >= DESKTOP_BP)
@@ -654,22 +802,16 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
     return () => { if (!asModal) setHideNav(false) }
   }, [isChat, setHideNav, asModal])
 
-  // FIX #2: when used as a modal (asModal=true), fill 100% of the overlay container.
-  // When used as a standalone route page, use the dvh-based calculation as before.
   const pageHeight = asModal
     ? '100%'
     : isChat || isDesktop
       ? 'calc(100dvh - 52px)'
       : 'calc(100dvh - 52px - 52px)'
 
-  function goToChat(dest) { setView(dest) }
-  function goBack() {
-  setView('inbox')
-}
+  function goBack() { setView('inbox') }
 
   return (
     <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column', background: 'white' }}>
-      {/* Modal close button shown in inbox header when asModal=true */}
       {asModal && view === 'inbox' && onClose && (
         <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
           <button onClick={onClose}
@@ -682,11 +824,26 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
       )}
 
       {view === 'inbox' ? (
-        <Inbox currentUserId={user.id} onOpenGroup={() => goToChat('group')} onOpenDM={partner => goToChat({ type: 'dm', partner })} />
+        <Inbox
+          currentUserId={user.id}
+          userChannel={userChannel}
+          onOpenGroup={() => setView('group')}
+          onOpenDM={partner => setView({ type: 'dm', partner })}
+        />
       ) : view === 'group' ? (
-        <ClassChat onBack={goBack} currentUser={user} profile={profile} />
+        <ClassChat
+          onBack={goBack}
+          currentUser={user}
+          profile={profile}
+          userChannel={userChannel}
+        />
       ) : (
-        <DMConversation partner={view.partner} currentUserId={user.id} onBack={goBack} />
+        <DMConversation
+          partner={view.partner}
+          currentUserId={user.id}
+          userChannel={userChannel}
+          onBack={goBack}
+        />
       )}
     </div>
   )
