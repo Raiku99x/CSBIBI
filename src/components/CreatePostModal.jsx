@@ -415,6 +415,7 @@ export default function CreatePostModal({
           visibility,
           group_members: group_members_ids,
           channel: selectedChannel || null,
+          is_official: profile?.role === 'moderator' || profile?.role === 'superadmin',
         })
         .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
         .single()
