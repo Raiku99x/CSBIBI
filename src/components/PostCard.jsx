@@ -3,7 +3,7 @@ import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
 import { useMuteGate } from '../hooks/useMuteGate'
 import { useDarkMode } from '../contexts/DarkModeContext'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { formatDistanceToNow, format, isPast } from 'date-fns'
 import {
   FileText, Download, BookOpen, Megaphone,
@@ -443,7 +443,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const { isModerator, isSuperadmin } = useRole()
   const { modMode } = useModMode()
   const { effectivelyMuted, getMuteMessage } = useMuteGate()
-  const canModerate = (isModerator || isSuperadmin) && modMode
+  const canModerate = useMemo(() => (isModerator || isSuperadmin) && modMode, [isModerator, isSuperadmin, modMode])
 
   const isGroupPost = postData.visibility === 'group'
   const groupMemberIds = postData.group_members || []
@@ -607,40 +607,20 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
       {postData.is_pinned && (
-                <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
-                  {postData.is_pinned && (
-                    <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:'#FFFBEB',flexWrap:'wrap' }}>
-                      <Pin size={11} color="#F59E0B"/>
-                      <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#F59E0B' }}>Pinned</span>
-                      {postData.pin_until && (
-                        <>
-                          <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-                          <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textSec }}>
-                            until {format(new Date(postData.pin_until), 'MMM d, yyyy')}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {postData.is_pinned && (postData.is_official || postData.is_locked) && (
-                    <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-                  )}
-                  {postData.is_official && (
-                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#16a34a',letterSpacing:0.2 }}>
-                      <BadgeCheck size={11} color="#16a34a"/> Official
-                    </span>
-                  )}
-                  {postData.is_official && postData.is_locked && (
-                    <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-                  )}
-                  {postData.is_locked && (
-                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.2 }}>
-                      <Lock size={11} color={colors.textSec}/> Comments locked
-                    </span>
-                  )}
-                </div>
-              )}
-
+        <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:'#FFFBEB',flexWrap:'wrap' }}>
+          <Pin size={11} color="#F59E0B"/>
+          <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#F59E0B' }}>Pinned</span>
+          {postData.pin_until && (
+            <>
+              <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+              <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textSec }}>
+                until {format(new Date(postData.pin_until), 'MMM d, yyyy')}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+        
         {banner && (
           <div style={{ background:banner.bg,padding:'7px 12px',display:'flex',alignItems:'center',gap:7 }}>
             <div style={{ width:20,height:20,borderRadius:5,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center' }}>{banner.icon}</div>
