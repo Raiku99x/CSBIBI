@@ -443,7 +443,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const { isModerator, isSuperadmin } = useRole()
   const { modMode } = useModMode()
   const { effectivelyMuted, getMuteMessage } = useMuteGate()
-  const canModerate = useMemo(() => (isModerator || isSuperadmin) && modMode, [isModerator, isSuperadmin, modMode])
+  const canModerate = (isModerator || isSuperadmin) && modMode
 
   const isGroupPost = postData.visibility === 'group'
   const groupMemberIds = postData.group_members || []
