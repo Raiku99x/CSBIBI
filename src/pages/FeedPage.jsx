@@ -229,7 +229,7 @@ export default function FeedPage() {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   const unpinnedPosts = posts.filter(post => !post.is_pinned && canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
   const visiblePosts = [...pinnedPosts, ...unpinnedPosts]
-
+  
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
       toast.error(getMuteMessage(), { duration: 4000 })
