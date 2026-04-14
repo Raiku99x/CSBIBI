@@ -436,6 +436,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [deleted, setDeleted]         = useState(false)
   const [postData, setPostData]       = useState(post)
   const [showMembersModal, setShowMembersModal] = useState(false)
+  const [showPinPicker, setShowPinPicker] = useState(false)
+  const [pinDays, setPinDays] = useState('7')
   const menuRef  = useRef(null)
   const shareRef = useRef(null)
 
@@ -471,13 +473,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   async function handleTogglePin() {
     try {
       const next = !postData.is_pinned
-      let pinUntil = null
-      if (next) {
-        const days = window.prompt('Pin for how many days? (e.g. 7)', '7')
-        if (!days) return
-        pinUntil = new Date(Date.now() + Number(days) * 86400000).toISOString()
-      }
-      await supabase.from('posts').update({ is_pinned: next, pin_until: pinUntil }).eq('id', postData.id)
+      if (next) { setShowPinPicker(true); return }
+      await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', postData.id)
+      setPostData(p => ({ ...p, is_pinned: false, pin_until: null }))
+      toast.success('Post unpinned')
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_pinned: next }))
       toast.success(next ? 'Post pinned' : 'Post unpinned')
@@ -503,6 +502,15 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     } catch (err) { toast.error(err.message) }
   }
 
+  async function confirmPin() {
+    const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
+    await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
+    await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
+    setPostData(p => ({ ...p, is_pinned: true, pin_until: pinUntil }))
+    setShowPinPicker(false)
+    toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
+  }
+  
   async function handleLike() {
     if (liking) return
     setLiking(true)
@@ -873,6 +881,34 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         @keyframes shareDropUpDesktop { from{opacity:0;transform:translateX(-50%) translateY(6px)}      to{opacity:1;transform:translateX(-50%) translateY(0)} }
         @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
       `}}/>
+      {showPinPicker && (
+        <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
+          <div style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:280,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden' }}>
+            <div style={{ padding:'14px 16px 10px',borderBottom:`1px solid ${colors.border}` }}>
+              <p style={{ margin:0,fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:15,color:colors.textPri }}>Pin this post</p>
+              <p style={{ margin:'3px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:12,color:colors.textSec }}>How many days should it stay pinned?</p>
+            </div>
+            <div style={{ padding:'14px 16px',display:'flex',gap:6,flexWrap:'wrap' }}>
+              {['1','3','7','14','30'].map(d => (
+                <button key={d} onClick={() => setPinDays(d)}
+                  style={{ padding:'6px 14px',borderRadius:20,border:`1.5px solid ${pinDays===d?'#F59E0B':'#E4E6EB'}`,background:pinDays===d?'#FFFBEB':'white',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:pinDays===d?'#F59E0B':'#65676B',cursor:'pointer' }}>
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <div style={{ display:'flex',gap:8,padding:'0 16px 14px' }}>
+              <button onClick={() => setShowPinPicker(false)}
+                style={{ flex:1,padding:'10px 0',borderRadius:10,border:'1.5px solid #E4E6EB',background:'white',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>
+                Cancel
+              </button>
+              <button onClick={confirmPin}
+                style={{ flex:1,padding:'10px 0',borderRadius:10,border:'none',background:'#F59E0B',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:'white' }}>
+                Pin for {pinDays}d
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
