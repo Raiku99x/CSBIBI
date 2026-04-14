@@ -504,7 +504,7 @@ export default function CreatePostModal({
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.4 }}>
               {form.subject_id
                 ? "Can't find someone? They may not be enrolled in the selected subject."
-                : 'No selected subject· Showing all users.'}
+                : 'No selected subject · Showing all users.'}
             </p>
           </div>
 
