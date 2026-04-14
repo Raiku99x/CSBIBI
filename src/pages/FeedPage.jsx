@@ -349,6 +349,7 @@ export default function FeedPage() {
                 subjects={subjects}
                 profile={profile}
                 onUserClick={handleUserClick}
+                onUpdated={(updated) => setPosts(prev => prev.map(p => p.id === updated.id ? updated : p))}
               />
             </div>
           ))}
