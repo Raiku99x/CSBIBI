@@ -471,7 +471,13 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   async function handleTogglePin() {
     try {
       const next = !postData.is_pinned
-      await supabase.from('posts').update({ is_pinned: next }).eq('id', postData.id)
+      let pinUntil = null
+      if (next) {
+        const days = window.prompt('Pin for how many days? (e.g. 7)', '7')
+        if (!days) return
+        pinUntil = new Date(Date.now() + Number(days) * 86400000).toISOString()
+      }
+      await supabase.from('posts').update({ is_pinned: next, pin_until: pinUntil }).eq('id', postData.id)
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_pinned: next }))
       toast.success(next ? 'Post pinned' : 'Post unpinned')
