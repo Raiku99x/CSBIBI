@@ -503,6 +503,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
 
   async function confirmPin() {
     const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
+    await supabase.from('posts').update({ is_pinned: false, pin_until: null }).neq('id', postData.id)
     await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
     await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
     const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
