@@ -236,22 +236,14 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
     finally { setActionLoading(false) }
   }
 
-  // ── Force Logout ────────────────────────────────────────────
-  // Strategy: set a `force_logout_at` timestamp on the profile.
-  // The app's auth listener (or a useEffect in Layout/App) checks this value
-  // against the user's session start time and signs them out if stale.
   async function handleForceLogout() {
     if (!profile) return
     setActionLoading(true)
     try {
       const now = new Date().toISOString()
-
-      // 1. Stamp the profile so the target user's client detects it
       await supabase.from('profiles')
         .update({ force_logout_at: now })
         .eq('id', profile.id)
-
-      // 2. Audit log
       await supabase.from('audit_logs').insert({
         actor_id: currentUser.id,
         action: 'force_logout',
@@ -259,15 +251,12 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
         target_id: profile.id,
         metadata: { force_logout_at: now },
       })
-
-      // 3. Notify the user (they'll see it when they log back in)
       await supabase.from('notifications').insert({
         user_id: profile.id,
         type: 'announcement',
         message: `🔐 You have been signed out by an administrator.`,
         is_read: false,
       })
-
       setShowForceLogoutModal(false)
       toast.success(`${profile.display_name} will be signed out immediately`)
     } catch (err) {
@@ -281,6 +270,30 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
     <>
       {/* Backdrop */}
       <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:60,background:'rgba(0,0,0,0.55)',animation:'fadeIn 0.18s ease' }}/>
+
+      {/* Close button — fixed so it stays visible while scrolling */}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          top: 14,
+          right: 14,
+          zIndex: 63,
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          background: 'rgba(0,0,0,0.45)',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+        }}
+      >
+        <X size={15} color="white"/>
+      </button>
 
       {/* Panel */}
       <div style={{
@@ -304,11 +317,7 @@ export default function UserProfilePage({ userId, onClose, onSendDM }) {
         ) : (
           <>
             {/* Header cover */}
-            <div style={{ background:`linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`, padding:'20px 16px 60px', position:'relative' }}>
-              <button onClick={onClose} style={{ position:'absolute',top:14,right:14,width:32,height:32,borderRadius:'50%',background:'rgba(255,255,255,0.2)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                <X size={15} color="white"/>
-              </button>
-            </div>
+            <div style={{ background:`linear-gradient(135deg, ${RED} 0%, ${BLUE} 100%)`, padding:'20px 16px 60px' }}/>
 
             {/* Avatar + info card */}
             <div style={{ background:'white', margin:'0 0 8px', padding:'0 16px 16px', position:'relative' }}>
