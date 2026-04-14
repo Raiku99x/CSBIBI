@@ -591,21 +591,31 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     <>
       <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
-        {(postData.is_pinned || postData.is_official || postData.is_locked) && (
-          <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
-            {postData.is_pinned && (postData.is_official || postData.is_locked) && (
-              <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-            )}
-            {postData.is_official && postData.is_locked && (
-              <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
-            )}
-            {postData.is_locked && (
-              <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.2 }}>
-                <Lock size={11} color={colors.textSec}/> Comments locked
-              </span>
-            )}
-          </div>
-        )}
+      {(postData.is_pinned || postData.is_official || postData.is_locked) && (
+                <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
+                  {postData.is_pinned && (
+                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#F59E0B',letterSpacing:0.2 }}>
+                      <Pin size={11} color="#F59E0B"/> Pinned
+                    </span>
+                  )}
+                  {postData.is_pinned && (postData.is_official || postData.is_locked) && (
+                    <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+                  )}
+                  {postData.is_official && (
+                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#16a34a',letterSpacing:0.2 }}>
+                      <BadgeCheck size={11} color="#16a34a"/> Official
+                    </span>
+                  )}
+                  {postData.is_official && postData.is_locked && (
+                    <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+                  )}
+                  {postData.is_locked && (
+                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:colors.textSec,letterSpacing:0.2 }}>
+                      <Lock size={11} color={colors.textSec}/> Comments locked
+                    </span>
+                  )}
+                </div>
+              )}
 
         {banner && (
           <div style={{ background:banner.bg,padding:'7px 12px',display:'flex',alignItems:'center',gap:7 }}>
