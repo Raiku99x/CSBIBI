@@ -41,13 +41,25 @@ export function useModMode() {
   }, [isModerator, isSuperadmin])
 
   function toggleModMode() {
-    if (!isModerator && !isSuperadmin) return
-    setModMode(prev => {
-      const next = !prev
-      try { localStorage.setItem(STORAGE_KEY, next) } catch {}
-      return next
-    })
-  }
+      if (!isModerator && !isSuperadmin) return
+      setModMode(prev => {
+        const next = !prev
+        try {
+          localStorage.setItem(STORAGE_KEY, next)
+          window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: String(next) }))
+        } catch {}
+        return next
+      })
+    }
+  
+    useEffect(() => {
+      function onStorage(e) {
+        if (e.key !== STORAGE_KEY) return
+        setModMode(e.newValue === 'true')
+      }
+      window.addEventListener('storage', onStorage)
+      return () => window.removeEventListener('storage', onStorage)
+    }, [])
 
   return { modMode, toggleModMode }
 }
