@@ -147,7 +147,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
           >
             <Plus size={14} color={showNew ? RED : '#65676B'} strokeWidth={2.5} />
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: showNew ? RED : '#65676B' }}>
-              New Message
+              Add
             </span>
           </button>
 
