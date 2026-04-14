@@ -39,17 +39,31 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   useEffect(() => {
     fetchComments()
     const ch = supabase.channel('comments-' + postId)
-      .on('postgres_changes', { event:'INSERT', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, async (payload) => {
-        const { data } = await supabase.from('comments').select('*, profiles!comments_author_id_fkey(*)').eq('id', payload.new.id).single()
-        if (data) { setComments(prev => [...prev, data]); onCommentCountChange?.(c => c + 1) }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` }, async (payload) => {
+        // Only add from realtime if it's from another user — our own comments are
+        // already added optimistically in handleSend, so skip duplicates.
+        if (payload.new.author_id === user?.id) return
+        const { data } = await supabase
+          .from('comments')
+          .select('*, profiles!comments_author_id_fkey(*)')
+          .eq('id', payload.new.id)
+          .single()
+        if (data) {
+          setComments(prev => {
+            // Guard against duplicates just in case
+            if (prev.some(c => c.id === data.id)) return prev
+            return [...prev, data]
+          })
+          onCommentCountChange?.(c => c + 1)
+        }
       })
-      .on('postgres_changes', { event:'DELETE', schema:'public', table:'comments', filter:`post_id=eq.${postId}` }, (payload) => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` }, (payload) => {
         setComments(prev => prev.filter(c => c.id !== payload.old.id))
         onCommentCountChange?.(c => Math.max(0, c - 1))
       })
       .subscribe()
     return () => supabase.removeChannel(ch)
-  }, [fetchComments, postId])
+  }, [fetchComments, postId, user?.id])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [comments])
 
@@ -62,28 +76,84 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
   async function handleSend(e) {
     e.preventDefault()
-    if (!text.trim() || effectivelyMuted) return
+    if (!text.trim() || effectivelyMuted || sending) return
     setSending(true)
     const content = text.trim()
     setText('')
+
+    // ── Optimistic comment ───────────────────────────────────
+    // Build a temporary comment object using the current profile so it appears
+    // instantly without waiting for the DB round-trip or realtime event.
+    const tempId = `temp-${Date.now()}`
+    const optimisticComment = {
+      id: tempId,
+      post_id: postId,
+      author_id: user.id,
+      content,
+      created_at: new Date().toISOString(),
+      profiles: {
+        id: user.id,
+        display_name: profile?.display_name || 'You',
+        avatar_url: profile?.avatar_url || null,
+      },
+      _optimistic: true,
+    }
+    setComments(prev => [...prev, optimisticComment])
+    onCommentCountChange?.(c => c + 1)
+
     try {
-      const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: user.id, content })
+      const { data: inserted, error } = await supabase
+        .from('comments')
+        .insert({ post_id: postId, author_id: user.id, content })
+        .select('*, profiles!comments_author_id_fkey(*)')
+        .single()
+
       if (error) throw error
-      const { data: postRow } = await supabase.from('posts').select('author_id, caption').eq('id', postId).single()
+
+      // Replace the optimistic entry with the real DB row
+      setComments(prev => prev.map(c => c.id === tempId ? inserted : c))
+
+      // Send notification to post author
+      const { data: postRow } = await supabase
+        .from('posts')
+        .select('author_id, caption')
+        .eq('id', postId)
+        .single()
       if (postRow?.author_id && postRow.author_id !== user.id) {
         const commenterName = profile?.display_name || 'Someone'
         await supabase.from('notifications').insert({
-          user_id: postRow.author_id, post_id: postId, type: 'comment',
-          message: `${commenterName} commented on your post "${postRow.caption?.slice(0,40)||'No caption'}…" — "${content.slice(0,50)}${content.length>50?'…':''}"`,
+          user_id: postRow.author_id,
+          post_id: postId,
+          type: 'comment',
+          message: `${commenterName} commented on your post "${postRow.caption?.slice(0, 40) || 'No caption'}…" — "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
           is_read: false,
         })
       }
-    } catch (err) { setText(content); console.error(err) }
-    finally { setSending(false); inputRef.current?.focus() }
+    } catch (err) {
+      // Roll back the optimistic comment on failure
+      setComments(prev => prev.filter(c => c.id !== tempId))
+      onCommentCountChange?.(c => Math.max(0, c - 1))
+      setText(content)
+      console.error(err)
+    } finally {
+      setSending(false)
+      inputRef.current?.focus()
+    }
   }
 
   async function handleDelete(commentId) {
-    await supabase.from('comments').delete().eq('id', commentId).eq('author_id', user.id)
+    // Optimistically remove from UI
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    onCommentCountChange?.(c => Math.max(0, c - 1))
+    const { error } = await supabase
+      .from('comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('author_id', user.id)
+    if (error) {
+      // Re-fetch to restore if delete failed
+      fetchComments()
+    }
   }
 
   return (
@@ -119,7 +189,11 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         {/* Header */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 16px 12px',borderBottom:`1px solid ${colors.border}` }}>
           <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:16,color:colors.textPri }}>
-            Comments {comments.length > 0 && <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:colors.textSec }}>· {comments.length}</span>}
+            Comments {comments.length > 0 && (
+              <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:14,color:colors.textSec }}>
+                · {comments.length}
+              </span>
+            )}
           </span>
           <button onClick={onClose} style={{ width:32,height:32,borderRadius:'50%',background:colors.surface,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
             <X size={15} color={colors.textSec}/>
@@ -137,7 +211,9 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
               <div style={{ display:'flex',justifyContent:'center',marginBottom:8 }}>
                 <MessageCircle size={36} color={colors.textMut}/>
               </div>
-              <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textSec,margin:0 }}>No comments yet — be the first!</p>
+              <p style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textSec,margin:0 }}>
+                No comments yet — be the first!
+              </p>
             </div>
           ) : (
             comments.map(comment => (
@@ -195,18 +271,18 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                   disabled={sending || !text.trim()}
                   style={{
                     width:38,height:38,borderRadius:'50%',flexShrink:0,
-                    background:text.trim()?RED:colors.surface,
-                    border:'none',cursor:text.trim()?'pointer':'default',
+                    background:text.trim() ? RED : colors.surface,
+                    border:'none',cursor:text.trim() ? 'pointer' : 'default',
                     display:'flex',alignItems:'center',justifyContent:'center',
                     transition:'background 0.15s, transform 0.1s',
-                    boxShadow:text.trim()?'0 2px 8px rgba(192,57,43,0.3)':'none',
+                    boxShadow:text.trim() ? '0 2px 8px rgba(192,57,43,0.3)' : 'none',
                   }}
                   onMouseDown={e => { if (text.trim()) e.currentTarget.style.transform = 'scale(0.92)' }}
                   onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   {sending
                     ? <Loader2 size={16} color="white" style={{ animation:'cssSpin 0.8s linear infinite' }}/>
-                    : <Send size={15} color={text.trim()?'white':colors.textMut}/>
+                    : <Send size={15} color={text.trim() ? 'white' : colors.textMut}/>
                   }
                 </button>
               </form>
@@ -231,7 +307,7 @@ function CommentRow({ comment, isOwn, onDelete, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
     <div
-      style={{ display:'flex',gap:10,alignItems:'flex-start' }}
+      style={{ display:'flex',gap:10,alignItems:'flex-start', opacity: comment._optimistic ? 0.75 : 1, transition:'opacity 0.2s' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -244,16 +320,19 @@ function CommentRow({ comment, isOwn, onDelete, colors }) {
         <div style={{ background:colors.surface,borderRadius:'4px 16px 16px 16px',padding:'8px 12px',display:'inline-block',maxWidth:'100%' }}>
           <p style={{ margin:'0 0 3px',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>
             {comment.profiles?.display_name || 'Unknown'}
+            {comment._optimistic && (
+              <span style={{ marginLeft:6,fontSize:10,fontWeight:500,color:colors.textMut }}>Sending…</span>
+            )}
           </p>
           <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:14,color:colors.textPri,lineHeight:1.45,wordBreak:'break-word' }}>
             {comment.content}
           </p>
         </div>
         <p style={{ margin:'4px 0 0 4px',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textMut }}>
-          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+          {comment._optimistic ? 'just now' : formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
         </p>
       </div>
-      {isOwn && hovered && (
+      {isOwn && hovered && !comment._optimistic && (
         <button
           onClick={onDelete}
           style={{ background:'none',border:'none',cursor:'pointer',color:colors.textMut,padding:'4px',display:'flex',flexShrink:0,transition:'color 0.12s' }}
