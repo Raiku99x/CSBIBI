@@ -503,7 +503,7 @@ export default function CreatePostModal({
             <Lock size={11} color="#7C3AED" style={{ flexShrink: 0 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.4 }}>
               {form.subject_id
-                ? 'Enrolled in selected subject · Only selected members can see this post.'
+                ? "Can't find someone? They may not be enrolled in the selected subject."
                 : 'Showing channel members · Only selected members can see this post.'}
             </p>
           </div>
@@ -695,15 +695,6 @@ export default function CreatePostModal({
                 </span>
               )}
             </button>
-            {/* Privacy tip shown below the member picker when group members are selected */}
-            {groupMembers.length > 0 && (
-              <div style={{ marginTop: 6, padding: '7px 10px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: 8, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                <Lock size={11} color="#7C3AED" style={{ flexShrink: 0, marginTop: 1 }} />
-                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: '#6D28D9', lineHeight: 1.45 }}>
-                  Only you and the {groupMembers.length} selected member{groupMembers.length !== 1 ? 's' : ''} can see this post.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
