@@ -437,6 +437,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showPinPicker, setShowPinPicker] = useState(false)
   const [pinDays, setPinDays] = useState('7')
+  const [showUnpinWarning, setShowUnpinWarning] = useState(false)
+  const [existingPin, setExistingPin] = useState(null)
   const menuRef  = useRef(null)
   const shareRef = useRef(null)
 
@@ -501,34 +503,39 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     } catch (err) { toast.error(err.message) }
   }
 
-  async function confirmPin() {
-      const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
-      
-      // Check if another post is already pinned
-      const { data: alreadyPinned } = await supabase
-        .from('posts')
-        .select('id, caption')
-        .eq('is_pinned', true)
-        .neq('id', postData.id)
-        .limit(1)
-        .single()
-  
-      if (alreadyPinned) {
-        const preview = alreadyPinned.caption?.slice(0, 40) || 'another post'
-        if (!window.confirm(`"${preview}..." is currently pinned. Unpin it and pin this post instead?`)) return
-        // Unpin the old one
-        await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', alreadyPinned.id)
-        onUpdated?.({ id: alreadyPinned.id, is_pinned: false, pin_until: null })
-      }
-  
-      await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
-      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
-      const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
-      setPostData(updated)
-      onUpdated?.(updated)
-      setShowPinPicker(false)
-      toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
+async function confirmPin() {
+    const { data: alreadyPinned } = await supabase
+      .from('posts')
+      .select('id, caption')
+      .eq('is_pinned', true)
+      .neq('id', postData.id)
+      .limit(1)
+      .single()
+
+    if (alreadyPinned) {
+      setExistingPin(alreadyPinned)
+      setShowUnpinWarning(true)
+      return
     }
+    await doPin()
+  }
+
+  async function doPin() {
+    const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
+    if (existingPin) {
+      await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', existingPin.id)
+      onUpdated?.({ id: existingPin.id, is_pinned: false, pin_until: null })
+      setExistingPin(null)
+    }
+    await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
+    await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
+    const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
+    setPostData(updated)
+    onUpdated?.(updated)
+    setShowPinPicker(false)
+    setShowUnpinWarning(false)
+    toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
+  }
   
   async function handleLike() {
     if (liking) return
@@ -872,6 +879,29 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         @keyframes shareDropUpDesktop { from{opacity:0;transform:translateX(-50%) translateY(6px)}      to{opacity:1;transform:translateX(-50%) translateY(0)} }
         @keyframes sheetSlideUp { from{opacity:0;transform:translateX(-50%) translateY(100%)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
       `}}/>
+      {showUnpinWarning && (
+        <div style={{ position:'fixed',inset:0,zIndex:110,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
+          <div style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:290,boxShadow:'0 12px 36px rgba(0,0,0,0.2)',overflow:'hidden',animation:'expandIn 0.16s ease' }}>
+            <div style={{ padding:'16px 16px 10px' }}>
+              <p style={{ margin:'0 0 6px',fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:15,color:colors.textPri }}>Replace pinned post?</p>
+              <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:colors.textSec,lineHeight:1.5 }}>
+                <span style={{ fontWeight:700,color:colors.textPri }}>"{existingPin?.caption?.slice(0,50) || 'Another post'}{existingPin?.caption?.length > 50 ? '…' : ''}"</span>
+                {' '}is currently pinned. It will be unpinned automatically.
+              </p>
+            </div>
+            <div style={{ display:'flex',gap:8,padding:'8px 16px 16px' }}>
+              <button onClick={() => { setShowUnpinWarning(false); setExistingPin(null) }}
+                style={{ flex:1,padding:'10px 0',borderRadius:10,border:`1.5px solid ${colors.border}`,background:'transparent',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>
+                Cancel
+              </button>
+              <button onClick={doPin}
+                style={{ flex:1,padding:'10px 0',borderRadius:10,border:'none',background:'#F59E0B',cursor:'pointer',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:'white' }}>
+                Pin this instead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPinPicker && (
         <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
           <div style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:280,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden' }}>
