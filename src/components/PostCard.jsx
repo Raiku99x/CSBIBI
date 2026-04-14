@@ -502,16 +502,33 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   }
 
   async function confirmPin() {
-    const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
-    await supabase.from('posts').update({ is_pinned: false, pin_until: null }).neq('id', postData.id)
-    await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
-    await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
-    const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
-    setPostData(updated)
-    onUpdated?.(updated)
-    setShowPinPicker(false)
-    toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
-  }
+      const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
+      
+      // Check if another post is already pinned
+      const { data: alreadyPinned } = await supabase
+        .from('posts')
+        .select('id, caption')
+        .eq('is_pinned', true)
+        .neq('id', postData.id)
+        .limit(1)
+        .single()
+  
+      if (alreadyPinned) {
+        const preview = alreadyPinned.caption?.slice(0, 40) || 'another post'
+        if (!window.confirm(`"${preview}..." is currently pinned. Unpin it and pin this post instead?`)) return
+        // Unpin the old one
+        await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', alreadyPinned.id)
+        onUpdated?.({ id: alreadyPinned.id, is_pinned: false, pin_until: null })
+      }
+  
+      await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
+      const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
+      setPostData(updated)
+      onUpdated?.(updated)
+      setShowPinPicker(false)
+      toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
+    }
   
   async function handleLike() {
     if (liking) return
