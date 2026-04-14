@@ -418,8 +418,7 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
   )
 }
 
-export default function PostCard({ post, currentUserId, subjects = [], profile, onUserClick }) {
-  const { colors } = useDarkMode()
+export default function PostCard({ post, currentUserId, subjects = [], profile, onUserClick, onUpdated }) {  const { colors } = useDarkMode()
   const [liked, setLiked]             = useState(false)
   const [likeCount, setLikeCount]     = useState(0)
   const [likeAvatars, setLikeAvatars] = useState([])
@@ -475,7 +474,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       const next = !postData.is_pinned
       if (next) { setShowPinPicker(true); return }
       await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', postData.id)
-      setPostData(p => ({ ...p, is_pinned: false, pin_until: null }))
+        const updated = { ...postData, is_pinned: false, pin_until: null }
+      setPostData(updated)
+      onUpdated?.(updated)
       toast.success('Post unpinned')
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       setPostData(p => ({ ...p, is_pinned: next }))
@@ -506,7 +507,9 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     const pinUntil = new Date(Date.now() + Number(pinDays) * 86400000).toISOString()
     await supabase.from('posts').update({ is_pinned: true, pin_until: pinUntil }).eq('id', postData.id)
     await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'pin_post', target_type: 'post', target_id: postData.id })
-    setPostData(p => ({ ...p, is_pinned: true, pin_until: pinUntil }))
+    const updated = { ...postData, is_pinned: true, pin_until: pinUntil }
+    setPostData(updated)
+    onUpdated?.(updated)
     setShowPinPicker(false)
     toast.success(`Post pinned for ${pinDays} day${pinDays !== '1' ? 's' : ''}`)
   }
