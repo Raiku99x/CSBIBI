@@ -22,7 +22,6 @@ const DESKTOP_BP = 1024
 
 const isTouchDevice = () => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
-// ── Channel badge ─────────────────────────────────────────────────────────
 function ChannelBadge({ channel, style = {} }) {
   if (!channel) return null
   return (
@@ -43,7 +42,7 @@ function ChannelBadge({ channel, style = {} }) {
 }
 
 // ── Inbox ─────────────────────────────────────────────────────────────────
-function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel }) {
+function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
   const [dmConvos, setDmConvos]       = useState([])
   const [allUsers, setAllUsers]       = useState([])
   const [latestGroup, setLatestGroup] = useState(null)
@@ -134,17 +133,35 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Title + channel badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
             {userChannel && <ChannelBadge channel={userChannel} />}
           </div>
-          <button onClick={() => setShowNew(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {showNew ? <X size={14} color={RED} /> : <Plus size={14} color="#65676B" strokeWidth={2.5} />}
+
+          {/* New Message button */}
+          <button
+            onClick={() => setShowNew(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            <Plus size={14} color={showNew ? RED : '#65676B'} strokeWidth={2.5} />
             <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 600, fontSize: 13, color: showNew ? RED : '#65676B' }}>
-              {showNew ? 'Close' : 'New Message'}
+              New Message
             </span>
           </button>
+
+          {/* Close button — only shown in modal mode */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{ width: 32, height: 32, borderRadius: '50%', background: '#F0F2F5', border: '1.5px solid #E4E6EB', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.12s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#E4E6EB'}
+              onMouseLeave={e => e.currentTarget.style.background = '#F0F2F5'}
+            >
+              <X size={14} color="#65676B" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -792,23 +809,13 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
 
   return (
     <div style={{ height: pageHeight, display: 'flex', flexDirection: 'column', background: 'white' }}>
-      {asModal && view === 'inbox' && onClose && (
-        <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }}>
-          <button onClick={onClose}
-            style={{ width: 32, height: 32, borderRadius: '50%', background: '#F0F2F5', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 1l12 12M13 1L1 13" stroke="#65676B" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
-      )}
-
       {view === 'inbox' ? (
         <Inbox
           currentUserId={user.id}
           userChannel={userChannel}
           onOpenGroup={() => setView('group')}
           onOpenDM={partner => setView({ type: 'dm', partner })}
+          onClose={asModal ? onClose : null}
         />
       ) : view === 'group' ? (
         <ClassChat
