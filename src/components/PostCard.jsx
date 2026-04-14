@@ -358,6 +358,18 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
   const [viewingUserId, setViewingUserId] = useState(null)  // ADD THIS
   const modalRef = useRef()
 
+useEffect(() => {
+  if (!memberIds?.length) { setLoading(false); return }
+  supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', memberIds)
+    .then(({ data }) => {
+      if (data) setMembers(data)
+      setLoading(false)
+    })
+}, [memberIds])
+  
   return (
     <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
       <div ref={modalRef} style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:300,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden',animation:'expandIn 0.16s ease' }}>
