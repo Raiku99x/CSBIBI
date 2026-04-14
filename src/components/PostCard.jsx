@@ -474,11 +474,10 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       const next = !postData.is_pinned
       if (next) { setShowPinPicker(true); return }
       await supabase.from('posts').update({ is_pinned: false, pin_until: null }).eq('id', postData.id)
-        const updated = { ...postData, is_pinned: false, pin_until: null }
+      await supabase.from('audit_logs').insert({ actor_id: currentUserId, action: 'unpin_post', target_type: 'post', target_id: postData.id })
+      const updated = { ...postData, is_pinned: false, pin_until: null }
       setPostData(updated)
       onUpdated?.(updated)
-      toast.success('Post unpinned')
-      await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
       toast.success('Post unpinned')
     } catch (err) { toast.error(err.message) }
   }
