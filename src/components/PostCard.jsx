@@ -392,9 +392,9 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
         </div>
 
         {/* Privacy tip */}
-        <div style={{ margin:'10px 12px 2px', padding:'7px 10px', background:'rgba(124,58,237,0.07)', border:'1px solid rgba(124,58,237,0.18)', borderRadius:8, display:'flex', alignItems:'flex-start', gap:7 }}>
-          <Lock size={11} color="#7C3AED" style={{ flexShrink:0, marginTop:1 }}/>
-          <p style={{ margin:0, fontFamily:'"Instrument Sans",system-ui', fontSize:11.5, color:'#5B21B6', lineHeight:1.45 }}>
+        <div style={{ padding: '6px 9px', background: '#EDE9FE', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Lock size={10} color="#7C3AED" style={{ flexShrink: 0 }} />
+          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.3 }}>
             Only the post author and these members can see this post.
           </p>
         </div>
