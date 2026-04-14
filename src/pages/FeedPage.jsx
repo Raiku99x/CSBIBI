@@ -351,7 +351,11 @@ export default function FeedPage() {
                 subjects={subjects}
                 profile={profile}
                 onUserClick={handleUserClick}
-                onUpdated={(updated) => setPosts(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))}
+                onUpdated={(updated) => setPosts(prev => prev.map(p => {
+                  if (p.id === updated.id) return { ...p, ...updated }
+                  if (updated.is_pinned) return { ...p, is_pinned: false, pin_until: null }
+                  return p
+                }))}
               />
             </div>
           ))}
