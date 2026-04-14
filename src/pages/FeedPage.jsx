@@ -224,11 +224,10 @@ export default function FeedPage() {
     return () => clearInterval(timer)
   }, [targetPostId, setSearchParams])
 
-  const pinnedPosts = posts
-    .filter(post => post.is_pinned && canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  const unpinnedPosts = posts.filter(post => !post.is_pinned && canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
-  const visiblePosts = [...pinnedPosts, ...unpinnedPosts]
+  const allVisible = posts.filter(post => canSeePost(post, user?.id, isSuperadmin, superadminGroupView))
+  const pinnedPost = allVisible.find(post => post.is_pinned)
+  const unpinnedPosts = allVisible.filter(post => !post.is_pinned)
+  const visiblePosts = pinnedPost ? [pinnedPost, ...unpinnedPosts] : unpinnedPosts
   
   function tryOpenCreate(type = 'status', subType = '') {
     if (effectivelyMuted) {
