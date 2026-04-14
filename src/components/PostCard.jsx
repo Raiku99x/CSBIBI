@@ -591,7 +591,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     <>
       <article style={{ background:colors.cardBg, borderTop:`1px solid ${colors.border}`, borderBottom:`1px solid ${colors.border}`, marginBottom:6, position:'relative' }}>
 
-      {(postData.is_pinned || postData.is_locked) && (
+      {postData.is_pinned && (
                 <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
                   {postData.is_pinned && (
                     <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#F59E0B',letterSpacing:0.2 }}>
