@@ -5,6 +5,7 @@ import { useMuteGate } from '../hooks/useMuteGate'
 import { useDarkMode } from '../contexts/DarkModeContext'
 import { formatDistanceToNow } from 'date-fns'
 import { X, Send, Loader2, Trash2, MicOff, MessageCircle } from 'lucide-react'
+import UserProfilePage from '../pages/UserProfilePage'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
 function dicebearUrl(name = '') {
@@ -23,6 +24,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [viewingUserId, setViewingUserId] = useState(null)
   const inputRef = useRef()
   const bottomRef = useRef()
 
@@ -40,8 +42,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
     fetchComments()
     const ch = supabase.channel('comments-' + postId)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` }, async (payload) => {
-        // Only add from realtime if it's from another user — our own comments are
-        // already added optimistically in handleSend, so skip duplicates.
         if (payload.new.author_id === user?.id) return
         const { data } = await supabase
           .from('comments')
@@ -50,7 +50,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
           .single()
         if (data) {
           setComments(prev => {
-            // Guard against duplicates just in case
             if (prev.some(c => c.id === data.id)) return prev
             return [...prev, data]
           })
@@ -81,9 +80,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
     const content = text.trim()
     setText('')
 
-    // ── Optimistic comment ───────────────────────────────────
-    // Build a temporary comment object using the current profile so it appears
-    // instantly without waiting for the DB round-trip or realtime event.
     const tempId = `temp-${Date.now()}`
     const optimisticComment = {
       id: tempId,
@@ -110,10 +106,8 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
 
       if (error) throw error
 
-      // Replace the optimistic entry with the real DB row
       setComments(prev => prev.map(c => c.id === tempId ? inserted : c))
 
-      // Send notification to post author
       const { data: postRow } = await supabase
         .from('posts')
         .select('author_id, caption')
@@ -130,7 +124,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         })
       }
     } catch (err) {
-      // Roll back the optimistic comment on failure
       setComments(prev => prev.filter(c => c.id !== tempId))
       onCommentCountChange?.(c => Math.max(0, c - 1))
       setText(content)
@@ -142,7 +135,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   }
 
   async function handleDelete(commentId) {
-    // Optimistically remove from UI
     setComments(prev => prev.filter(c => c.id !== commentId))
     onCommentCountChange?.(c => Math.max(0, c - 1))
     const { error } = await supabase
@@ -151,7 +143,6 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
       .eq('id', commentId)
       .eq('author_id', user.id)
     if (error) {
-      // Re-fetch to restore if delete failed
       fetchComments()
     }
   }
@@ -222,6 +213,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
                 comment={comment}
                 isOwn={comment.author_id === user.id}
                 onDelete={() => handleDelete(comment.id)}
+                onUserClick={(id) => setViewingUserId(id)}
                 colors={colors}
               />
             ))
@@ -291,6 +283,14 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         </div>
       </div>
 
+      {/* User profile overlay — rendered above the sheet */}
+      {viewingUserId && (
+        <UserProfilePage
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+        />
+      )}
+
       <style>{`
         @keyframes cssFadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes cssSpin   { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
@@ -303,7 +303,7 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   )
 }
 
-function CommentRow({ comment, isOwn, onDelete, colors }) {
+function CommentRow({ comment, isOwn, onDelete, onUserClick, colors }) {
   const [hovered, setHovered] = useState(false)
   return (
     <div
@@ -313,12 +313,20 @@ function CommentRow({ comment, isOwn, onDelete, colors }) {
     >
       <img
         src={comment.profiles?.avatar_url || dicebearUrl(comment.profiles?.display_name)}
-        style={{ width:34,height:34,borderRadius:10,objectFit:'cover',flexShrink:0 }}
+        style={{ width:34,height:34,borderRadius:10,objectFit:'cover',flexShrink:0,cursor: comment._optimistic ? 'default' : 'pointer' }}
         alt=""
+        onClick={() => !comment._optimistic && comment.profiles?.id && onUserClick(comment.profiles.id)}
       />
       <div style={{ flex:1,minWidth:0 }}>
         <div style={{ background:colors.surface,borderRadius:'4px 16px 16px 16px',padding:'8px 12px',display:'inline-block',maxWidth:'100%' }}>
-          <p style={{ margin:'0 0 3px',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:colors.textPri }}>
+          <p
+            style={{
+              margin:'0 0 3px',fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13,color:colors.textPri,
+              cursor: comment._optimistic ? 'default' : 'pointer',
+              display: 'inline',
+            }}
+            onClick={() => !comment._optimistic && comment.profiles?.id && onUserClick(comment.profiles.id)}
+          >
             {comment.profiles?.display_name || 'Unknown'}
             {comment._optimistic && (
               <span style={{ marginLeft:6,fontSize:10,fontWeight:500,color:colors.textMut }}>Sending…</span>
