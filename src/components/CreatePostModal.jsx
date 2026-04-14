@@ -498,22 +498,13 @@ export default function CreatePostModal({
               </button>
             </div>
           </div>
-
-          {/* Info banner */}
-          <div style={{ margin: '10px 16px 0', padding: '9px 11px', background: '#EDE9FE', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
-            <Users size={14} color="#5B21B6" style={{ flexShrink: 0, marginTop: 1 }} />
-            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
+          
+          <div style={{ margin: '8px 16px 0', padding: '7px 10px', background: '#EDE9FE', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <Lock size={11} color="#7C3AED" style={{ flexShrink: 0 }} />
+            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.4 }}>
               {form.subject_id
-                ? "Showing users in your channel enrolled in the selected subject."
-                : 'Showing members in your channel. Select a subject to filter by enrolled users.'}
-            </p>
-          </div>
-
-          {/* Privacy tip */}
-          <div style={{ margin: '8px 16px 0', padding: '8px 11px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
-            <Lock size={12} color="#7C3AED" style={{ flexShrink: 0, marginTop: 1 }} />
-            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: '#6D28D9', lineHeight: 1.5 }}>
-              Only you and the members you select will be able to see this post. Search by name or @username.
+                ? 'Enrolled in selected subject · Only selected members can see this post.'
+                : 'Showing channel members · Only selected members can see this post.'}
             </p>
           </div>
 
