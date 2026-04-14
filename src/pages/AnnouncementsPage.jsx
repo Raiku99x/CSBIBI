@@ -438,7 +438,7 @@ export default function AnnouncementsPage() {
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: 'white' }}>Deadlines</p>
               <p style={{ margin: '2px 0 0', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                {userChannel ? `${userChannel} channel · enrolled subjects` : 'From your enrolled subjects'}
+                Showing Deadlines from your enrolled subjects` : 'From your enrolled subjects'}
               </p>
             </div>
             {!isPageLoading && (
