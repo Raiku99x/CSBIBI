@@ -479,8 +479,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       onUpdated?.(updated)
       toast.success('Post unpinned')
       await supabase.from('audit_logs').insert({ actor_id:currentUserId, action:next?'pin_post':'unpin_post', target_type:'post', target_id:postData.id })
-      setPostData(p => ({ ...p, is_pinned: next }))
-      toast.success(next ? 'Post pinned' : 'Post unpinned')
+      toast.success('Post unpinned')
     } catch (err) { toast.error(err.message) }
   }
 
