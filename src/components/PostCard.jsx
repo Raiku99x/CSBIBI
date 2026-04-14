@@ -355,32 +355,13 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
 function GroupMembersModal({ memberIds, onClose, colors }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [viewingUserId, setViewingUserId] = useState(null)  // ADD THIS
   const modalRef = useRef()
-
-  useEffect(() => {
-    async function fetchMembers() {
-      if (!memberIds || memberIds.length === 0) { setLoading(false); return }
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url')
-        .in('id', memberIds)
-      setMembers(data || [])
-      setLoading(false)
-    }
-    fetchMembers()
-  }, [memberIds])
-
-  useEffect(() => {
-    function h(e) {
-      if (modalRef.current && !modalRef.current.contains(e.target)) onClose()
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [onClose])
 
   return (
     <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
       <div ref={modalRef} style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:300,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden',animation:'expandIn 0.16s ease' }}>
+        {/* header stays the same */}
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 14px 10px',borderBottom:`1px solid ${colors.border}` }}>
           <div style={{ display:'flex',alignItems:'center',gap:7 }}>
             <Users size={14} color="#7C3AED"/>
@@ -391,15 +372,15 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
           </button>
         </div>
 
-        {/* Privacy tip */}
-        <div style={{ margin: '0 10px 6px', padding: '5px 9px', background: '#EDE9FE', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Lock size={10} color="#7C3AED" style={{ flexShrink: 0 }} />
-          <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 10, color: '#5B21B6', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {/* privacy tip stays the same */}
+        <div style={{ margin:'0 10px 6px',padding:'5px 9px',background:'#EDE9FE',borderRadius:7,display:'flex',alignItems:'center',gap:5 }}>
+          <Lock size={10} color="#7C3AED" style={{ flexShrink:0 }}/>
+          <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:10,color:'#5B21B6',lineHeight:1.3 }}>
             Only you and selected members can see this post.
           </p>
         </div>
 
-        <div style={{ padding:'6px 0', maxHeight:260, overflowY:'auto' }}>
+        <div style={{ padding:'6px 0',maxHeight:260,overflowY:'auto' }}>
           {loading ? (
             <div style={{ padding:'20px 0',textAlign:'center' }}>
               <div style={{ width:18,height:18,borderRadius:'50%',border:'2.5px solid #DDD6FE',borderTopColor:'#7C3AED',animation:'spin 0.7s linear infinite',margin:'0 auto' }}/>
@@ -407,13 +388,25 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
           ) : members.length === 0 ? (
             <p style={{ margin:0,padding:'16px 14px',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:colors.textSec,textAlign:'center' }}>No members found</p>
           ) : members.map(m => (
-            <div key={m.id} style={{ display:'flex',alignItems:'center',gap:10,padding:'9px 14px' }}>
+            <div key={m.id}
+              onClick={() => setViewingUserId(m.id)}   // ADD THIS
+              style={{ display:'flex',alignItems:'center',gap:10,padding:'9px 14px',cursor:'pointer',transition:'background 0.1s' }}  // ADD cursor + transition
+              onMouseEnter={e => e.currentTarget.style.background = colors.surface}   // ADD THIS
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}   // ADD THIS
+            >
               <img src={m.avatar_url||dicebearUrl(m.display_name)} style={{ width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:`1.5px solid ${colors.border}` }} alt=""/>
               <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13.5,color:colors.textPri }}>{m.display_name}</span>
             </div>
           ))}
         </div>
       </div>
+
+      {viewingUserId && (
+        <UserProfilePage
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+        />
+      )}
     </div>
   )
 }
