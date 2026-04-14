@@ -434,6 +434,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [showShare, setShowShare]     = useState(false)
   const [deleted, setDeleted]         = useState(false)
   const [postData, setPostData]       = useState(post)
+  useEffect(() => { setPostData(post) }, [post.is_pinned, post.pin_until, post.is_locked, post.is_official])
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [showPinPicker, setShowPinPicker] = useState(false)
   const [pinDays, setPinDays] = useState('7')
