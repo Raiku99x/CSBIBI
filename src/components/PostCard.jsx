@@ -390,7 +390,16 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
             <X size={14} color={colors.textSec}/>
           </button>
         </div>
-        <div style={{ padding:'6px 0', maxHeight:280, overflowY:'auto' }}>
+
+        {/* Privacy tip */}
+        <div style={{ margin:'10px 12px 2px', padding:'7px 10px', background:'rgba(124,58,237,0.07)', border:'1px solid rgba(124,58,237,0.18)', borderRadius:8, display:'flex', alignItems:'flex-start', gap:7 }}>
+          <Lock size={11} color="#7C3AED" style={{ flexShrink:0, marginTop:1 }}/>
+          <p style={{ margin:0, fontFamily:'"Instrument Sans",system-ui', fontSize:11.5, color:'#5B21B6', lineHeight:1.45 }}>
+            Only the post author and these members can see this post.
+          </p>
+        </div>
+
+        <div style={{ padding:'6px 0', maxHeight:260, overflowY:'auto' }}>
           {loading ? (
             <div style={{ padding:'20px 0',textAlign:'center' }}>
               <div style={{ width:18,height:18,borderRadius:'50%',border:'2.5px solid #DDD6FE',borderTopColor:'#7C3AED',animation:'spin 0.7s linear infinite',margin:'0 auto' }}/>
@@ -620,7 +629,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           </div>
         )}
 
-            
         {/* Header */}
         <div style={{ padding:'10px 12px 8px',display:'flex',alignItems:'center',gap:9 }}>
           <img
