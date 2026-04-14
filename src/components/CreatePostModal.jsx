@@ -694,9 +694,17 @@ export default function CreatePostModal({
                   ({groupMembers.length}) Edit
                 </span>
               )}
-            </button>
-          </div>
-        )}
+              </button>
+                {groupMembers.length > 0 && (
+                  <div style={{ marginTop: 4, padding: '5px 9px', background: '#EDE9FE', borderRadius: 7, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Lock size={10} color="#7C3AED" style={{ flexShrink: 0 }} />
+                    <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.3 }}>
+                      Only you and the {groupMembers.length} selected member{groupMembers.length !== 1 ? 's' : ''} can see this post.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
         <div ref={typePickerRef} style={{ marginBottom: 16, borderRadius: 12, border: typeError ? '2px solid #E41E3F' : '2px solid transparent', background: typeError ? '#FFF0F0' : 'transparent', transition: 'all 0.2s', padding: typeError ? '8px' : '0' }}>
           <p style={{ margin: '0 0 7px', fontFamily: '"Instrument Sans", system-ui', fontSize: 10.5, fontWeight: 700, color: typeError ? '#E41E3F' : '#8A8D91', textTransform: 'uppercase', letterSpacing: 0.6, display: 'flex', alignItems: 'center', gap: 4 }}>
