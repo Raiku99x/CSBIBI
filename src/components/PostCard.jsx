@@ -594,9 +594,18 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       {postData.is_pinned && (
                 <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:colors.surface,flexWrap:'wrap' }}>
                   {postData.is_pinned && (
-                    <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:600,color:'#F59E0B',letterSpacing:0.2 }}>
-                      <Pin size={11} color="#F59E0B"/> Pinned
-                    </span>
+                    <div style={{ display:'flex',alignItems:'center',gap:6,padding:'5px 12px',borderBottom:`1px solid ${colors.border}`,background:'#FFFBEB',flexWrap:'wrap' }}>
+                      <Pin size={11} color="#F59E0B"/>
+                      <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,fontWeight:700,color:'#F59E0B' }}>Pinned</span>
+                      {postData.pin_until && (
+                        <>
+                          <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
+                          <span style={{ fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:colors.textSec }}>
+                            until {format(new Date(postData.pin_until), 'MMM d, yyyy')}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   )}
                   {postData.is_pinned && (postData.is_official || postData.is_locked) && (
                     <span style={{ color:colors.textMut,fontSize:11 }}>·</span>
