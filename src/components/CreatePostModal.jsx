@@ -14,7 +14,7 @@ import {
   X, Image, Paperclip, ChevronDown, Loader2,
   Plus, MessageSquareQuote, Eye, EyeOff,
   ClipboardPaste, Trash2, Clock, FileText,
-  Users, Globe, Search, Check,
+  Users, Globe, Search, Check, Lock,
   MessageCircle, Megaphone, Bell, CalendarCheck, Folder
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -275,8 +275,12 @@ export default function CreatePostModal({
     }
     clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(() => {
-      const q = memberSearch.trim().toLowerCase()
-      setFilteredUsers(allUsers.filter(u => u.display_name?.toLowerCase().includes(q)))
+      // Strip leading @ so searching "@john" finds "john"
+      const q = memberSearch.trim().replace(/^@/, '').toLowerCase()
+      setFilteredUsers(allUsers.filter(u =>
+        u.display_name?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q)
+      ))
     }, 150)
     return () => clearTimeout(searchTimeout.current)
   }, [memberSearch, allUsers, showMemberPanel])
@@ -494,6 +498,8 @@ export default function CreatePostModal({
               </button>
             </div>
           </div>
+
+          {/* Info banner */}
           <div style={{ margin: '10px 16px 0', padding: '9px 11px', background: '#EDE9FE', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
             <Users size={14} color="#5B21B6" style={{ flexShrink: 0, marginTop: 1 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 12, color: '#5B21B6', lineHeight: 1.5 }}>
@@ -502,10 +508,20 @@ export default function CreatePostModal({
                 : 'Showing members in your channel. Select a subject to filter by enrolled users.'}
             </p>
           </div>
+
+          {/* Privacy tip */}
+          <div style={{ margin: '8px 16px 0', padding: '8px 11px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: 9, display: 'flex', alignItems: 'flex-start', gap: 7, flexShrink: 0 }}>
+            <Lock size={12} color="#7C3AED" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: '#6D28D9', lineHeight: 1.5 }}>
+              Only you and the members you select will be able to see this post. Search by name or @username.
+            </p>
+          </div>
+
+          {/* Search */}
           <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1.5px solid #DDD6FE', background: '#F9F7FF' }}>
               <Search size={14} color="#8A8D91" />
-              <input autoFocus type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search by name…"
+              <input autoFocus type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search by name or @username…"
                 style={{ flex: 1, border: 'none', outline: 'none', fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#050505', background: 'transparent' }} />
               {allUsersLoading && <Loader2 size={13} color="#7C3AED" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
               {memberSearch && !allUsersLoading && (
@@ -515,6 +531,7 @@ export default function CreatePostModal({
               )}
             </div>
           </div>
+
           <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
             {allUsersLoading ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
@@ -550,7 +567,7 @@ export default function CreatePostModal({
             ) : memberSearch.trim() ? (
               <div style={{ padding: '24px 0', textAlign: 'center' }}>
                 <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>
-                  No results for "{memberSearch}"
+                  No results for "{memberSearch.replace(/^@/, '')}"
                   {form.subject_id && <span style={{ display: 'block', marginTop: 4, color: '#C0392B', fontWeight: 600, fontSize: 12 }}>They may not be enrolled in this subject</span>}
                 </p>
               </div>
@@ -687,6 +704,15 @@ export default function CreatePostModal({
                 </span>
               )}
             </button>
+            {/* Privacy tip shown below the member picker when group members are selected */}
+            {groupMembers.length > 0 && (
+              <div style={{ marginTop: 6, padding: '7px 10px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: 8, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                <Lock size={11} color="#7C3AED" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11.5, color: '#6D28D9', lineHeight: 1.45 }}>
+                  Only you and the {groupMembers.length} selected member{groupMembers.length !== 1 ? 's' : ''} can see this post.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
