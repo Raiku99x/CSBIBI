@@ -45,6 +45,41 @@ function getDueStatus(due_date, due_time) {
   return            { label: `${days}d left`, color: BLUE, bg: BLUE_BG,  urgent: false, past: false }
 }
 
+// ── Link detection ────────────────────────────────────────────
+const URL_REGEX = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+\.[^\s<>"']+)/gi
+
+function renderTextWithLinks(text) {
+  if (!text) return null
+  URL_REGEX.lastIndex = 0
+  const parts = text.split(URL_REGEX)
+  return parts.map((part, i) => {
+    URL_REGEX.lastIndex = 0
+    if (URL_REGEX.test(part)) {
+      const href = part.startsWith('http') ? part : 'https://' + part
+      return (
+        <a
+          key={i}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{
+            color: '#0D7377',
+            textDecoration: 'underline',
+            textDecorationColor: 'rgba(13,115,119,0.45)',
+            textUnderlineOffset: '2px',
+            wordBreak: 'break-all',
+            fontWeight: 600,
+          }}
+        >
+          {part}
+        </a>
+      )
+    }
+    return part
+  })
+}
+
 function parsePhotos(photo_url) {
   if (!photo_url) return []
   try { const p = JSON.parse(photo_url); return Array.isArray(p) ? p : [photo_url] } catch { return [photo_url] }
@@ -225,7 +260,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
               </div>
               {post.caption && (
                 <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13, fontWeight: done ? 400 : 500, color: done ? '#9CA3AF' : '#1c1e21', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textDecoration: done ? 'line-through' : 'none', lineHeight: 1.45 }}>
-                  {post.caption}
+                  {renderTextWithLinks(post.caption)}
                 </p>
               )}
             </div>
@@ -246,8 +281,8 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
           {expanded && (
             <div style={{ borderTop: '1px solid #F0F2F5', padding: '12px 14px 14px 12px', display: 'flex', flexDirection: 'column', gap: 10, animation: 'expandIn 0.18s ease' }}>
               {post.caption && (
-                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: done ? '#9CA3AF' : '#1c1e21', lineHeight: 1.55, textDecoration: done ? 'line-through' : 'none' }}>
-                  {post.caption}
+                <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: done ? '#9CA3AF' : '#1c1e21', lineHeight: 1.55, textDecoration: done ? 'line-through' : 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {renderTextWithLinks(post.caption)}
                 </p>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -343,7 +378,6 @@ export default function AnnouncementsPage() {
   const [filter, setFilter]         = useState('All')
   const [typeFilter, setTypeFilter] = useState('All Types')
 
-  // The user's channel — used to filter deadlines to only show relevant ones
   const userChannel = profile?.section || null
 
   async function handleToggleDone(postId) {
@@ -354,16 +388,10 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     async function load() {
-      // Get enrolled subjects
       const { data: enrolled } = await supabase
         .from('user_subjects').select('subject_id').eq('user_id', user.id)
       const subjectIds = enrolled?.map(e => e.subject_id) || []
 
-      // Build deadline query
-      // Channel filtering logic:
-      //   - Show deadlines where post.channel = userChannel (user's own channel posts)
-      //   - OR post.channel IS NULL (global posts visible to all channels)
-      //   - AND subject is enrolled by the user OR subject is null (general)
       let query = supabase
         .from('posts')
         .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
@@ -371,12 +399,10 @@ export default function AnnouncementsPage() {
         .not('due_date', 'is', null)
         .order('due_date', { ascending: true })
 
-      // Apply channel filter: only show deadlines from user's channel or global (null channel)
       if (userChannel) {
         query = query.or(`channel.eq.${userChannel},channel.is.null`)
       }
 
-      // Apply subject enrollment filter
       if (subjectIds.length > 0) {
         query = query.or(`subject_id.in.(${subjectIds.join(',')}),subject_id.is.null`)
       } else {
