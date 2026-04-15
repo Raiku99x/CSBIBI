@@ -354,23 +354,11 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
 }
 
 // ── GroupMembersModal — FIXED ─────────────────────────────────
-// Bug 1: clicking a member row opened UserProfilePage, but the group modal
-//        backdrop was still mounted at a lower z-index. When the user
-//        pressed X on the profile panel, the click event bubbled through and
-//        also closed the group modal.
-// Bug 2: clicking the group modal backdrop while the profile panel was open
-//        would close both at once.
-//
-// Fix:
-//   • UserProfilePage is rendered OUTSIDE the backdrop stack so its own
-//     backdrop sits above everything at z-index 200.
-//   • The group modal backdrop uses e.stopPropagation() and is hidden (pointer-
-//     events: none) while the profile panel is open so clicks can't reach it.
-function GroupMembersModal({ memberIds, onClose, colors }) {
+// Clicking a member now closes the group modal entirely and opens
+// UserProfilePage cleanly via the onMemberClick callback passed from PostCard.
+function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
-  // Track which member's profile is open inside this modal
-  const [viewingUserId, setViewingUserId] = useState(null)
 
   useEffect(() => {
     if (!memberIds?.length) { setLoading(false); return }
@@ -384,17 +372,17 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
       })
   }, [memberIds])
 
-  // When profile panel is open we still want the group modal visible but its
-  // backdrop must not swallow the profile panel's close click.
-  const profileOpen = !!viewingUserId
+  function handleMemberClick(memberId) {
+    // Close the group modal first, then open profile
+    onClose()
+    onMemberClick(memberId)
+  }
 
   return (
     <>
-      {/* ── Group modal backdrop ─────────────────────────────
-          pointer-events are disabled while a profile is open so the profile
-          panel's own backdrop handles all clicks at z-index 200+.          */}
+      {/* Backdrop */}
       <div
-        onClick={profileOpen ? undefined : onClose}
+        onClick={onClose}
         style={{
           position: 'fixed',
           inset: 0,
@@ -404,12 +392,9 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          // Disable pointer-events on the backdrop (not the modal card) while
-          // the profile is open so the profile panel can be closed normally.
-          pointerEvents: profileOpen ? 'none' : 'auto',
         }}
       >
-        {/* ── Modal card — always receives pointer events ── */}
+        {/* Modal card — stop backdrop click from propagating */}
         <div
           onClick={e => e.stopPropagation()}
           style={{
@@ -420,11 +405,6 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
             boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
             overflow: 'hidden',
             animation: 'expandIn 0.16s ease',
-            pointerEvents: 'auto',
-            // Push card above the backdrop when profile is open so it stays
-            // visible behind the profile panel.
-            zIndex: 101,
-            position: 'relative',
           }}
         >
           {/* Header */}
@@ -463,14 +443,13 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
 
           {/* Privacy notice */}
           <div style={{
-            margin: '0 10px 6px',
+            margin: '8px 10px 6px',
             padding: '5px 9px',
             background: '#EDE9FE',
             borderRadius: 7,
             display: 'flex',
             alignItems: 'center',
             gap: 5,
-            marginTop: 8,
           }}>
             <Lock size={10} color="#7C3AED" style={{ flexShrink: 0 }}/>
             <p style={{
@@ -512,7 +491,7 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
             ) : members.map(m => (
               <div
                 key={m.id}
-                onClick={() => setViewingUserId(m.id)}
+                onClick={() => handleMemberClick(m.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -549,17 +528,6 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
           </div>
         </div>
       </div>
-
-      {/* ── UserProfilePage rendered OUTSIDE the group modal stack ──────
-          z-index 200 ensures it sits on top of the group modal (z 100/101).
-          Its own backdrop handles close — clicking X on the profile only
-          calls setViewingUserId(null), leaving the group modal intact.     */}
-      {viewingUserId && (
-        <UserProfilePage
-          userId={viewingUserId}
-          onClose={() => setViewingUserId(null)}
-        />
-      )}
     </>
   )
 }
@@ -583,6 +551,8 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [postData, setPostData]       = useState(post)
   useEffect(() => { setPostData(post) }, [post.is_pinned, post.pin_until, post.is_locked, post.is_official])
   const [showMembersModal, setShowMembersModal] = useState(false)
+  // Tracks which user profile to show AFTER the group modal closes
+  const [profileUserId, setProfileUserId] = useState(null)
   const [showPinPicker, setShowPinPicker] = useState(false)
   const [pinDays, setPinDays] = useState('7')
   const [showUnpinWarning, setShowUnpinWarning] = useState(false)
@@ -1014,9 +984,26 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
       {showComments && !postData.is_locked && (
         <CommentsSheet postId={postData.id} onClose={() => setShowComments(false)} onCommentCountChange={setCommentCount}/>
       )}
+
+      {/* Group members modal — passes onMemberClick so clicking a member
+          closes the modal and opens UserProfilePage cleanly */}
       {showMembersModal && (
-        <GroupMembersModal memberIds={groupMemberIds} onClose={() => setShowMembersModal(false)} colors={colors}/>
+        <GroupMembersModal
+          memberIds={groupMemberIds}
+          onClose={() => setShowMembersModal(false)}
+          colors={colors}
+          onMemberClick={(userId) => setProfileUserId(userId)}
+        />
       )}
+
+      {/* UserProfilePage opened after group modal closes */}
+      {profileUserId && (
+        <UserProfilePage
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
+
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes slideDown   { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
         @keyframes slideUp     { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
