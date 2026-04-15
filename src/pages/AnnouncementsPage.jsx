@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useDeadlineCompletions } from '../hooks/useDeadlineCompletions'
@@ -15,6 +15,7 @@ const BLUE    = '#1A5276'
 const BLUE_BG = '#D6EAF8'
 const GREY    = '#65676B'
 const GREY_BG = '#F0F2F5'
+const PAGE_SIZE = 20
 
 function formatTime12(t) {
   if (!t) return null
@@ -45,7 +46,6 @@ function getDueStatus(due_date, due_time) {
   return            { label: `${days}d left`, color: BLUE, bg: BLUE_BG,  urgent: false, past: false }
 }
 
-// ── Link detection ────────────────────────────────────────────
 const URL_REGEX = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+\.[^\s<>"']+)/gi
 
 function renderTextWithLinks(text) {
@@ -57,21 +57,8 @@ function renderTextWithLinks(text) {
     if (URL_REGEX.test(part)) {
       const href = part.startsWith('http') ? part : 'https://' + part
       return (
-        <a
-          key={i}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          style={{
-            color: '#0D7377',
-            textDecoration: 'underline',
-            textDecorationColor: 'rgba(13,115,119,0.45)',
-            textUnderlineOffset: '2px',
-            wordBreak: 'break-all',
-            fontWeight: 600,
-          }}
-        >
+        <a key={i} href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ color: '#0D7377', textDecoration: 'underline', textDecorationColor: 'rgba(13,115,119,0.45)', textUnderlineOffset: '2px', wordBreak: 'break-all', fontWeight: 600 }}>
           {part}
         </a>
       )
@@ -104,14 +91,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
       {pastDueCount > 0 && !hidePast && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 14px',
-          background: '#FCEBEB',
-          border: '1px solid #F7C1C1',
-          borderLeft: `4px solid ${RED}`,
-          borderRadius: 10,
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#FCEBEB', border: '1px solid #F7C1C1', borderLeft: `4px solid ${RED}`, borderRadius: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: RED, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertCircle size={14} color="white" />
           </div>
@@ -126,14 +106,7 @@ function NotifBar({ pastDueCount, dueSoonCount }) {
         </div>
       )}
       {dueSoonCount > 0 && !hideSoon && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 14px',
-          background: '#FAEEDA',
-          border: '1px solid #FAC775',
-          borderLeft: `4px solid #EF9F27`,
-          borderRadius: 10,
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#FAEEDA', border: '1px solid #FAC775', borderLeft: `4px solid #EF9F27`, borderRadius: 10 }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#854F0B', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertTriangle size={14} color="#FAEEDA" />
           </div>
@@ -181,12 +154,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
     <div style={{
       background: animating ? '#DCFCE7' : done ? '#FAFAFA' : 'white',
       borderRadius: 12,
-      border: `1px solid ${
-        animating ? '#86EFAC'
-        : done ? '#E5E7EB'
-        : status.urgent && !status.past ? '#F5B7B1'
-        : '#E4E6EB'
-      }`,
+      border: `1px solid ${animating ? '#86EFAC' : done ? '#E5E7EB' : status.urgent && !status.past ? '#F5B7B1' : '#E4E6EB'}`,
       overflow: 'hidden',
       transition: 'background 0.25s, border-color 0.25s, opacity 0.32s, transform 0.32s',
       opacity: hiding ? 0 : done ? 0.65 : 1,
@@ -220,8 +188,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                 )}
               </div>
               <button
-                onClick={handleToggle}
-                disabled={toggling}
+                onClick={handleToggle} disabled={toggling}
                 style={{
                   width: 62, padding: '5px 0', borderRadius: 8, border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -286,11 +253,8 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                 </p>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img
-                  src={post.profiles?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(post.profiles?.display_name || 'U')}&backgroundColor=1A5276&textColor=ffffff`}
-                  style={{ width: 24, height: 24, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }}
-                  alt=""
-                />
+                <img src={post.profiles?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(post.profiles?.display_name || 'U')}&backgroundColor=1A5276&textColor=ffffff`}
+                  style={{ width: 24, height: 24, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} alt="" />
                 <span style={{ fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 12, color: '#050505' }}>{post.profiles?.display_name || 'Unknown'}</span>
                 <span style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#8A8D91' }}>· {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
               </div>
@@ -309,8 +273,7 @@ function DeadlineRow({ post, done, onToggleDone, toggling }) {
                     <a key={i} href={file.url} target="_blank" rel="noopener noreferrer"
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9, background: BLUE_BG, border: `1px solid #AED6F1`, textDecoration: 'none' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#C5E1F5'}
-                      onMouseLeave={e => e.currentTarget.style.background = BLUE_BG}
-                    >
+                      onMouseLeave={e => e.currentTarget.style.background = BLUE_BG}>
                       <div style={{ width: 30, height: 30, borderRadius: 7, background: 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid #AED6F1` }}>
                         <FileText size={13} color={BLUE} />
                       </div>
@@ -375,8 +338,15 @@ export default function AnnouncementsPage() {
 
   const [deadlines, setDeadlines]   = useState([])
   const [loading, setLoading]       = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore]         = useState(true)
   const [filter, setFilter]         = useState('All')
   const [typeFilter, setTypeFilter] = useState('All Types')
+
+  const sentinelRef  = useRef(null)
+  const loadingRef   = useRef(false)
+  const hasMoreRef   = useRef(true)
+  const cursorRef    = useRef(null) // due_date of last fetched item
 
   const userChannel = profile?.section || null
 
@@ -386,35 +356,77 @@ export default function AnnouncementsPage() {
     setTogglingId(null)
   }
 
-  useEffect(() => {
-    async function load() {
-      const { data: enrolled } = await supabase
-        .from('user_subjects').select('subject_id').eq('user_id', user.id)
-      const subjectIds = enrolled?.map(e => e.subject_id) || []
+  async function fetchDeadlines(cursor = null, replace = false) {
+    if (replace) setLoading(true)
+    else setLoadingMore(true)
 
-      let query = supabase
-        .from('posts')
-        .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
-        .eq('post_type', 'announcement')
-        .not('due_date', 'is', null)
-        .order('due_date', { ascending: true })
+    const { data: enrolled } = await supabase
+      .from('user_subjects').select('subject_id').eq('user_id', user.id)
+    const subjectIds = enrolled?.map(e => e.subject_id) || []
 
-      if (userChannel) {
-        query = query.or(`channel.eq.${userChannel},channel.is.null`)
-      }
+    let q = supabase
+      .from('posts')
+      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+      .eq('post_type', 'announcement')
+      .not('due_date', 'is', null)
+      .order('due_date', { ascending: true })
+      .limit(PAGE_SIZE)
 
-      if (subjectIds.length > 0) {
-        query = query.or(`subject_id.in.(${subjectIds.join(',')}),subject_id.is.null`)
-      } else {
-        query = query.is('subject_id', null)
-      }
+    if (cursor) q = q.gt('due_date', cursor)
 
-      const { data } = await query
-      if (data) setDeadlines(data)
-      setLoading(false)
+    if (userChannel) {
+      q = q.or(`channel.eq.${userChannel},channel.is.null`)
     }
-    if (user && profile !== null) load()
-  }, [user, profile, userChannel])
+
+    if (subjectIds.length > 0) {
+      q = q.or(`subject_id.in.(${subjectIds.join(',')}),subject_id.is.null`)
+    } else {
+      q = q.is('subject_id', null)
+    }
+
+    const { data } = await q
+    const results = data || []
+    const more = results.length === PAGE_SIZE
+
+    if (replace) {
+      setDeadlines(results)
+    } else {
+      setDeadlines(prev => {
+        const existingIds = new Set(prev.map(p => p.id))
+        return [...prev, ...results.filter(p => !existingIds.has(p.id))]
+      })
+    }
+
+    if (results.length > 0) {
+      cursorRef.current = results[results.length - 1].due_date
+    }
+
+    setHasMore(more)
+    hasMoreRef.current = more
+    setLoading(false)
+    setLoadingMore(false)
+    loadingRef.current = false
+  }
+
+  useEffect(() => {
+    if (user && profile !== null) {
+      fetchDeadlines(null, true)
+    }
+  }, [user, profile, userChannel]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Infinite scroll
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && !loadingRef.current && hasMoreRef.current) {
+        loadingRef.current = true
+        fetchDeadlines(cursorRef.current)
+      }
+    }, { rootMargin: '300px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDueSoon = (d) => {
     const dl = getDeadlineDate(d.due_date, d.due_time)
@@ -469,7 +481,7 @@ export default function AnnouncementsPage() {
             </div>
             {!isPageLoading && (
               <div style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', color: 'white', padding: '4px 12px', borderRadius: 20, fontFamily: '"Instrument Sans", system-ui', fontWeight: 700, fontSize: 13 }}>
-                {deadlines.length}
+                {deadlines.length}{hasMore ? '+' : ''}
               </div>
             )}
           </div>
@@ -515,17 +527,39 @@ export default function AnnouncementsPage() {
           subtitle={emptyConfig[filter]?.subtitle || ''}
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {displayItems.map(post => (
-            <DeadlineRow
-              key={post.id}
-              post={post}
-              done={filter === 'Done' || isDone(post.id)}
-              onToggleDone={handleToggleDone}
-              toggling={togglingId === post.id}
-            />
-          ))}
-        </div>
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {displayItems.map(post => (
+              <DeadlineRow
+                key={post.id}
+                post={post}
+                done={filter === 'Done' || isDone(post.id)}
+                onToggleDone={handleToggleDone}
+                toggling={togglingId === post.id}
+              />
+            ))}
+          </div>
+
+          {/* Only show sentinel/loader when on 'All' or 'Done' filter (which use full deadlines list) */}
+          {(filter === 'All' || filter === 'Done') && hasMore && (
+            <div ref={sentinelRef} style={{ padding: '20px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+              {loadingMore && (
+                <>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2.5px solid #E4E6EB', borderTopColor: RED, animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+                  <span style={{ fontFamily: '"Instrument Sans",system-ui', fontSize: 12, color: '#BCC0C4' }}>Loading more...</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {!hasMore && deadlines.length > 0 && (
+            <div style={{ padding: '16px 0 8px', textAlign: 'center' }}>
+              <span style={{ fontFamily: '"Instrument Sans",system-ui', fontSize: 12, color: '#BCC0C4' }}>
+                · {deadlines.length} deadlines total · All loaded ·
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       <style>{`
