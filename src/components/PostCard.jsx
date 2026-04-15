@@ -353,11 +353,24 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   )
 }
 
+// ── GroupMembersModal — FIXED ─────────────────────────────────
+// Bug 1: clicking a member row opened UserProfilePage, but the group modal
+//        backdrop was still mounted at a lower z-index. When the user
+//        pressed X on the profile panel, the click event bubbled through and
+//        also closed the group modal.
+// Bug 2: clicking the group modal backdrop while the profile panel was open
+//        would close both at once.
+//
+// Fix:
+//   • UserProfilePage is rendered OUTSIDE the backdrop stack so its own
+//     backdrop sits above everything at z-index 200.
+//   • The group modal backdrop uses e.stopPropagation() and is hidden (pointer-
+//     events: none) while the profile panel is open so clicks can't reach it.
 function GroupMembersModal({ memberIds, onClose, colors }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  // Track which member's profile is open inside this modal
   const [viewingUserId, setViewingUserId] = useState(null)
-  const modalRef = useRef()
 
   useEffect(() => {
     if (!memberIds?.length) { setLoading(false); return }
@@ -370,50 +383,177 @@ function GroupMembersModal({ memberIds, onClose, colors }) {
         setLoading(false)
       })
   }, [memberIds])
-  
+
+  // When profile panel is open we still want the group modal visible but its
+  // backdrop must not swallow the profile panel's close click.
+  const profileOpen = !!viewingUserId
+
   return (
     <>
-      <div style={{ position:'fixed',inset:0,zIndex:100,background:'rgba(0,0,0,0.35)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}>
-        <div ref={modalRef} style={{ background:colors.cardBg,borderRadius:14,width:'100%',maxWidth:300,boxShadow:'0 12px 36px rgba(0,0,0,0.18)',overflow:'hidden',animation:'expandIn 0.16s ease' }}>
-          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 14px 10px',borderBottom:`1px solid ${colors.border}` }}>
-            <div style={{ display:'flex',alignItems:'center',gap:7 }}>
+      {/* ── Group modal backdrop ─────────────────────────────
+          pointer-events are disabled while a profile is open so the profile
+          panel's own backdrop handles all clicks at z-index 200+.          */}
+      <div
+        onClick={profileOpen ? undefined : onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100,
+          background: 'rgba(0,0,0,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          // Disable pointer-events on the backdrop (not the modal card) while
+          // the profile is open so the profile panel can be closed normally.
+          pointerEvents: profileOpen ? 'none' : 'auto',
+        }}
+      >
+        {/* ── Modal card — always receives pointer events ── */}
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: colors.cardBg,
+            borderRadius: 14,
+            width: '100%',
+            maxWidth: 300,
+            boxShadow: '0 12px 36px rgba(0,0,0,0.18)',
+            overflow: 'hidden',
+            animation: 'expandIn 0.16s ease',
+            pointerEvents: 'auto',
+            // Push card above the backdrop when profile is open so it stays
+            // visible behind the profile panel.
+            zIndex: 101,
+            position: 'relative',
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '13px 14px 10px',
+            borderBottom: `1px solid ${colors.border}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <Users size={14} color="#7C3AED"/>
-              <span style={{ fontFamily:'"Bricolage Grotesque",system-ui',fontWeight:800,fontSize:14,color:colors.textPri }}>Group Members</span>
+              <span style={{
+                fontFamily: '"Bricolage Grotesque",system-ui',
+                fontWeight: 800,
+                fontSize: 14,
+                color: colors.textPri,
+              }}>
+                Group Members
+              </span>
             </div>
-            <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',display:'flex',padding:3,borderRadius:6 }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                padding: 3,
+                borderRadius: 6,
+              }}
+            >
               <X size={14} color={colors.textSec}/>
             </button>
           </div>
 
-          <div style={{ margin:'0 10px 6px',padding:'5px 9px',background:'#EDE9FE',borderRadius:7,display:'flex',alignItems:'center',gap:5 }}>
-            <Lock size={10} color="#7C3AED" style={{ flexShrink:0 }}/>
-            <p style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:10,color:'#5B21B6',lineHeight:1.3 }}>
+          {/* Privacy notice */}
+          <div style={{
+            margin: '0 10px 6px',
+            padding: '5px 9px',
+            background: '#EDE9FE',
+            borderRadius: 7,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: 8,
+          }}>
+            <Lock size={10} color="#7C3AED" style={{ flexShrink: 0 }}/>
+            <p style={{
+              margin: 0,
+              fontFamily: '"Instrument Sans",system-ui',
+              fontSize: 10,
+              color: '#5B21B6',
+              lineHeight: 1.3,
+            }}>
               Only you and selected members can see this post.
             </p>
           </div>
 
-          <div style={{ padding:'6px 0',maxHeight:260,overflowY:'auto' }}>
+          {/* Member list */}
+          <div style={{ padding: '6px 0', maxHeight: 260, overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ padding:'20px 0',textAlign:'center' }}>
-                <div style={{ width:18,height:18,borderRadius:'50%',border:'2.5px solid #DDD6FE',borderTopColor:'#7C3AED',animation:'spin 0.7s linear infinite',margin:'0 auto' }}/>
+              <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                <div style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  border: '2.5px solid #DDD6FE',
+                  borderTopColor: '#7C3AED',
+                  animation: 'spin 0.7s linear infinite',
+                  margin: '0 auto',
+                }}/>
               </div>
             ) : members.length === 0 ? (
-              <p style={{ margin:0,padding:'16px 14px',fontFamily:'"Instrument Sans",system-ui',fontSize:13,color:colors.textSec,textAlign:'center' }}>No members found</p>
+              <p style={{
+                margin: 0,
+                padding: '16px 14px',
+                fontFamily: '"Instrument Sans",system-ui',
+                fontSize: 13,
+                color: colors.textSec,
+                textAlign: 'center',
+              }}>
+                No members found
+              </p>
             ) : members.map(m => (
-              <div key={m.id}
+              <div
+                key={m.id}
                 onClick={() => setViewingUserId(m.id)}
-                style={{ display:'flex',alignItems:'center',gap:10,padding:'9px 14px',cursor:'pointer',transition:'background 0.1s' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 14px',
+                  cursor: 'pointer',
+                  transition: 'background 0.1s',
+                }}
                 onMouseEnter={e => e.currentTarget.style.background = colors.surface}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
-                <img src={m.avatar_url||dicebearUrl(m.display_name)} style={{ width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:`1.5px solid ${colors.border}` }} alt=""/>
-                <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:600,fontSize:13.5,color:colors.textPri }}>{m.display_name}</span>
+                <img
+                  src={m.avatar_url || dicebearUrl(m.display_name)}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                    border: `1.5px solid ${colors.border}`,
+                  }}
+                  alt=""
+                />
+                <span style={{
+                  fontFamily: '"Instrument Sans",system-ui',
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  color: colors.textPri,
+                }}>
+                  {m.display_name}
+                </span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {/* ── UserProfilePage rendered OUTSIDE the group modal stack ──────
+          z-index 200 ensures it sits on top of the group modal (z 100/101).
+          Its own backdrop handles close — clicking X on the profile only
+          calls setViewingUserId(null), leaving the group modal intact.     */}
       {viewingUserId && (
         <UserProfilePage
           userId={viewingUserId}
