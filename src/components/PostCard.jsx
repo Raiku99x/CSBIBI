@@ -80,6 +80,46 @@ function parseQuoted(raw) {
   } catch { return { from: '', message: raw } }
 }
 
+// ── Link detection ────────────────────────────────────────────
+// Splits text into plain-text segments and clickable links.
+// Handles http://, https://, and bare www. URLs.
+const URL_REGEX = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+\.[^\s<>"']+)/gi
+
+function renderTextWithLinks(text, textStyle = {}) {
+  if (!text) return null
+  // Reset regex state before use
+  URL_REGEX.lastIndex = 0
+  const parts = text.split(URL_REGEX)
+  // After split, even indices are plain text, odd indices are URLs
+  return parts.map((part, i) => {
+    URL_REGEX.lastIndex = 0
+    if (URL_REGEX.test(part)) {
+      const href = part.startsWith('http') ? part : 'https://' + part
+      return (
+        <a
+          key={i}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{
+            color: '#0D7377',
+            textDecoration: 'underline',
+            textDecorationColor: 'rgba(13,115,119,0.45)',
+            textUnderlineOffset: '2px',
+            wordBreak: 'break-all',
+            fontWeight: 600,
+            ...textStyle,
+          }}
+        >
+          {part}
+        </a>
+      )
+    }
+    return part
+  })
+}
+
 function buildMessengerText(post) {
   const subType   = post.sub_type
   const postType  = post.post_type
@@ -341,7 +381,7 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
       </div>
       <div style={{ padding:'7px 4px 8px' }}>
         <div style={{ margin:0,fontFamily:'"Instrument Sans",system-ui',fontSize:13.5,color:colors.textPri,lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
-          {displayText}
+          {renderTextWithLinks(displayText)}
           {isLong && (
             <button onClick={() => setExpanded(e => !e)} style={{ background:'none',border:'none',cursor:'pointer',color:accentColor,fontWeight:700,fontSize:13,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0,verticalAlign:'baseline' }}>
               {expanded ? 'See less' : 'See more'}
@@ -353,9 +393,7 @@ function QuotedMessageBlock({ from, message, subType, postType, colors }) {
   )
 }
 
-// ── GroupMembersModal — FIXED ─────────────────────────────────
-// Clicking a member now closes the group modal entirely and opens
-// UserProfilePage cleanly via the onMemberClick callback passed from PostCard.
+// ── GroupMembersModal ─────────────────────────────────────────
 function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -373,14 +411,12 @@ function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
   }, [memberIds])
 
   function handleMemberClick(memberId) {
-    // Close the group modal first, then open profile
     onClose()
     onMemberClick(memberId)
   }
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -394,7 +430,6 @@ function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
           padding: 24,
         }}
       >
-        {/* Modal card — stop backdrop click from propagating */}
         <div
           onClick={e => e.stopPropagation()}
           style={{
@@ -407,7 +442,6 @@ function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
             animation: 'expandIn 0.16s ease',
           }}
         >
-          {/* Header */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -441,7 +475,6 @@ function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
             </button>
           </div>
 
-          {/* Privacy notice */}
           <div style={{
             margin: '8px 10px 6px',
             padding: '5px 9px',
@@ -463,7 +496,6 @@ function GroupMembersModal({ memberIds, onClose, colors, onMemberClick }) {
             </p>
           </div>
 
-          {/* Member list */}
           <div style={{ padding: '6px 0', maxHeight: 260, overflowY: 'auto' }}>
             {loading ? (
               <div style={{ padding: '20px 0', textAlign: 'center' }}>
@@ -551,7 +583,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
   const [postData, setPostData]       = useState(post)
   useEffect(() => { setPostData(post) }, [post.is_pinned, post.pin_until, post.is_locked, post.is_official])
   const [showMembersModal, setShowMembersModal] = useState(false)
-  // Tracks which user profile to show AFTER the group modal closes
   const [profileUserId, setProfileUserId] = useState(null)
   const [showPinPicker, setShowPinPicker] = useState(false)
   const [pinDays, setPinDays] = useState('7')
@@ -893,7 +924,7 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
           <div style={{ padding:`0 12px ${photos.length>0?'8px':'0'}` }}>
             {caption && (
               <div style={{ margin:0,fontSize:14.5,color:colors.textPri,fontFamily:'"Instrument Sans",system-ui',lineHeight:1.55,whiteSpace:'pre-wrap',wordBreak:'break-word' }}>
-                {displayCaption}
+                {renderTextWithLinks(displayCaption)}
                 {isLong && (
                   <button onClick={()=>setExpanded(e=>!e)} style={{ background:'none',border:'none',cursor:'pointer',color:RED,fontWeight:700,fontSize:14,fontFamily:'"Instrument Sans",system-ui',marginLeft:4,padding:0,verticalAlign:'baseline' }}>
                     {expanded?'See less':'See more'}
@@ -985,8 +1016,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         <CommentsSheet postId={postData.id} onClose={() => setShowComments(false)} onCommentCountChange={setCommentCount}/>
       )}
 
-      {/* Group members modal — passes onMemberClick so clicking a member
-          closes the modal and opens UserProfilePage cleanly */}
       {showMembersModal && (
         <GroupMembersModal
           memberIds={groupMemberIds}
@@ -996,7 +1025,6 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
         />
       )}
 
-      {/* UserProfilePage opened after group modal closes */}
       {profileUserId && (
         <UserProfilePage
           userId={profileUserId}
