@@ -503,7 +503,7 @@ export default function CreatePostModal({
             <Lock size={11} color="#7C3AED" style={{ flexShrink: 0 }} />
             <p style={{ margin: 0, fontFamily: '"Instrument Sans", system-ui', fontSize: 11, color: '#5B21B6', lineHeight: 1.4 }}>
               {form.subject_id
-                ? "Can't find someone? They may not be enrolled in the selected subject."
+                ? <>Can't find someone? They may not be enrolled in the selected subject. <strong>[{subjects.find(s => s.id === form.subject_id)?.name || 'Selected Subject'}]</strong></>
                 : 'No selected subject · Showing all users.'}
             </p>
           </div>
