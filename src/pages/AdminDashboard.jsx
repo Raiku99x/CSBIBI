@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useRole } from '../hooks/useRole'
@@ -273,7 +273,8 @@ function StatusPill({ icon, color, label }) {
 }
 
 // ── Users ─────────────────────────────────────────────────────
-function UsersTab({ users, currentUserId, isSuperadmin, currentUserChannel, onViewUser, onUsersChange }) {  const [search, setSearch] = useState('')
+function UsersTab({ users, currentUserId, isSuperadmin, currentUserChannel, onViewUser, onUsersChange }) {
+  const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [actionLoadingId, setActionLoadingId] = useState(null)
   const [mutePickerUserId, setMutePickerUserId] = useState(null)
@@ -282,17 +283,17 @@ function UsersTab({ users, currentUserId, isSuperadmin, currentUserChannel, onVi
 
   useEffect(() => { setLocalUsers(users) }, [users])
 
-const filtered = localUsers.filter(u => {
-  if (!isSuperadmin && currentUserChannel) {
-    if (u.section !== currentUserChannel) return false
-  }
-  const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
-  if (!matchSearch) return false
-  if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
-  if (filter === 'muted')  return u.is_muted
-  if (filter === 'banned') return u.is_banned
-  return true
-})
+  const filtered = localUsers.filter(u => {
+    if (!isSuperadmin && currentUserChannel) {
+      if (u.section !== currentUserChannel) return false
+    }
+    const matchSearch = u.display_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+    if (!matchSearch) return false
+    if (filter === 'mods')   return u.role === 'moderator' || u.role === 'superadmin'
+    if (filter === 'muted')  return u.is_muted
+    if (filter === 'banned') return u.is_banned
+    return true
+  })
 
   function optimisticUpdate(userId, patch) {
     setLocalUsers(prev => prev.map(u => u.id === userId ? { ...u, ...patch } : u))
@@ -435,7 +436,6 @@ const filtered = localUsers.filter(u => {
             onMouseEnter={e => e.currentTarget.style.background='#F7F8FA'}
             onMouseLeave={e => e.currentTarget.style.background='white'}>
 
-            {/* Avatar — clickable to open profile */}
             <img
               src={u.avatar_url||dicebearUrl(u.display_name)}
               onClick={() => onViewUser(u.id)}
@@ -443,7 +443,6 @@ const filtered = localUsers.filter(u => {
               alt=""
             />
 
-            {/* Name + badges — clickable to open profile */}
             <div style={{ flex:1,minWidth:0,cursor:'pointer' }} onClick={() => onViewUser(u.id)}>
               <div style={{ display:'flex',alignItems:'center',gap:5,flexWrap:'wrap' }}>
                 <span style={{ fontFamily:'"Instrument Sans",system-ui',fontWeight:700,fontSize:13.5,color:'#050505' }}>{u.display_name}</span>
@@ -456,93 +455,36 @@ const filtered = localUsers.filter(u => {
               <p style={{ margin:'1px 0 0',fontFamily:'"Instrument Sans",system-ui',fontSize:11,color:'#8A8D91',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{u.email}</p>
             </div>
 
-            {/* ── QUICK ACTION BUTTONS ── */}
             {!isSelf && !isSuperadminUser && !isLoading && (
               <div style={{ display:'flex',gap:4,flexShrink:0,alignItems:'center' }}>
-
-                {/* Mute / Unmute — visible to all mods */}
                 {u.is_muted ? (
-                  <QuickBtn
-                    icon={<Volume2 size={14}/>}
-                    title="Unmute"
-                    color={GREEN}
-                    bg="#F0FDF4"
-                    onClick={() => handleUnmute(u)}
-                  />
+                  <QuickBtn icon={<Volume2 size={14}/>} title="Unmute" color={GREEN} bg="#F0FDF4" onClick={() => handleUnmute(u)}/>
                 ) : (
-                  <QuickBtn
-                    icon={<VolumeX size={14}/>}
-                    title="Mute"
-                    color="#C2410C"
-                    bg="#FFF7ED"
-                    onClick={() => { setMutePickerUserId(u.id); setMuteHours('24') }}
-                    active={mutePickerUserId === u.id}
-                  />
+                  <QuickBtn icon={<VolumeX size={14}/>} title="Mute" color="#C2410C" bg="#FFF7ED" onClick={() => { setMutePickerUserId(u.id); setMuteHours('24') }} active={mutePickerUserId === u.id}/>
                 )}
-
-                {/* View Profile — visible to all mods */}
-                <QuickBtn
-                  icon={<ChevronRight size={14}/>}
-                  title="View Profile"
-                  color="#65676B"
-                  bg="#F0F2F5"
-                  onClick={() => onViewUser(u.id)}
-                />
-
-                {/* Superadmin-only actions */}
+                <QuickBtn icon={<ChevronRight size={14}/>} title="View Profile" color="#65676B" bg="#F0F2F5" onClick={() => onViewUser(u.id)}/>
                 {isSuperadmin && (
                   <>
-                    {/* Ban / Unban */}
                     {u.is_banned ? (
-                      <QuickBtn
-                        icon={<UserCheck size={14}/>}
-                        title="Unban"
-                        color={GREEN}
-                        bg="#F0FDF4"
-                        onClick={() => handleUnban(u)}
-                      />
+                      <QuickBtn icon={<UserCheck size={14}/>} title="Unban" color={GREEN} bg="#F0FDF4" onClick={() => handleUnban(u)}/>
                     ) : (
-                      <QuickBtn
-                        icon={<UserX size={14}/>}
-                        title="Ban"
-                        color={RED}
-                        bg="#FEE2E2"
-                        onClick={() => handleBan(u)}
-                      />
+                      <QuickBtn icon={<UserX size={14}/>} title="Ban" color={RED} bg="#FEE2E2" onClick={() => handleBan(u)}/>
                     )}
-
-                    {/* Promote / Demote mod */}
                     {(u.role === 'user' || u.role === 'moderator') && (
-                      <QuickBtn
-                        icon={<Shield size={14}/>}
-                        title={u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}
-                        color={u.role === 'moderator' ? '#65676B' : BLUE}
-                        bg={u.role === 'moderator' ? '#F0F2F5' : '#EBF5FB'}
-                        onClick={() => handlePromoteDemote(u)}
-                      />
+                      <QuickBtn icon={<Shield size={14}/>} title={u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'} color={u.role === 'moderator' ? '#65676B' : BLUE} bg={u.role === 'moderator' ? '#F0F2F5' : '#EBF5FB'} onClick={() => handlePromoteDemote(u)}/>
                     )}
-
-                    {/* Force Logout */}
-                    <QuickBtn
-                      icon={<LogOut size={14}/>}
-                      title="Force Logout"
-                      color="#7C3AED"
-                      bg="#F5F3FF"
-                      onClick={() => handleForceLogout(u)}
-                    />
+                    <QuickBtn icon={<LogOut size={14}/>} title="Force Logout" color="#7C3AED" bg="#F5F3FF" onClick={() => handleForceLogout(u)}/>
                   </>
                 )}
               </div>
             )}
 
-            {/* Loading spinner */}
             {isLoading && (
               <div style={{ flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',width:32,height:32 }}>
                 <Loader2 size={16} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
               </div>
             )}
 
-            {/* Self / superadmin target: just arrow to profile */}
             {(isSelf || isSuperadminUser) && !isLoading && (
               <button onClick={() => onViewUser(u.id)}
                 style={{ width:30,height:30,borderRadius:8,background:'#F0F2F5',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
@@ -1049,53 +991,107 @@ function AuditTab({ logs }) {
   )
 }
 
-// ── Posts Manager Tab ─────────────────────────────────────────
+// ── Posts Manager Tab (Infinite Scroll) ───────────────────────
+const PAGE_SIZE = 20
+
 function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
-  const [posts, setPosts]       = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [search, setSearch]     = useState('')
-  const [filter, setFilter]     = useState('all')
-  const [selected, setSelected] = useState(new Set())
-  const [deleting, setDeleting] = useState(false)
-  const [page, setPage]         = useState(0)
-  const PAGE_SIZE = 30
+  const [posts, setPosts]         = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore]     = useState(true)
+  const [search, setSearch]       = useState('')
+  const [filter, setFilter]       = useState('all')
+  const [selected, setSelected]   = useState(new Set())
+  const [deleting, setDeleting]   = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const cursorRef   = useRef(null)   // created_at of last loaded post
+  const searchTimer = useRef(null)
+  const sentinelRef = useRef(null)
+  const observerRef = useRef(null)
 
-  useEffect(() => { fetchPosts() }, [])
-
-  async function fetchPosts() {
-    setLoading(true)
-    const { data, error } = await supabase
+  // Build query based on current filter + search
+  function buildQuery(cursor = null, searchVal = search, filterVal = filter) {
+    let q = supabase
       .from('posts')
-      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)')
+      .select('*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(500)
-    if (!error) setPosts(data || [])
-    setLoading(false)
+      .limit(PAGE_SIZE)
+
+    if (filterVal === 'announcements') q = q.eq('post_type', 'announcement')
+    else if (filterVal === 'status')   q = q.eq('post_type', 'status')
+    else if (filterVal === 'deleted')  q = q.eq('is_deleted', true)
+    else                               q = q.eq('is_deleted', false)
+
+    if (searchVal.trim()) {
+      q = q.or(`caption.ilike.%${searchVal.trim()}%,profiles.display_name.ilike.%${searchVal.trim()}%`)
+    }
+
+    if (cursor) q = q.lt('created_at', cursor)
+
+    return q
   }
 
-  const filtered = posts.filter(p => {
-    const q = search.toLowerCase()
-    const matchSearch = !q ||
-      p.caption?.toLowerCase().includes(q) ||
-      p.profiles?.display_name?.toLowerCase().includes(q) ||
-      p.subjects?.name?.toLowerCase().includes(q)
-    if (!matchSearch) return false
-    if (filter === 'announcements') return p.post_type === 'announcement'
-    if (filter === 'status')        return p.post_type === 'status'
-    if (filter === 'deleted')       return p.is_deleted
-    return !p.is_deleted
-  })
+  // Initial / reset load
+  const loadFresh = useCallback(async (searchVal = search, filterVal = filter) => {
+    setLoading(true)
+    setPosts([])
+    setSelected(new Set())
+    cursorRef.current = null
+    const { data, error, count } = await buildQuery(null, searchVal, filterVal)
+    if (!error) {
+      setPosts(data || [])
+      setTotalCount(count || 0)
+      setHasMore((data || []).length === PAGE_SIZE)
+      if (data?.length) cursorRef.current = data[data.length - 1].created_at
+    }
+    setLoading(false)
+  }, []) // eslint-disable-line
 
-  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  // Load next page
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !cursorRef.current) return
+    setLoadingMore(true)
+    const { data, error } = await buildQuery(cursorRef.current)
+    if (!error && data?.length) {
+      setPosts(prev => [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
+      cursorRef.current = data[data.length - 1].created_at
+    } else {
+      setHasMore(false)
+    }
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, search, filter]) // eslint-disable-line
+
+  // Mount: initial load
+  useEffect(() => { loadFresh(search, filter) }, []) // eslint-disable-line
+
+  // Filter change: reload immediately
+  useEffect(() => { loadFresh(search, filter) }, [filter]) // eslint-disable-line
+
+  // Search: debounced reload
+  function handleSearchChange(val) {
+    setSearch(val)
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => loadFresh(val, filter), 300)
+  }
+
+  // IntersectionObserver for sentinel
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect()
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadMore()
+    }, { rootMargin: '200px' })
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current)
+    return () => observerRef.current?.disconnect()
+  }, [loadMore])
 
   function toggleSelect(id) {
     setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
 
   function toggleSelectAll() {
-    if (paginated.every(p => selected.has(p.id))) { setSelected(new Set()) }
-    else { setSelected(new Set(paginated.map(p => p.id))) }
+    if (posts.every(p => selected.has(p.id))) setSelected(new Set())
+    else setSelected(new Set(posts.map(p => p.id)))
   }
 
   async function bulkDelete() {
@@ -1107,7 +1103,7 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
     if (error) { toast.error(error.message); setDeleting(false); return }
     toast.success(`Deleted ${ids.length} post${ids.length !== 1 ? 's' : ''}`)
     setSelected(new Set())
-    fetchPosts()
+    loadFresh(search, filter)
     setDeleting(false)
   }
 
@@ -1116,40 +1112,46 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
     const { error } = await supabase.from('posts').delete().eq('id', post.id)
     if (error) { toast.error(error.message); return }
     toast.success('Post deleted')
-    fetchPosts()
+    setPosts(prev => prev.filter(p => p.id !== post.id))
+    setTotalCount(c => c - 1)
+    setSelected(prev => { const next = new Set(prev); next.delete(post.id); return next })
   }
 
-  if (loading) return (
-    <div style={{ display:'flex',justifyContent:'center',padding:48 }}>
-      <Loader2 size={24} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
-    </div>
-  )
-
-  const allPageSelected = paginated.length > 0 && paginated.every(p => selected.has(p.id))
+  const allSelected = posts.length > 0 && posts.every(p => selected.has(p.id))
 
   return (
     <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+      {/* Search */}
       <div style={{ display:'flex',gap:8 }}>
         <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,background:'white',borderRadius:10,border:'1px solid #E4E6EB',padding:'0 12px',height:38 }}>
           <Search size={14} color='#BCC0C4'/>
-          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} placeholder='Search posts, authors…'
+          <input value={search} onChange={e => handleSearchChange(e.target.value)} placeholder='Search posts, authors…'
             style={{ flex:1,border:'none',outline:'none',fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',background:'transparent' }}/>
+          {search && (
+            <button onClick={() => handleSearchChange('')} style={{ background:'none',border:'none',cursor:'pointer',color:'#BCC0C4',display:'flex',padding:0 }}>
+              <X size={13}/>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Filters */}
       <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
         {['all','announcements','status','deleted'].map(f => (
-          <button key={f} onClick={() => { setFilter(f); setPage(0); setSelected(new Set()) }}
+          <button key={f} onClick={() => setFilter(f)}
             style={{ padding:'5px 12px',borderRadius:20,border:`1.5px solid ${filter===f?RED:'#E4E6EB'}`,background:filter===f?'#FADBD8':'white',color:filter===f?RED:'#65676B',fontFamily:'Instrument Sans, system-ui',fontWeight:filter===f?700:500,fontSize:12,cursor:'pointer' }}>
             {f.charAt(0).toUpperCase()+f.slice(1)}
           </button>
         ))}
       </div>
+
+      {/* Bulk actions bar */}
       <div style={{ display:'flex',alignItems:'center',gap:8,justifyContent:'space-between' }}>
         <div style={{ display:'flex',alignItems:'center',gap:8 }}>
           <button onClick={toggleSelectAll}
             style={{ display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontFamily:'Instrument Sans, system-ui',fontSize:12,fontWeight:600,color:'#65676B',padding:'4px 0' }}>
-            {allPageSelected ? <CheckSquare size={15} color={RED}/> : <Square size={15} color='#BCC0C4'/>}
-            {allPageSelected ? 'Deselect all' : 'Select all'}
+            {allSelected ? <CheckSquare size={15} color={RED}/> : <Square size={15} color='#BCC0C4'/>}
+            {allSelected ? 'Deselect all' : 'Select all'}
           </button>
           {selected.size > 0 && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:12,color:'#65676B' }}>{selected.size} selected</span>}
         </div>
@@ -1161,58 +1163,74 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
           </button>
         )}
       </div>
+
+      {/* Count */}
       <p style={{ margin:'0 0 2px',fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91' }}>
-        {filtered.length} post{filtered.length!==1?'s':''}
-        {totalPages > 1 && ` · Page ${page+1} of ${totalPages}`}
+        {loading ? 'Loading…' : `${totalCount} post${totalCount !== 1 ? 's' : ''}`}
       </p>
-      {paginated.length === 0 ? (
+
+      {/* Initial loading spinner */}
+      {loading && (
+        <div style={{ display:'flex',justifyContent:'center',padding:48 }}>
+          <Loader2 size={24} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && posts.length === 0 && (
         <div style={{ background:'white',borderRadius:12,border:'1px solid #DADDE1',padding:'40px 0',textAlign:'center' }}>
           <div style={{ fontSize:36,marginBottom:8 }}>📭</div>
           <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#65676B' }}>No posts found</p>
         </div>
-      ) : (
-        paginated.map(post => (
-          <div key={post.id}
-            style={{ background:'white',borderRadius:12,border:`1px solid ${selected.has(post.id)?RED+'60':'#DADDE1'}`,padding:'11px 14px',display:'flex',alignItems:'flex-start',gap:10,transition:'border-color 0.12s' }}>
-            <button onClick={() => toggleSelect(post.id)} style={{ background:'none',border:'none',cursor:'pointer',padding:'2px 0',flexShrink:0,marginTop:1 }}>
-              {selected.has(post.id) ? <CheckSquare size={16} color={RED}/> : <Square size={16} color='#BCC0C4'/>}
-            </button>
-            <img src={post.profiles?.avatar_url||dicebearUrl(post.profiles?.display_name)} style={{ width:34,height:34,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=''/>
-            <div style={{ flex:1,minWidth:0 }}>
-              <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2 }}>
-                <span style={{ fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{post.profiles?.display_name||'Unknown'}</span>
-                <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4',fontWeight:500 }}>·</span>
-                <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:post.post_type==='announcement'?'#0D7377':'#65676B',fontWeight:600,background:post.post_type==='announcement'?'#E6F4F4':'#F0F2F5',padding:'1px 6px',borderRadius:6 }}>
-                  {post.sub_type||post.post_type}
-                </span>
-                {post.subjects?.name && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91' }}>· {post.subjects.name}</span>}
-                {post.is_deleted && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:RED,background:'#FEE2E2',padding:'1px 6px',borderRadius:6 }}>Deleted</span>}
-              </div>
-              <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                {post.caption||<span style={{ color:'#BCC0C4',fontStyle:'italic' }}>No caption</span>}
-              </p>
-              <p style={{ margin:'3px 0 0',fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4' }}>
-                {formatDistanceToNow(new Date(post.created_at),{addSuffix:true})}
-              </p>
-            </div>
-            <div style={{ display:'flex',gap:4,flexShrink:0 }}>
-              {isSuperadmin && !post.is_deleted && <ActionBtn icon={<Pencil size={13}/>} color='#0D7377' title='Edit post' onClick={() => onEditPost(post)}/>}
-              <ActionBtn icon={<Trash2 size={13}/>} color={RED} title='Delete post' onClick={() => deleteSingle(post)}/>
-            </div>
-          </div>
-        ))
       )}
-      {totalPages > 1 && (
-        <div style={{ display:'flex',gap:8,justifyContent:'center',paddingTop:4 }}>
-          <button onClick={() => setPage(p => Math.max(0,p-1))} disabled={page===0}
-            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===0?'#BCC0C4':'#050505',cursor:page===0?'default':'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:600,fontSize:13 }}>
-            ← Prev
+
+      {/* Post list */}
+      {posts.map(post => (
+        <div key={post.id}
+          style={{ background:'white',borderRadius:12,border:`1px solid ${selected.has(post.id)?RED+'60':'#DADDE1'}`,padding:'11px 14px',display:'flex',alignItems:'flex-start',gap:10,transition:'border-color 0.12s' }}>
+          <button onClick={() => toggleSelect(post.id)} style={{ background:'none',border:'none',cursor:'pointer',padding:'2px 0',flexShrink:0,marginTop:1 }}>
+            {selected.has(post.id) ? <CheckSquare size={16} color={RED}/> : <Square size={16} color='#BCC0C4'/>}
           </button>
-          <button onClick={() => setPage(p => Math.min(totalPages-1,p+1))} disabled={page===totalPages-1}
-            style={{ padding:'7px 16px',borderRadius:10,border:'1px solid #E4E6EB',background:'white',color:page===totalPages-1?'#BCC0C4':'#050505',cursor:page===totalPages-1?'default':'pointer',fontFamily:'Instrument Sans, system-ui',fontWeight:600,fontSize:13 }}>
-            Next →
-          </button>
+          <img src={post.profiles?.avatar_url||dicebearUrl(post.profiles?.display_name)} style={{ width:34,height:34,borderRadius:9,objectFit:'cover',flexShrink:0 }} alt=''/>
+          <div style={{ flex:1,minWidth:0 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2 }}>
+              <span style={{ fontFamily:'Instrument Sans, system-ui',fontWeight:700,fontSize:13,color:'#050505' }}>{post.profiles?.display_name||'Unknown'}</span>
+              <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4',fontWeight:500 }}>·</span>
+              <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:post.post_type==='announcement'?'#0D7377':'#65676B',fontWeight:600,background:post.post_type==='announcement'?'#E6F4F4':'#F0F2F5',padding:'1px 6px',borderRadius:6 }}>
+                {post.sub_type||post.post_type}
+              </span>
+              {post.subjects?.name && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#8A8D91' }}>· {post.subjects.name}</span>}
+              {post.is_deleted && <span style={{ fontFamily:'Instrument Sans, system-ui',fontSize:11,fontWeight:700,color:RED,background:'#FEE2E2',padding:'1px 6px',borderRadius:6 }}>Deleted</span>}
+            </div>
+            <p style={{ margin:0,fontFamily:'Instrument Sans, system-ui',fontSize:13,color:'#050505',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
+              {post.caption||<span style={{ color:'#BCC0C4',fontStyle:'italic' }}>No caption</span>}
+            </p>
+            <p style={{ margin:'3px 0 0',fontFamily:'Instrument Sans, system-ui',fontSize:11,color:'#BCC0C4' }}>
+              {formatDistanceToNow(new Date(post.created_at),{addSuffix:true})}
+            </p>
+          </div>
+          <div style={{ display:'flex',gap:4,flexShrink:0 }}>
+            {isSuperadmin && !post.is_deleted && <ActionBtn icon={<Pencil size={13}/>} color='#0D7377' title='Edit post' onClick={() => onEditPost(post)}/>}
+            <ActionBtn icon={<Trash2 size={13}/>} color={RED} title='Delete post' onClick={() => deleteSingle(post)}/>
+          </div>
         </div>
+      ))}
+
+      {/* Infinite scroll sentinel */}
+      <div ref={sentinelRef} style={{ height: 1 }}/>
+
+      {/* Load more spinner */}
+      {loadingMore && (
+        <div style={{ display:'flex',justifyContent:'center',padding:'12px 0' }}>
+          <Loader2 size={20} color={RED} style={{ animation:'spin 0.8s linear infinite' }}/>
+        </div>
+      )}
+
+      {/* End of list */}
+      {!loading && !hasMore && posts.length > 0 && (
+        <p style={{ textAlign:'center',fontFamily:'Instrument Sans, system-ui',fontSize:12,color:'#BCC0C4',padding:'8px 0' }}>
+          All {totalCount} post{totalCount !== 1 ? 's' : ''} loaded
+        </p>
       )}
     </div>
   )
