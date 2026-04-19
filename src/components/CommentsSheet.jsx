@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useMuteGate } from '../hooks/useMuteGate'
 import { useDarkMode } from '../contexts/DarkModeContext'
+import { useBackButton } from '../hooks/useBackButton'
 import { formatDistanceToNow } from 'date-fns'
 import { X, Send, Loader2, Trash2, MicOff, MessageCircle } from 'lucide-react'
 import UserProfilePage from '../pages/UserProfilePage'
@@ -27,6 +28,9 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
   const [viewingUserId, setViewingUserId] = useState(null)
   const inputRef = useRef()
   const bottomRef = useRef()
+
+  // Back button closes the sheet
+  useBackButton(onClose)
 
   const fetchComments = useCallback(async () => {
     const { data } = await supabase

@@ -1,10 +1,13 @@
 import { X } from 'lucide-react'
 import { APP_VERSION, APP_YEAR, APP_COHORT } from '../version'
+import { useBackButton } from '../hooks/useBackButton'
 
 const RED  = '#C0392B'
 const BLUE = '#1A5276'
 
 export default function AboutModal({ onClose }) {
+  useBackButton(onClose)
+
   return (
     <>
       <div
@@ -70,7 +73,6 @@ export default function AboutModal({ onClose }) {
 
         {/* Info rows */}
         <div style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {/* FIX #17: use shared constants instead of hardcoded strings */}
           <InfoRow label="Version" value={APP_VERSION} accent />
           <InfoRow label="Program" value={APP_COHORT} />
           <InfoRow label="Developer" value="Yaru" />

@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import PostCard from "./PostCard";
 import UserProfilePage from "../pages/UserProfilePage";
 import { useAuth } from "../contexts/AuthContext";
+import { useBackButton } from "../hooks/useBackButton";
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { useDarkMode } from "../contexts/DarkModeContext";
 
@@ -69,6 +70,9 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const [customEnd, setCustomEnd] = useState("");
   const [viewingUserId, setViewingUserId] = useState(null);
   const inputRef = useRef(null);
+
+  // Back button closes the overlay
+  useBackButton(onClose);
 
   useEffect(() => {
     supabase.from("posts").select("*, profiles!posts_author_id_fkey(*), subjects!posts_subject_id_fkey(*)")
