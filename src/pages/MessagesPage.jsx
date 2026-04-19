@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavVisibility } from '../components/Layout'
+import { useBackButton } from '../hooks/useBackButton'
 import { formatDistanceToNow } from 'date-fns'
 import {
   Send, Trash2, AtSign, Loader2,
@@ -134,13 +135,11 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ background: 'white', borderBottom: '1px solid #E4E6EB', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Title + channel badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <span style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 20, color: '#050505' }}>Messages</span>
             {userChannel && <ChannelBadge channel={userChannel} />}
           </div>
 
-          {/* New Message button */}
           <button
             onClick={() => setShowNew(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 10, background: showNew ? '#FADBD8' : '#F0F2F5', border: `1.5px solid ${showNew ? '#F5B7B1' : '#E4E6EB'}`, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0 }}
@@ -151,7 +150,6 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
             </span>
           </button>
 
-          {/* Close button — only shown in modal mode */}
           {onClose && (
             <button
               onClick={onClose}
@@ -313,6 +311,9 @@ function ClassChat({ onBack, currentUser, profile, userChannel }) {
   const bottomRef  = useRef()
   const tagMenuRef = useRef()
   const inputRef   = useRef()
+
+  // Back button goes back to inbox
+  useBackButton(onBack)
 
   const fetchMessages = useCallback(async () => {
     let q = supabase
@@ -569,6 +570,9 @@ function DMConversation({ partner, currentUserId, userChannel, onBack }) {
   const bottomRef = useRef()
   const inputRef  = useRef()
 
+  // Back button goes back to inbox
+  useBackButton(onBack)
+
   const isCrossChannel = userChannel && partner?.section && partner.section !== userChannel
 
   const fetchMessages = useCallback(async () => {
@@ -798,6 +802,9 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
     if (!asModal) setHideNav(isChat)
     return () => { if (!asModal) setHideNav(false) }
   }, [isChat, setHideNav, asModal])
+
+  // When used as modal (MessagesOverlay), back button on inbox view closes the modal
+  useBackButton(onClose || (() => {}), asModal && view === 'inbox')
 
   const pageHeight = asModal
     ? '100%'
