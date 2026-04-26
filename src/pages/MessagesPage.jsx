@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavVisibility } from '../components/Layout'
-import { useBackButton } from '../hooks/useBackButton'
 import { formatDistanceToNow } from 'date-fns'
 import {
   Send, Trash2, AtSign, Loader2,
@@ -312,8 +311,7 @@ function ClassChat({ onBack, currentUser, profile, userChannel }) {
   const tagMenuRef = useRef()
   const inputRef   = useRef()
 
-  // Back button goes back to inbox
-  useBackButton(onBack)
+  // NO useBackButton here — handled by parent MessagesPage
 
   const fetchMessages = useCallback(async () => {
     let q = supabase
@@ -570,8 +568,7 @@ function DMConversation({ partner, currentUserId, userChannel, onBack }) {
   const bottomRef = useRef()
   const inputRef  = useRef()
 
-  // Back button goes back to inbox
-  useBackButton(onBack)
+  // NO useBackButton here — handled by parent MessagesPage
 
   const isCrossChannel = userChannel && partner?.section && partner.section !== userChannel
 
@@ -684,9 +681,7 @@ function DMConversation({ partner, currentUserId, userChannel, onBack }) {
                   <p style={{ margin: '0 0 4px', fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 700, fontSize: 16, color: '#050505' }}>{partner.display_name}</p>
                   <p style={{ margin: '0 0 2px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13, color: '#8A8D91' }}>@{partner.username || partner.display_name?.toLowerCase().replace(/\s+/g, '')}</p>
                   <p style={{ margin: '4px 0 6px', fontFamily: '"Instrument Sans", system-ui', fontSize: 13.5, color: '#8A8D91' }}>Send a message to start chatting</p>
-                  {userChannel && (
-                    <ChannelBadge channel={userChannel} style={{ display: 'inline-flex' }} />
-                  )}
+                  {userChannel && <ChannelBadge channel={userChannel} style={{ display: 'inline-flex' }} />}
                 </div>
               </div>
             ) : grouped.map(msg => (
@@ -803,8 +798,34 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
     return () => { if (!asModal) setHideNav(false) }
   }, [isChat, setHideNav, asModal])
 
-  // When used as modal (MessagesOverlay), back button on inbox view closes the modal
-  useBackButton(onClose || (() => {}), asModal && view === 'inbox')
+  // Handle back button at the MessagesPage level only
+  useEffect(() => {
+    // Push a history entry when we open a chat view
+    if (isChat) {
+      window.history.pushState({ messagesView: true }, '')
+
+      function handlePopState() {
+        setView('inbox')
+      }
+
+      window.addEventListener('popstate', handlePopState)
+      return () => window.removeEventListener('popstate', handlePopState)
+    }
+  }, [isChat])
+
+  // When on inbox in modal mode, back button closes the modal
+  useEffect(() => {
+    if (asModal && !isChat && onClose) {
+      window.history.pushState({ messagesInbox: true }, '')
+
+      function handlePopState() {
+        onClose()
+      }
+
+      window.addEventListener('popstate', handlePopState)
+      return () => window.removeEventListener('popstate', handlePopState)
+    }
+  }, [asModal, isChat, onClose])
 
   const pageHeight = asModal
     ? '100%'
