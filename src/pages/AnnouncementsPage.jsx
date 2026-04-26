@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useDeadlineCompletions } from '../hooks/useDeadlineCompletions'
+import { useTabPageBack } from '../hooks/useTabPageBack'
 import { format, formatDistanceToNow, isPast, isToday, isTomorrow, differenceInDays } from 'date-fns'
 import {
   Clock, ChevronDown, ChevronUp,
@@ -332,6 +333,8 @@ function LoadingSkeleton() {
 const FILTERS = ['All', 'Due Soon', 'Past Due', 'Done']
 
 export default function AnnouncementsPage() {
+  useTabPageBack()
+
   const { user, profile } = useAuth()
   const { isDone, toggleDone, doneIds, loading: completionsLoading } = useDeadlineCompletions()
   const [togglingId, setTogglingId] = useState(null)
@@ -346,7 +349,7 @@ export default function AnnouncementsPage() {
   const sentinelRef  = useRef(null)
   const loadingRef   = useRef(false)
   const hasMoreRef   = useRef(true)
-  const cursorRef    = useRef(null) // due_date of last fetched item
+  const cursorRef    = useRef(null)
 
   const userChannel = profile?.section || null
 
@@ -414,7 +417,6 @@ export default function AnnouncementsPage() {
     }
   }, [user, profile, userChannel]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Infinite scroll
   useEffect(() => {
     const sentinel = sentinelRef.current
     if (!sentinel) return
@@ -540,7 +542,6 @@ export default function AnnouncementsPage() {
             ))}
           </div>
 
-          {/* Only show sentinel/loader when on 'All' or 'Done' filter (which use full deadlines list) */}
           {(filter === 'All' || filter === 'Done') && hasMore && (
             <div ref={sentinelRef} style={{ padding: '20px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
               {loadingMore && (

@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useTabPageBack } from '../hooks/useTabPageBack'
 import { Grid3X3, ExternalLink, AppWindow } from 'lucide-react'
 
 export default function AppsPage() {
+  useTabPageBack()
+
   const { user } = useAuth()
   const [grouped, setGrouped] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,7 +79,6 @@ export default function AppsPage() {
               background: 'white', borderRadius: 12, border: '1px solid #DADDE1',
               overflow: 'hidden', boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
             }}>
-              {/* Subject header */}
               <div style={{
                 padding: '12px 16px', borderBottom: '1px solid #F0F2F5',
                 background: '#FAFAFA',

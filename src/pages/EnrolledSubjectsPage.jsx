@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useTabPageBack } from '../hooks/useTabPageBack'
 import PostCard from '../components/PostCard'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
@@ -24,6 +25,8 @@ function getColor(name) {
 }
 
 export default function EnrolledSubjectsPage() {
+  useTabPageBack()
+
   const { user, profile } = useAuth()
   const [allSubjects, setAllSubjects] = useState([])
   const [enrolledIds, setEnrolledIds] = useState(new Set())
@@ -32,24 +35,18 @@ export default function EnrolledSubjectsPage() {
   const [selected, setSelected] = useState(null)
   const [search, setSearch] = useState('')
 
-  // User's channel — subjects are filtered to show only those assigned to the
-  // user's channel OR global subjects (channel = null)
   const userChannel = profile?.section || null
 
   useEffect(() => {
     async function load() {
-      // Fetch subjects: only those matching userChannel OR global (null channel)
       let subjectQuery = supabase
         .from('subjects')
         .select('*')
         .order('name')
 
       if (userChannel) {
-        // Show subjects assigned to user's channel OR global subjects (no channel)
         subjectQuery = subjectQuery.or(`channel.eq.${userChannel},channel.is.null`)
       }
-      // If user has no channel, show all subjects (shouldn't normally happen
-      // after verification, but graceful fallback)
 
       const [{ data: subjects }, { data: enrolled }] = await Promise.all([
         subjectQuery,
