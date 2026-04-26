@@ -33,9 +33,13 @@ export function useDeadlineReminders() {
       const subjectIds = enrolled?.map(e => e.subject_id) || []
 
       // 2. Fetch upcoming/past deadlines
+const userChannel = enrolled?.length
+        ? (await supabase.from('profiles').select('section').eq('id', user.id).single()).data?.section || null
+        : null
+
       let query = supabase
         .from('posts')
-        .select('id, caption, due_date, due_time, subject_id, subjects(name)')
+        .select('id, caption, due_date, due_time, subject_id, channel, subjects(name)')
         .eq('post_type', 'announcement')
         .not('due_date', 'is', null)
       if (subjectIds.length > 0) {
@@ -43,7 +47,12 @@ export function useDeadlineReminders() {
       } else {
         query = query.is('subject_id', null)
       }
-      const { data: deadlines } = await query
+      const { data: rawDeadlines } = await query
+
+      // Only keep deadlines that belong to the user's channel or are global (no channel)
+      const deadlines = (rawDeadlines || []).filter(d =>
+        !d.channel || !userChannel || d.channel === userChannel
+      )
       if (!deadlines?.length) return
 
       // 3. Get which ones user already marked done
