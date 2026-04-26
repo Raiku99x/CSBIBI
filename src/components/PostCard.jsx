@@ -695,18 +695,32 @@ export default function PostCard({ post, currentUserId, subjects = [], profile, 
     try {
       if (nowLiked) {
         await supabase.from('likes').insert({ post_id: postData.id, user_id: currentUserId })
-        if (postData.author_id && postData.author_id !== currentUserId) {
-          const { count: totalLikes } = await supabase.from('likes').select('id', { count:'exact', head:true }).eq('post_id', postData.id)
-          const likerName = profile?.display_name || 'Someone'
-          const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
-          await supabase.from('notifications').delete().eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
-          await supabase.from('notifications').insert({ user_id:postData.author_id, post_id:postData.id, type:'like', message:`${likerName} liked your post "${postData.caption?.slice(0,40)||'No caption'}..."${countSuffix}`, is_read:false })
+      if (postData.author_id && postData.author_id !== currentUserId) {
+          const likerChannel = profile?.section || null
+          const { data: authorProfile } = await supabase
+            .from('profiles').select('section').eq('id', postData.author_id).single()
+          const sameChannel =
+            !likerChannel || !authorProfile?.section || likerChannel === authorProfile.section
+          if (sameChannel) {
+            const { count: totalLikes } = await supabase.from('likes').select('id', { count:'exact', head:true }).eq('post_id', postData.id)
+            const likerName = profile?.display_name || 'Someone'
+            const countSuffix = totalLikes > 1 ? ` (${totalLikes} likes total)` : ''
+            await supabase.from('notifications').delete().eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+            await supabase.from('notifications').insert({ user_id:postData.author_id, post_id:postData.id, type:'like', message:`${likerName} liked your post "${postData.caption?.slice(0,40)||'No caption'}..."${countSuffix}`, is_read:false })
+          }
         }
       } else {
         await supabase.from('likes').delete().eq('post_id', postData.id).eq('user_id', currentUserId)
-        if (postData.author_id && postData.author_id !== currentUserId) {
-          await supabase.from('notifications').delete()
-            .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+      if (postData.author_id && postData.author_id !== currentUserId) {
+          const likerChannel = profile?.section || null
+          const { data: authorProfile } = await supabase
+            .from('profiles').select('section').eq('id', postData.author_id).single()
+          const sameChannel =
+            !likerChannel || !authorProfile?.section || likerChannel === authorProfile.section
+          if (sameChannel) {
+            await supabase.from('notifications').delete()
+              .eq('user_id', postData.author_id).eq('post_id', postData.id).eq('type', 'like')
+          }
         }
       }
       const { data } = await supabase.from('likes').select('user_id, profiles(avatar_url, display_name)').eq('post_id', postData.id)
