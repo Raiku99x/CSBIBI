@@ -118,14 +118,21 @@ export default function CommentsSheet({ postId, onClose, onCommentCountChange })
         .eq('id', postId)
         .single()
       if (postRow?.author_id && postRow.author_id !== user.id) {
-        const commenterName = profile?.display_name || 'Someone'
-        await supabase.from('notifications').insert({
-          user_id: postRow.author_id,
-          post_id: postId,
-          type: 'comment',
-          message: `${commenterName} commented on your post "${postRow.caption?.slice(0, 40) || 'No caption'}…" — "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
-          is_read: false,
-        })
+        const commenterChannel = profile?.section || null
+        const { data: authorProfile } = await supabase
+          .from('profiles').select('section').eq('id', postRow.author_id).single()
+        const sameChannel =
+          !commenterChannel || !authorProfile?.section || commenterChannel === authorProfile.section
+        if (sameChannel) {
+          const commenterName = profile?.display_name || 'Someone'
+          await supabase.from('notifications').insert({
+            user_id: postRow.author_id,
+            post_id: postId,
+            type: 'comment',
+            message: `${commenterName} commented on your post "${postRow.caption?.slice(0, 40) || 'No caption'}…" — "${content.slice(0, 50)}${content.length > 50 ? '…' : ''}"`,
+            is_read: false,
+          })
+        }
       }
     } catch (err) {
       setComments(prev => prev.filter(c => c.id !== tempId))
