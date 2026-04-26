@@ -79,6 +79,7 @@ export default function CreatePostModal({
 }) {
   const { user, profile } = useAuth()
   const announcementTypes = useAnnouncementTypes()
+  const userChannel = profile?.section || null
 
   const initialType = POST_TYPES.find(t => t.sub_type === defaultSubType) || null
   const [selectedType, setSelectedType] = useState(defaultSubType !== 'status' ? initialType : null)
@@ -437,13 +438,24 @@ export default function CreatePostModal({
           notifyUserIds = (enrolled || []).map(e => e.user_id)
         }
         if (notifyUserIds.length) {
-          await supabase.from('notifications').insert(
-            notifyUserIds.map(uid => ({
-              user_id: uid, post_id: post.id, type: 'announcement',
-              message: `New announcement in ${post.subjects?.name || 'a subject'}: "${form.caption.slice(0, 60)}${form.caption.length > 60 ? '…' : ''}"`,
-              is_read: false,
-            }))
-          )
+          const postChannel = selectedChannel || userChannel || null
+          let filteredIds = notifyUserIds
+          if (postChannel) {
+            const { data: recipientProfiles } = await supabase
+              .from('profiles').select('id, section').in('id', notifyUserIds)
+            filteredIds = (recipientProfiles || [])
+              .filter(p => !p.section || p.section === postChannel)
+              .map(p => p.id)
+          }
+          if (filteredIds.length) {
+            await supabase.from('notifications').insert(
+              filteredIds.map(uid => ({
+                user_id: uid, post_id: post.id, type: 'announcement',
+                message: `New announcement in ${post.subjects?.name || 'a subject'}: "${form.caption.slice(0, 60)}${form.caption.length > 60 ? '…' : ''}"`,
+                is_read: false,
+              }))
+            )
+          }
         }
       }
 
