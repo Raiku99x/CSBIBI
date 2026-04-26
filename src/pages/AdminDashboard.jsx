@@ -5,6 +5,7 @@ import { useRole } from '../hooks/useRole'
 import { useModMode } from '../hooks/useModMode'
 import UserProfilePage from './UserProfilePage'
 import SubjectsTab from './SubjectsTab'
+import ChannelsTab from './ChannelsTab'
 import EditPostModal from '../components/EditPostModal'
 import {
   X, Shield, Crown, Users, FileText, Heart,
@@ -118,19 +119,20 @@ export default function AdminDashboard({ onClose }) {
     loadAll()
   }
 
-  const tabs = [
-    { key: 'overview',  label: 'Overview',  icon: BarChart2  },
-    { key: 'users',     label: 'Users',     icon: Users      },
-    { key: 'banners',   label: 'Banners',   icon: Megaphone  },
-    ...(isSuperadmin ? [
-      { key: 'posts',    label: 'Posts',      icon: FileText  },
-      { key: 'types',    label: 'Post Types', icon: Tag      },
-      { key: 'subjects', label: 'Subjects',   icon: BookOpen },
-      { key: 'controls', label: 'System',     icon: Wrench   },
-      { key: 'dms',      label: 'System DM',  icon: Mail     },
-      { key: 'audit',    label: 'Audit Log',  icon: Clock    },
-    ] : []),
-  ]
+const tabs = [
+  { key: 'overview',  label: 'Overview',  icon: BarChart2  },
+  { key: 'users',     label: 'Users',     icon: Users      },
+  { key: 'banners',   label: 'Banners',   icon: Megaphone  },
+  ...(isSuperadmin ? [
+    { key: 'posts',    label: 'Posts',      icon: FileText  },
+    { key: 'types',    label: 'Post Types', icon: Tag      },
+    { key: 'subjects', label: 'Subjects',   icon: BookOpen },
+    { key: 'channels', label: 'Channels',   icon: Radio    },
+    { key: 'controls', label: 'System',     icon: Wrench   },
+    { key: 'dms',      label: 'System DM',  icon: Mail     },
+    { key: 'audit',    label: 'Audit Log',  icon: Clock    },
+  ] : []),
+]
 
   return (
     <>
@@ -190,6 +192,7 @@ export default function AdminDashboard({ onClose }) {
               {tab === 'posts'     && <PostsTab currentUserId={user.id} isSuperadmin={isSuperadmin} onEditPost={setEditingPost}/>}
               {tab === 'types'     && <AnnouncementTypesTab/>}
               {tab === 'subjects'  && <SubjectsTab/>}
+              {tab === 'channels'  && <ChannelsTab/>}
               {tab === 'controls'  && <SystemControlsTab users={users} currentUserId={user.id}/>}
               {tab === 'dms'       && <SystemDMTab users={users} currentUserId={user.id}/>}
               {tab === 'audit'     && <AuditTab logs={auditLogs}/>}
