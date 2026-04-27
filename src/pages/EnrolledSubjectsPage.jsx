@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTabPageBack } from '../hooks/useTabPageBack'
+import { useDebounce } from '../hooks/useDebounce'
 import PostCard from '../components/PostCard'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
@@ -34,6 +35,7 @@ export default function EnrolledSubjectsPage() {
   const [toggling, setToggling] = useState(null)
   const [selected, setSelected] = useState(null)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 250)
 
   const userChannel = profile?.section || null
 
@@ -104,8 +106,8 @@ export default function EnrolledSubjectsPage() {
   }
 
   const filtered = allSubjects.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.description?.toLowerCase().includes(search.toLowerCase())
+    s.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    s.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
   )
   const enrolledSubjects  = filtered.filter(s => enrolledIds.has(s.id))
   const availableSubjects = filtered.filter(s => !enrolledIds.has(s.id))
