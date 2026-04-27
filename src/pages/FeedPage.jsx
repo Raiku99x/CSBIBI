@@ -1,3 +1,4 @@
+import PushPermissionBanner from '../components/PushPermissionBanner'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -274,6 +275,7 @@ export default function FeedPage() {
   return (
     <div style={{ paddingTop: 6 }}>
       <SystemBanner/>
+      <PushPermissionBanner/>
 
       {effectivelyMuted && (
         <div style={{ background:'#FFF7ED', border:'1px solid #FED7AA', borderLeft:'4px solid #C2410C', borderRadius:10, margin:'0 0 8px', padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
