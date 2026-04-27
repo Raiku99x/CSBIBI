@@ -25,7 +25,8 @@ const POST_TYPES = [
 ]
 
 const MAX_PHOTOS = 20
-const MAX_FILES = 10
+const MAX_PHOTO_SIZE_MB = 10
+const MAX_FILE_SIZE_MB = 30
 
 const FILE_ACCEPT = [
   'application/pdf',
@@ -161,6 +162,12 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     const chosen = Array.from(e.target.files || [])
     const remaining = MAX_PHOTOS - totalPhotos
     if (remaining <= 0) { toast.error(`Max ${MAX_PHOTOS} photos`); return }
+    const oversized = chosen.filter(f => f.size > MAX_PHOTO_SIZE_MB * 1024 * 1024)
+    if (oversized.length > 0) {
+      toast.error(`Photos must be under ${MAX_PHOTO_SIZE_MB}MB. ${oversized.map(f => f.name).join(', ')} ${oversized.length > 1 ? 'are' : 'is'} too large.`)
+      e.target.value = ''
+      return
+    }
     const toAdd = chosen.slice(0, remaining)
     setPhotoFiles(prev => [...prev, ...toAdd])
     setPhotoPreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))])
@@ -181,6 +188,12 @@ export default function EditPostModal({ post, profile, subjects, onClose, onUpda
     const chosen = Array.from(e.target.files || [])
     const remaining = MAX_FILES - totalFiles
     if (remaining <= 0) { toast.error(`Max ${MAX_FILES} files`); e.target.value = ''; return }
+    const oversized = chosen.filter(f => f.size > MAX_FILE_SIZE_MB * 1024 * 1024)
+    if (oversized.length > 0) {
+      toast.error(`Files must be under ${MAX_FILE_SIZE_MB}MB. ${oversized.map(f => f.name).join(', ')} ${oversized.length > 1 ? 'are' : 'is'} too large.`)
+      e.target.value = ''
+      return
+    }
     const toAdd = chosen.slice(0, remaining)
     setAttachFiles(prev => [...prev, ...toAdd])
     e.target.value = ''
