@@ -1003,12 +1003,12 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore]     = useState(true)
   const [search, setSearch]       = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const [filter, setFilter]       = useState('all')
   const [selected, setSelected]   = useState(new Set())
   const [deleting, setDeleting]   = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const cursorRef   = useRef(null)   // created_at of last loaded post
-  const searchTimer = useRef(null)
   const sentinelRef = useRef(null)
   const observerRef = useRef(null)
 
@@ -1066,18 +1066,20 @@ function PostsTab({ currentUserId, isSuperadmin, onEditPost }) {
   }, [loadingMore, hasMore, search, filter]) // eslint-disable-line
 
   // Mount: initial load
-  useEffect(() => { loadFresh(search, filter) }, []) // eslint-disable-line
-
-  // Filter change: reload immediately
-  useEffect(() => { loadFresh(search, filter) }, [filter]) // eslint-disable-line
-
-  // Search: debounced reload
+  useEffect(() => { loadFresh(debouncedSearch, filter) }, []) // eslint-disable-line
+  
+// Filter change: reload immediately
+  useEffect(() => { loadFresh(debouncedSearch, filter) }, [filter]) // eslint-disable-line
+  
+ // Search: debounced reload via useDebounce hook
   function handleSearchChange(val) {
     setSearch(val)
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => loadFresh(val, filter), 300)
   }
 
+  useEffect(() => {
+    loadFresh(debouncedSearch, filter)
+  }, [debouncedSearch]) // eslint-disable-line
+  
   // IntersectionObserver for sentinel
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect()
