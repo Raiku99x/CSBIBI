@@ -1,3 +1,4 @@
+import { usePushNotifications } from '../hooks/usePushNotifications'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -15,6 +16,8 @@ const BLUE = '#1A5276'
 const TEAL = '#0D7377'
 
 const GENDERS = ['Male', 'Female', 'Prefer not to say']
+
+const { subscribe: subscribePush, isSupported: pushSupported } = usePushNotifications()
 
 // ── Sanitize text input — strip HTML/script chars ─────────────
 function sanitize(str) {
@@ -296,20 +299,29 @@ export default function CodeGatePage() {
     }
   }
 
-  if (success) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEEF2', padding: 24 }}>
-        <style>{`@keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes pop{0%{transform:scale(0.7)}70%{transform:scale(1.12)}100%{transform:scale(1)}}`}</style>
-        <div style={{ textAlign: 'center', animation: 'fadeSlideUp 0.4s cubic-bezier(0.16,1,0.3,1)' }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#DCFCE7', border: '2.5px solid #86EFAC', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', animation: 'pop 0.5s cubic-bezier(0.16,1,0.3,1)' }}>
-            <CheckCircle2 size={40} color="#16a34a"/>
-          </div>
-          <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 24, color: '#050505', margin: '0 0 8px' }}>You're in!</p>
-          <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#65676B', margin: 0 }}>Setting up your account…</p>
+  // Add near top of CodeGatePage component (after other hooks):
+const { subscribe: subscribePush, isSupported: pushSupported } = usePushNotifications()
+
+if (success) {
+  setTimeout(() => {
+    if (pushSupported && Notification.permission === 'default') {
+      subscribePush()
+    }
+  }, 3000)
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ECEEF2', padding: 24 }}>
+      <style>{`@keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes pop{0%{transform:scale(0.7)}70%{transform:scale(1.12)}100%{transform:scale(1)}}`}</style>
+      <div style={{ textAlign: 'center', animation: 'fadeSlideUp 0.4s cubic-bezier(0.16,1,0.3,1)' }}>
+        <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#DCFCE7', border: '2.5px solid #86EFAC', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', animation: 'pop 0.5s cubic-bezier(0.16,1,0.3,1)' }}>
+          <CheckCircle2 size={40} color="#16a34a"/>
         </div>
+        <p style={{ fontFamily: '"Bricolage Grotesque", system-ui', fontWeight: 800, fontSize: 24, color: '#050505', margin: '0 0 8px' }}>You're in!</p>
+        <p style={{ fontFamily: '"Instrument Sans", system-ui', fontSize: 14, color: '#65676B', margin: 0 }}>Setting up your account…</p>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   return (
     <>
