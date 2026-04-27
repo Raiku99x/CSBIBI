@@ -18,6 +18,7 @@ import ProfilePage from './pages/ProfilePage'
 import CodeGatePage from './pages/CodeGatePage'
 import { supabase } from './lib/supabase'
 import { useDeadlineReminders } from './hooks/useDeadlineReminders'
+import { getCache, setCache } from './lib/cache'
 
 // ── Error Boundary ───────────────────────────────────────────
 // Catches render errors anywhere in the tree and shows a recovery
@@ -193,8 +194,10 @@ function AppRoutes() {
   const [subjects, setSubjects] = useState([])
 
   useEffect(() => {
+    const cached = getCache('subjects')
+    if (cached) { setSubjects(cached); return }
     supabase.from('subjects').select('*').order('name').then(({ data }) => {
-      if (data) setSubjects(data)
+      if (data) { setSubjects(data); setCache('subjects', data, 5 * 60_000) }
     })
   }, [])
 
