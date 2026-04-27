@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTabPageBack } from '../hooks/useTabPageBack'
 import { useDebounce } from '../hooks/useDebounce'
+import { getCache, setCache } from '../lib/cache'
 import PostCard from '../components/PostCard'
 import UserProfilePage from './UserProfilePage'
 import { PostSkeleton } from '../components/Skeletons'
@@ -50,11 +51,16 @@ export default function EnrolledSubjectsPage() {
         subjectQuery = subjectQuery.or(`channel.eq.${userChannel},channel.is.null`)
       }
 
-      const [{ data: subjects }, { data: enrolled }] = await Promise.all([
-        subjectQuery,
+      const cachedSubjects = getCache('subjects')
+      const [subjectsResult, { data: enrolled }] = await Promise.all([
+        cachedSubjects ? Promise.resolve({ data: cachedSubjects }) : subjectQuery,
         supabase.from('user_subjects').select('subject_id').eq('user_id', user.id),
       ])
-      if (subjects) setAllSubjects(subjects)
+      const subjects = subjectsResult.data
+      if (subjects) {
+        setAllSubjects(subjects)
+        if (!cachedSubjects) setCache('subjects', subjects, 5 * 60_000)
+      }
       if (enrolled) setEnrolledIds(new Set(enrolled.map(e => e.subject_id)))
       setLoading(false)
     }
