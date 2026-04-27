@@ -1,4 +1,5 @@
 import { useAnnouncementTypes } from '../hooks/useAnnouncementTypes'
+import { useDebounce } from '../hooks/useDebounce'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -95,6 +96,7 @@ export default function CreatePostModal({
   const [visibility, setVisibility]         = useState('class')
   const [groupMembers, setGroupMembers]     = useState([])
   const [memberSearch, setMemberSearch]     = useState('')
+  const debouncedMemberSearch = useDebounce(memberSearch, 150)
   const [allUsers, setAllUsers]             = useState([])
   const [filteredUsers, setFilteredUsers]   = useState([])
   const [allUsersLoading, setAllUsersLoading] = useState(false)
@@ -103,7 +105,6 @@ export default function CreatePostModal({
   const [showMemberPanel, setShowMemberPanel] = useState(false)
   const [pendingMembers, setPendingMembers] = useState([])
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
-  const searchTimeout                       = useRef(null)
   const visibilityDropdownRef               = useRef(null)
 
   const [photoFiles, setPhotoFiles]         = useState([])
@@ -268,23 +269,18 @@ export default function CreatePostModal({
     setMemberSearch('')
   }
 
-  useEffect(() => {
+ useEffect(() => {
     if (!showMemberPanel) return
-    if (!memberSearch.trim()) {
+    if (!debouncedMemberSearch.trim()) {
       setFilteredUsers(allUsers)
       return
     }
-    clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => {
-      // Strip leading @ so searching "@john" finds "john"
-      const q = memberSearch.trim().replace(/^@/, '').toLowerCase()
-      setFilteredUsers(allUsers.filter(u =>
-        u.display_name?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q)
-      ))
-    }, 150)
-    return () => clearTimeout(searchTimeout.current)
-  }, [memberSearch, allUsers, showMemberPanel])
+    const q = debouncedMemberSearch.trim().replace(/^@/, '').toLowerCase()
+    setFilteredUsers(allUsers.filter(u =>
+      u.display_name?.toLowerCase().includes(q) ||
+      u.username?.toLowerCase().includes(q)
+    ))
+  }, [debouncedMemberSearch, allUsers, showMemberPanel])
 
   useEffect(() => {
     if (showMemberPanel) {
