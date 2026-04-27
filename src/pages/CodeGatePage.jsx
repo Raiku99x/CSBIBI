@@ -17,8 +17,6 @@ const TEAL = '#0D7377'
 
 const GENDERS = ['Male', 'Female', 'Prefer not to say']
 
-const { subscribe: subscribePush, isSupported: pushSupported } = usePushNotifications()
-
 // ── Sanitize text input — strip HTML/script chars ─────────────
 function sanitize(str) {
   return str
