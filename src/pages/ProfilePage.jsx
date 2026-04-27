@@ -67,8 +67,8 @@ export default function ProfilePage() {
       toast.error('Please select an image file')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB')
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image must be under 10MB')
       return
     }
     setPendingAvatarFile(file)
