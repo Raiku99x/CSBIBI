@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useDebounce } from '../hooks/useDebounce'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavVisibility } from '../components/Layout'
@@ -48,6 +49,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
   const [latestGroup, setLatestGroup] = useState(null)
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
+  const debouncedSearch = useDebounce(search, 250)
   const [showNew, setShowNew]         = useState(false)
 
   const refresh = useCallback(async () => {
@@ -119,7 +121,7 @@ function Inbox({ onOpenGroup, onOpenDM, currentUserId, userChannel, onClose }) {
     return () => supabase.removeChannel(ch)
   }, [refresh, currentUserId, userChannel])
 
-  const q = search.toLowerCase()
+  const q = debouncedSearch.toLowerCase()
   const filteredDMs  = dmConvos.filter(c =>
     c.partner?.display_name?.toLowerCase().includes(q) ||
     c.partner?.username?.toLowerCase().includes(q)
