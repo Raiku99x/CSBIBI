@@ -77,7 +77,6 @@ const userChannel = enrolled?.length
       const logInserts = []
 
       for (const deadline of deadlines) {
-        // Skip if already done
         if (doneIds.has(deadline.id)) continue
 
         const dt = getDeadlineDate(deadline.due_date, deadline.due_time)
@@ -92,7 +91,18 @@ const userChannel = enrolled?.length
             isTomorrow(new Date(deadline.due_date + 'T00:00:00')) ||
             days <= 3)
 
-        if (isPastDue && !sentSet.has(`${deadline.id}::past_due`)) {
+        if (!isPastDue && !isDueSoon) continue
+        if (isPastDue && sentSet.has(`${deadline.id}::past_due`)) continue
+        if (isDueSoon && sentSet.has(`${deadline.id}::due_soon`)) continue
+
+        const { count: doneCount } = await supabase
+          .from('deadline_completions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('post_id', deadline.id)
+        if (doneCount > 0) continue
+
+        if (isPastDue) {
           notifications.push({
             user_id: user.id,
             post_id: deadline.id,
@@ -106,7 +116,7 @@ const userChannel = enrolled?.length
             reminder_type: 'past_due',
             sent_date: today,
           })
-        } else if (isDueSoon && !sentSet.has(`${deadline.id}::due_soon`)) {
+        } else if (isDueSoon) {
           const label =
             days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`
           notifications.push({
