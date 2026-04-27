@@ -189,7 +189,7 @@ export default function CodeGatePage() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Select an image file'); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image must be under 10MB'); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
     e.target.value = ''
