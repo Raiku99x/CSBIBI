@@ -11,6 +11,7 @@ import { Image, Megaphone, Paperclip, VolumeX, Clock, Users, Eye, EyeOff, Radio 
 import SystemBanner from '../components/SystemBanner'
 import { useNavigate } from 'react-router-dom'
 import { useRole } from '../hooks/useRole'
+import { getCache, setCache, clearCache } from '../lib/cache'
 import toast from 'react-hot-toast'
 
 const AVATAR_HEX = ['0D7377','0A5C60','3D5166','4A6070','2D6A4F','3A6EA5','2E5F8A','1A5276','2C3E50','7A5C42','8A6A50','8A4A4B','7A3D3E','647A3A','596B32','1A7A80','156870','3A4F70','2E4260','7A3A35','6A2E2A','156A6E','0F5F63','922B21','C0392B']
@@ -111,16 +112,27 @@ export default function FeedPage() {
 
   const fetchInitial = useCallback(async () => {
     setLoading(true)
+    const cacheKey = `feed_${activeChannel || 'all'}`
+    const cached = getCache(cacheKey)
+    if (cached) {
+      setPosts(cached)
+      const more = cached.length === PAGE_SIZE
+      setHasMore(more)
+      hasMoreRef.current = more
+      if (cached.length > 0) oldestCreatedAt.current = cached[cached.length - 1].created_at
+      setLoading(false)
+      return
+    }
     const { data } = await buildQuery()
     if (data) {
       setPosts(data)
+      setCache(cacheKey, data, 2 * 60_000)
       const more = data.length === PAGE_SIZE
       setHasMore(more)
       hasMoreRef.current = more
       if (data.length > 0) oldestCreatedAt.current = data[data.length - 1].created_at
     }
     setLoading(false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingChannel, activeChannel])
 
   const fetchMore = useCallback(async () => {
@@ -382,10 +394,11 @@ export default function FeedPage() {
         <CreatePostModal
           onClose={handleModalClose}
           onCreated={(post) => {
-            setPosts(prev =>
-              prev.some(p => p.id === post.id) ? prev : [post, ...prev]
-            )
-          }}
+              clearCache(`feed_${activeChannel || 'all'}`)
+              setPosts(prev =>
+                prev.some(p => p.id === post.id) ? prev : [post, ...prev]
+              )
+            }}
           subjects={subjects}
           defaultType={createType}
           defaultSubType={createSubType}
