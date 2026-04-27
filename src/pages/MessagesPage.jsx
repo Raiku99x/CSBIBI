@@ -23,6 +23,18 @@ const DESKTOP_BP = 1024
 
 const isTouchDevice = () => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
+// ── Push notification helper ──────────────────────────────────
+async function sendPush(userIds, payload) {
+  if (!userIds?.length) return
+  try {
+    await supabase.functions.invoke('send-push', {
+      body: { user_ids: userIds, payload },
+    })
+  } catch (err) {
+    console.error('Push error:', err)
+  }
+}
+
 function ChannelBadge({ channel, style = {} }) {
   if (!channel) return null
   return (
@@ -313,8 +325,6 @@ function ClassChat({ onBack, currentUser, profile, userChannel }) {
   const tagMenuRef = useRef()
   const inputRef   = useRef()
 
-  // NO useBackButton here — handled by parent MessagesPage
-
   const fetchMessages = useCallback(async () => {
     let q = supabase
       .from('chat')
@@ -391,9 +401,40 @@ function ClassChat({ onBack, currentUser, profile, userChannel }) {
       }).select('id').single()
       if (error) throw error
 
-      if (tagUser && tagPublic) {
-        await supabase.from('notifications').insert({ user_id: tagUser.id, chat_message_id: inserted.id, type: 'tag', message: `🏷️ ${profile?.display_name} mentioned you in chat`, is_read: false })
+      const senderName = profile?.display_name || 'Someone'
+      const channelLabel = userChannel ? `${userChannel} Chat` : 'Class Chat'
+
+      // ── Push notification for tagged user ──────────────────
+      if (tagUser && tagPublic && inserted?.id) {
+        await supabase.from('notifications').insert({
+          user_id: tagUser.id,
+          chat_message_id: inserted.id,
+          type: 'tag',
+          message: `🏷️ ${senderName} mentioned you in chat`,
+          is_read: false,
+        })
+        await sendPush([tagUser.id], {
+          title: `🏷️ ${senderName} mentioned you`,
+          body: text.trim().slice(0, 100),
+          tag: `chat-tag-${inserted.id}`,
+          url: '/messages',
+        })
       }
+
+      // ── Push notification for all other channel members ────
+      // (excluding sender and tagged user who already got one)
+      const otherUsers = users.filter(u =>
+        u.id !== currentUser.id && (!tagUser || u.id !== tagUser.id)
+      )
+      if (otherUsers.length > 0) {
+        await sendPush(otherUsers.map(u => u.id), {
+          title: `💬 ${channelLabel}`,
+          body: `${senderName}: ${text.trim().slice(0, 80)}`,
+          tag: `group-chat-${userChannel || 'global'}`,  // same tag = replaces previous notif
+          url: '/messages',
+        })
+      }
+
       setText('')
       setTagUser(null)
     } catch (err) {
@@ -562,15 +603,13 @@ function GroupBubble({ msg, currentUserId, onDelete }) {
 }
 
 // ── DMConversation ────────────────────────────────────────────────────────
-function DMConversation({ partner, currentUserId, userChannel, onBack }) {
+function DMConversation({ partner, currentUserId, userChannel, onBack, senderProfile }) {
   const [messages, setMessages] = useState([])
   const [text, setText]         = useState('')
   const [loading, setLoading]   = useState(true)
   const [sending, setSending]   = useState(false)
   const bottomRef = useRef()
   const inputRef  = useRef()
-
-  // NO useBackButton here — handled by parent MessagesPage
 
   const isCrossChannel = userChannel && partner?.section && partner.section !== userChannel
 
@@ -625,6 +664,15 @@ function DMConversation({ partner, currentUserId, userChannel, onBack }) {
         channel: userChannel || null,
       })
       if (error) throw error
+
+      // ── Push notification for DM recipient ────────────────
+      const senderName = senderProfile?.display_name || 'Someone'
+      await sendPush([partner.id], {
+        title: `💬 ${senderName}`,
+        body: content.slice(0, 100),
+        tag: `dm-${currentUserId}`,  // same tag = replaces previous notif from same sender
+        url: '/messages',
+      })
     } catch (err) {
       toast.error(err.message)
       setText(content)
@@ -800,30 +848,19 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
     return () => { if (!asModal) setHideNav(false) }
   }, [isChat, setHideNav, asModal])
 
-  // Handle back button at the MessagesPage level only
   useEffect(() => {
-    // Push a history entry when we open a chat view
     if (isChat) {
       window.history.pushState({ messagesView: true }, '')
-
-      function handlePopState() {
-        setView('inbox')
-      }
-
+      function handlePopState() { setView('inbox') }
       window.addEventListener('popstate', handlePopState)
       return () => window.removeEventListener('popstate', handlePopState)
     }
   }, [isChat])
 
-  // When on inbox in modal mode, back button closes the modal
   useEffect(() => {
     if (asModal && !isChat && onClose) {
       window.history.pushState({ messagesInbox: true }, '')
-
-      function handlePopState() {
-        onClose()
-      }
-
+      function handlePopState() { onClose() }
       window.addEventListener('popstate', handlePopState)
       return () => window.removeEventListener('popstate', handlePopState)
     }
@@ -860,6 +897,7 @@ export default function MessagesPage({ asModal = false, onClose, initialDMTarget
           currentUserId={user.id}
           userChannel={userChannel}
           onBack={goBack}
+          senderProfile={profile}
         />
       )}
     </div>
