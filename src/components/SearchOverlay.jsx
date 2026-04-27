@@ -5,6 +5,7 @@ import UserProfilePage from "../pages/UserProfilePage";
 import { useAuth } from "../contexts/AuthContext";
 import { useBackButton } from "../hooks/useBackButton";
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
+import { useDebounce } from '../hooks/useDebounce'
 import { useDarkMode } from "../contexts/DarkModeContext";
 
 const RED = '#C0392B';
@@ -60,8 +61,7 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   const { dark, colors } = useDarkMode();
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 280)
   const [showFilters, setShowFilters] = useState(false);
   const [activeType, setActiveType] = useState("all");
   const [activeSubjectId, setActiveSubjectId] = useState("all");
@@ -81,11 +81,6 @@ export default function SearchOverlay({ onClose, subjects = [] }) {
   }, []);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 280);
-    return () => clearTimeout(t);
-  }, [query]);
 
   const activeFilterCount = [
     activeType !== "all",
