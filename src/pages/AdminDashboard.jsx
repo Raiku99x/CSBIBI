@@ -19,6 +19,7 @@ import {
   Volume2, UserX, UserCheck, LogOut, ChevronDown as CD
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
+import { getCache, setCache, clearCache } from '../lib/cache'
 import { useDebounce } from '../hooks/useDebounce'
 import toast from 'react-hot-toast'
 
@@ -87,6 +88,7 @@ export default function AdminDashboard({ onClose }) {
       setAuditLogs(logsData || [])
       setBanners(bannersData || [])
       setSubjects(subjectsData || [])
+      if (subjectsData) setCache('subjects', subjectsData, 5 * 60_000)
     } catch (err) {
       toast.error('Failed to load dashboard data')
     }
