@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useBackButton } from "../hooks/useBackButton";
 import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { useDebounce } from '../hooks/useDebounce'
+import { useDebounce } from '../hooks/useDebounce'
 import { useDarkMode } from "../contexts/DarkModeContext";
 
 const RED = '#C0392B';
